@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeft, TrendingUp, Calendar, Target, Award, BarChart3, PieChart, LineChart } from 'lucide-react';
-import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell } from 'recharts';
+import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell, Pie } from 'recharts';
 
 type User = {
   id: string;
