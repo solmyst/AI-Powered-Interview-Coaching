@@ -19,7 +19,7 @@ function App() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signup');
-  const [firebaseUser, loading, error] = useAuthState(auth);
+  const [firebaseUser, loading] = useAuthState(auth);
   const [initializing, setInitializing] = useState(true);
 
   // Handle Firebase auth state changes

@@ -1,6 +1,5 @@
 import { collection, addDoc, getDocs, query, where, orderBy, limit, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { v4 as uuidv4 } from 'uuid';
 
 export interface InterviewSession {
   id: string;
@@ -48,8 +47,8 @@ export class InterviewService {
         createdAt: serverTimestamp()
       });
       return docRef.id;
-    } catch (error: any) {
-      throw new Error(error.message || 'Failed to save interview session');
+    } catch (error: unknown) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to save interview session');
     }
   }
 
@@ -77,8 +76,8 @@ export class InterviewService {
       });
 
       return sessions;
-    } catch (error: any) {
-      throw new Error(error.message || 'Failed to fetch interview sessions');
+    } catch (error: unknown) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to fetch interview sessions');
     }
   }
 
@@ -149,8 +148,8 @@ export class InterviewService {
           content: Math.round(skillBreakdown.content)
         }
       };
-    } catch (error: any) {
-      throw new Error(error.message || 'Failed to fetch user analytics');
+    } catch (error: unknown) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to fetch user analytics');
     }
   }
 }

@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Mic, MicOff, Video, VideoOff, ArrowLeft, Play, Square, RotateCcw } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Camera, Mic, Video, ArrowLeft, Play } from 'lucide-react';
 import { AIInterviewer } from './interview/AIInterviewer';
 import { RealTimeFeedback } from './interview/RealTimeFeedback';
 import { VideoFeed } from './interview/VideoFeed';
@@ -22,9 +22,9 @@ type InterviewSession = {
   isActive: boolean;
   startTime?: Date;
   feedback: {
-    speech: any;
-    visual: any;
-    content: any;
+    speech: Record<string, unknown>;
+    visual: Record<string, unknown>;
+    content: Record<string, unknown>;
   };
 };
 
@@ -33,13 +33,13 @@ type Props = {
   onBack: () => void;
 };
 
-export function InterviewPractice({ user, onBack }: Props) {
+export function InterviewPractice({ onBack }: Props) {
   const [session, setSession] = useState<InterviewSession | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const [micEnabled, setMicEnabled] = useState(true);
   const [showReport, setShowReport] = useState(false);
-  const [realTimeFeedback, setRealTimeFeedback] = useState({
+  const [realTimeFeedback] = useState({
     eyeContact: 85,
     speakingPace: 'good',
     posture: 'excellent',
@@ -96,7 +96,7 @@ export function InterviewPractice({ user, onBack }: Props) {
       // Create new session
       const newSession: InterviewSession = {
         id: Date.now().toString(),
-        type: type as any,
+        type: type as InterviewSession['type'],
         duration: 0,
         questions: generateQuestions(type),
         currentQuestion: 0,

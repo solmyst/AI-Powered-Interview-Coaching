@@ -36,8 +36,8 @@ export function AuthModal({ onClose, onAuth, initialMode = 'signup' }: AuthModal
         const user = await AuthService.signInWithEmail(formData.email, formData.password);
         onAuth(user);
       }
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -50,8 +50,8 @@ export function AuthModal({ onClose, onAuth, initialMode = 'signup' }: AuthModal
     try {
       const user = await AuthService.signInWithGoogle();
       onAuth(user);
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'An error occurred');
     } finally {
       setLoading(false);
     }

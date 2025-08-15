@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mic, MicOff, Square, Pause, Play } from 'lucide-react';
+import { Mic, MicOff, Square } from 'lucide-react';
 
 type InterviewSession = {
   id: string;

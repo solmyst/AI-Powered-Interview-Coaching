@@ -11,9 +11,9 @@ type InterviewSession = {
   isActive: boolean;
   startTime?: Date;
   feedback: {
-    speech: any;
-    visual: any;
-    content: any;
+    speech: Record<string, unknown>;
+    visual: Record<string, unknown>;
+    content: Record<string, unknown>;
   };
 };
 
@@ -161,7 +161,7 @@ export function FeedbackReport({ session, onClose, onRetry, onBack }: Props) {
         >
           <h3 className="text-xl font-bold text-gray-800 mb-6">Performance Breakdown</h3>
           <div className="grid md:grid-cols-2 gap-6">
-            {Object.entries(analysisResults.categories).map(([key, data], index) => {
+            {Object.entries(analysisResults.categories).map(([key, data]) => {
               const icons = {
                 eyeContact: Eye,
                 speechClarity: Volume2,

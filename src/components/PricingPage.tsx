@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, CheckCircle, Star, Zap } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Star } from 'lucide-react';
 import { User as AppUser } from '../services/authService';
 
 interface PricingPageProps {

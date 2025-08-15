@@ -2,7 +2,6 @@ import React from 'react';
 import { 
   Play,
   TrendingUp,
-  Clock,
   Award,
   Target,
   ArrowRight,
@@ -10,7 +9,6 @@ import {
   BarChart3,
   CheckCircle,
   AlertCircle,
-  Star,
   Video,
   Brain,
   Users

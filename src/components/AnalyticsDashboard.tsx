@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeft, TrendingUp, Calendar, Target, Award, BarChart3, PieChart, LineChart } from 'lucide-react';
-import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell, Pie } from 'recharts';
+import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPieChart, Cell, Pie } from 'recharts';
 
 type User = {
   id: string;
@@ -15,7 +15,7 @@ type Props = {
   onBack: () => void;
 };
 
-export function AnalyticsDashboard({ user, onBack }: Props) {
+export function AnalyticsDashboard({ onBack }: Props) {
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'quarter'>('month');
 
   // Mock data for demonstration
@@ -158,7 +158,7 @@ export function AnalyticsDashboard({ user, onBack }: Props) {
                 <YAxis domain={[60, 90]} />
                 <Tooltip 
                   labelFormatter={(date) => new Date(date).toLocaleDateString()}
-                  formatter={(value, name) => [value + '%', 'Score']}
+                  formatter={(value) => [value + '%', 'Score']}
                 />
                 <Line type="monotone" dataKey="score" stroke="#3B82F6" strokeWidth={3} />
               </RechartsLineChart>

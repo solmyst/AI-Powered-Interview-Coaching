@@ -8,7 +8,6 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, googleProvider, db } from '../config/firebase';
-import { v4 as uuidv4 } from 'uuid';
 
 export interface User {
   id: string;
@@ -52,8 +51,8 @@ export class AuthService {
       });
 
       return userData;
-    } catch (error: any) {
-      throw new Error(error.message || 'Failed to create account');
+    } catch (error: unknown) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to create account');
     }
   }
 
@@ -69,8 +68,8 @@ export class AuthService {
       });
 
       return await this.getUserData(firebaseUser);
-    } catch (error: any) {
-      throw new Error(error.message || 'Failed to sign in');
+    } catch (error: unknown) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to sign in');
     }
   }
 
@@ -112,8 +111,8 @@ export class AuthService {
 
         return await this.getUserData(firebaseUser);
       }
-    } catch (error: any) {
-      throw new Error(error.message || 'Failed to sign in with Google');
+    } catch (error: unknown) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to sign in with Google');
     }
   }
 
@@ -143,8 +142,8 @@ export class AuthService {
   static async signOut(): Promise<void> {
     try {
       await signOut(auth);
-    } catch (error: any) {
-      throw new Error(error.message || 'Failed to sign out');
+    } catch (error: unknown) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to sign out');
     }
   }
 
@@ -155,8 +154,8 @@ export class AuthService {
         subscription,
         updatedAt: serverTimestamp()
       });
-    } catch (error: any) {
-      throw new Error(error.message || 'Failed to update subscription');
+    } catch (error: unknown) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to update subscription');
     }
   }
 
@@ -171,7 +170,7 @@ export class AuthService {
           updatedAt: serverTimestamp()
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to update session count:', error);
     }
   }
@@ -187,7 +186,7 @@ export class AuthService {
           updatedAt: serverTimestamp()
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to update practice time:', error);
     }
   }
