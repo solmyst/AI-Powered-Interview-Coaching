@@ -144,28 +144,30 @@ export function AuthModal({ onClose, onAuth, initialMode = 'signup' }: AuthModal
           </div>
         </div>
 
-        {/* Quick Demo Access */}
-        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-          <p className="text-xs text-gray-600 mb-2">Quick demo:</p>
-          <div className="grid grid-cols-3 gap-1">
-            {mockUsers.map((user, index) => (
-              <button
-                key={index}
-                onClick={() => onAuth({ ...user, id: `demo_${index}` })}
-                className="text-center p-2 rounded-md hover:bg-gray-100 transition-colors"
-              >
-                <div className="text-xs font-medium text-gray-900 mb-1">{user.subscription}</div>
-                <div className={`px-1 py-0.5 rounded text-xs ${
-                  user.subscription === 'free' ? 'bg-gray-200 text-gray-700' :
-                  user.subscription === 'premium' ? 'bg-blue-200 text-blue-700' :
-                  'bg-purple-200 text-purple-700'
-                }`}>
-                  Demo
-                </div>
-              </button>
-            ))}
+        {/* Demo Access - Only show in development */}
+        {import.meta.env.DEV && (
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+            <p className="text-xs text-gray-600 mb-2">Development demo:</p>
+            <div className="grid grid-cols-3 gap-1">
+              {mockUsers.map((user, index) => (
+                <button
+                  key={index}
+                  onClick={() => onAuth({ ...user, id: `demo_${index}` })}
+                  className="text-center p-2 rounded-md hover:bg-gray-100 transition-colors"
+                >
+                  <div className="text-xs font-medium text-gray-900 mb-1">{user.subscription}</div>
+                  <div className={`px-1 py-0.5 rounded text-xs ${
+                    user.subscription === 'free' ? 'bg-gray-200 text-gray-700' :
+                    user.subscription === 'premium' ? 'bg-blue-200 text-blue-700' :
+                    'bg-purple-200 text-purple-700'
+                  }`}>
+                    Demo
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {!isOnline() && (
           <div className="mb-3 p-2.5 bg-yellow-50 border border-yellow-200 rounded-lg">

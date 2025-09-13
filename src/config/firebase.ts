@@ -15,19 +15,18 @@ const requiredEnvVars = [
 ];
 
 const missingVars = requiredEnvVars.filter(varName => !import.meta.env[varName]);
-if (missingVars.length > 0) {
-  console.error('Missing Firebase environment variables:', missingVars);
-  throw new Error(`Missing required Firebase environment variables: ${missingVars.join(', ')}`);
+if (missingVars.length > 0 && import.meta.env.DEV) {
+  console.warn('Missing Firebase environment variables (using fallbacks):', missingVars);
 }
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyB0V1BUZVIO_6m9eGI4HkDEsV1nUNqiul8",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "ai-interview-ed8ee.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "ai-interview-ed8ee",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "ai-interview-ed8ee.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "676510751313",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:676510751313:web:c1341f26070b1a6f1b3670",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-LWXDYMSETT"
 };
 
 // Initialize Firebase

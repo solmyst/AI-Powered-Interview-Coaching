@@ -9,6 +9,7 @@ import { AuthModal } from './components/AuthModal';
 import { Navigation } from './components/Navigation';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { PricingPage } from './components/PricingPage';
+import { AuthDebug } from './components/AuthDebug';
 
 
 
@@ -129,6 +130,8 @@ function App() {
           initialMode={authMode}
         />
       )}
+
+      <AuthDebug user={user} />
     </div>
   );
 }
