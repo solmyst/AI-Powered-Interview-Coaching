@@ -112,7 +112,13 @@ export class AuthService {
         return await this.getUserData(firebaseUser);
       }
     } catch (error: unknown) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to sign in with Google');
+      if (error instanceof Error) {
+        if (error.message.includes('auth/configuration-not-found')) {
+          throw new Error('Firebase Authentication is not configured. Please enable Authentication in Firebase Console.');
+        }
+        throw new Error(error.message);
+      }
+      throw new Error('Failed to sign in with Google');
     }
   }
 
