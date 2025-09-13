@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, Mail, Lock, User, Eye, EyeOff, Brain } from 'lucide-react';
+import { X, Mail, Lock, User, Eye, EyeOff, Brain, Wifi, WifiOff } from 'lucide-react';
 import { AuthService, User as AppUser } from '../services/authService';
+import { getOfflineMessage, isOnline } from '../utils/offline';
 
 interface AuthModalProps {
   onClose: () => void;
@@ -44,7 +45,7 @@ export function AuthModal({ onClose, onAuth, initialMode = 'signup' }: AuthModal
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'An error occurred';
-      // Simplify Firebase error messages
+      // Simplify Firebase error messages and handle offline scenarios
       if (errorMessage.includes('auth/user-not-found')) {
         setError('No account found with this email');
       } else if (errorMessage.includes('auth/wrong-password')) {
@@ -55,8 +56,10 @@ export function AuthModal({ onClose, onAuth, initialMode = 'signup' }: AuthModal
         setError('Password is too weak');
       } else if (errorMessage.includes('auth/invalid-email')) {
         setError('Invalid email address');
+      } else if (errorMessage.includes('auth/network-request-failed')) {
+        setError('Network error. Please check your connection.');
       } else {
-        setError(errorMessage);
+        setError(getOfflineMessage(errorMessage));
       }
     } finally {
       setLoading(false);
@@ -71,7 +74,8 @@ export function AuthModal({ onClose, onAuth, initialMode = 'signup' }: AuthModal
       const user = await AuthService.signInWithGoogle();
       onAuth(user);
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : 'An error occurred');
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      setError(getOfflineMessage(errorMessage));
     } finally {
       setLoading(false);
     }
@@ -162,6 +166,15 @@ export function AuthModal({ onClose, onAuth, initialMode = 'signup' }: AuthModal
             ))}
           </div>
         </div>
+
+        {!isOnline() && (
+          <div className="mb-3 p-2.5 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <WifiOff className="h-4 w-4 text-yellow-600" />
+              <p className="text-xs text-yellow-700">You're offline. Some features may not work.</p>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="mb-3 p-2.5 bg-red-50 border border-red-200 rounded-lg">

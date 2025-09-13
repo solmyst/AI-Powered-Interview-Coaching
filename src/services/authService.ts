@@ -44,11 +44,16 @@ export class AuthService {
         totalPracticeTime: 0
       };
 
-      await setDoc(doc(db, 'users', firebaseUser.uid), {
-        ...userData,
-        createdAt: serverTimestamp(),
-        lastLoginAt: serverTimestamp()
-      });
+      try {
+        await setDoc(doc(db, 'users', firebaseUser.uid), {
+          ...userData,
+          createdAt: serverTimestamp(),
+          lastLoginAt: serverTimestamp()
+        });
+      } catch (error) {
+        console.warn('Failed to create user document in Firestore (possibly offline):', error);
+        // Continue with basic user data even if Firestore fails
+      }
 
       return userData;
     } catch (error: unknown) {
@@ -62,10 +67,14 @@ export class AuthService {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
 
-      // Update last login time
-      await updateDoc(doc(db, 'users', firebaseUser.uid), {
-        lastLoginAt: serverTimestamp()
-      });
+      // Update last login time (ignore if offline)
+      try {
+        await updateDoc(doc(db, 'users', firebaseUser.uid), {
+          lastLoginAt: serverTimestamp()
+        });
+      } catch (error) {
+        console.warn('Failed to update last login time (possibly offline):', error);
+      }
 
       return await this.getUserData(firebaseUser);
     } catch (error: unknown) {
@@ -79,37 +88,59 @@ export class AuthService {
       const result = await signInWithPopup(auth, googleProvider);
       const firebaseUser = result.user;
 
-      // Check if user exists in Firestore
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-      
-      if (!userDoc.exists()) {
-        // Create new user document
-        const userData: User = {
+      // Check if user exists in Firestore (handle offline gracefully)
+      try {
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        
+        if (!userDoc.exists()) {
+          // Create new user document
+          const userData: User = {
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName || 'User',
+            email: firebaseUser.email!,
+            subscription: 'free',
+            avatar: firebaseUser.photoURL || undefined,
+            createdAt: new Date(),
+            lastLoginAt: new Date(),
+            sessionsCount: 0,
+            totalPracticeTime: 0
+          };
+
+          try {
+            await setDoc(doc(db, 'users', firebaseUser.uid), {
+              ...userData,
+              createdAt: serverTimestamp(),
+              lastLoginAt: serverTimestamp()
+            });
+          } catch (error) {
+            console.warn('Failed to create user document (possibly offline):', error);
+          }
+
+          return userData;
+        } else {
+          // Update last login time for existing user
+          try {
+            await updateDoc(doc(db, 'users', firebaseUser.uid), {
+              lastLoginAt: serverTimestamp()
+            });
+          } catch (error) {
+            console.warn('Failed to update last login time (possibly offline):', error);
+          }
+
+          return await this.getUserData(firebaseUser);
+        }
+      } catch (error) {
+        console.warn('Failed to access Firestore, using basic user data:', error);
+        // Return basic user data if Firestore is completely unavailable
+        return {
           id: firebaseUser.uid,
           name: firebaseUser.displayName || 'User',
           email: firebaseUser.email!,
           subscription: 'free',
           avatar: firebaseUser.photoURL || undefined,
-          createdAt: new Date(),
-          lastLoginAt: new Date(),
           sessionsCount: 0,
           totalPracticeTime: 0
         };
-
-        await setDoc(doc(db, 'users', firebaseUser.uid), {
-          ...userData,
-          createdAt: serverTimestamp(),
-          lastLoginAt: serverTimestamp()
-        });
-
-        return userData;
-      } else {
-        // Update last login time for existing user
-        await updateDoc(doc(db, 'users', firebaseUser.uid), {
-          lastLoginAt: serverTimestamp()
-        });
-
-        return await this.getUserData(firebaseUser);
       }
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -124,23 +155,46 @@ export class AuthService {
 
   // Get user data from Firestore
   static async getUserData(firebaseUser: FirebaseUser): Promise<User> {
-    const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-    
-    if (userDoc.exists()) {
-      const data = userDoc.data();
+    try {
+      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        return {
+          id: firebaseUser.uid,
+          name: data.name || firebaseUser.displayName || 'User',
+          email: data.email || firebaseUser.email!,
+          subscription: data.subscription || 'free',
+          avatar: data.avatar || firebaseUser.photoURL || undefined,
+          createdAt: data.createdAt?.toDate(),
+          lastLoginAt: data.lastLoginAt?.toDate(),
+          sessionsCount: data.sessionsCount || 0,
+          totalPracticeTime: data.totalPracticeTime || 0
+        };
+      } else {
+        // Return basic user data if Firestore document doesn't exist
+        return {
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName || 'User',
+          email: firebaseUser.email!,
+          subscription: 'free',
+          avatar: firebaseUser.photoURL || undefined,
+          sessionsCount: 0,
+          totalPracticeTime: 0
+        };
+      }
+    } catch (error) {
+      console.warn('Failed to get user data from Firestore, using basic data:', error);
+      // Return basic user data if offline or Firestore fails
       return {
         id: firebaseUser.uid,
-        name: data.name || firebaseUser.displayName || 'User',
-        email: data.email || firebaseUser.email!,
-        subscription: data.subscription || 'free',
-        avatar: data.avatar || firebaseUser.photoURL || undefined,
-        createdAt: data.createdAt?.toDate(),
-        lastLoginAt: data.lastLoginAt?.toDate(),
-        sessionsCount: data.sessionsCount || 0,
-        totalPracticeTime: data.totalPracticeTime || 0
+        name: firebaseUser.displayName || 'User',
+        email: firebaseUser.email!,
+        subscription: 'free',
+        avatar: firebaseUser.photoURL || undefined,
+        sessionsCount: 0,
+        totalPracticeTime: 0
       };
-    } else {
-      throw new Error('User data not found');
     }
   }
 

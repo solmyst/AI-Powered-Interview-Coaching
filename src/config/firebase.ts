@@ -45,6 +45,13 @@ googleProvider.setCustomParameters({
 // Initialize Cloud Firestore and get a reference to the service
 export const db = getFirestore(app);
 
+// Enable offline persistence for Firestore
+import { enableNetwork, disableNetwork } from 'firebase/firestore';
+
+// Handle offline/online state
+export const enableFirestoreNetwork = () => enableNetwork(db);
+export const disableFirestoreNetwork = () => disableNetwork(db);
+
 // Initialize Cloud Storage and get a reference to the service
 export const storage = getStorage(app);
 
