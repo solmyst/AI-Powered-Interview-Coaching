@@ -1,87 +1,56 @@
-import React, { useState, useEffect } from 'react';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from './config/firebase';
-import { AuthService, User as AppUser } from './services/authService';
-import { LandingPage } from './components/LandingPage';
-import { Dashboard } from './components/Dashboard';
-import { InterviewPractice } from './components/InterviewPractice';
-import { AuthModal } from './components/AuthModal';
-import { Navigation } from './components/Navigation';
-import { AnalyticsDashboard } from './components/AnalyticsDashboard';
-import { PricingPage } from './components/PricingPage';
-import { AuthDebug } from './components/AuthDebug';
-
-
-
-type Page = 'landing' | 'dashboard' | 'interview' | 'analytics' | 'pricing';
+import { useState, useEffect } from 'react';
+import { User as AppUser, Page } from './types';
+import { LandingPage } from './components/pages/LandingPage';
+import { Dashboard } from './components/pages/Dashboard';
+import { InterviewPractice } from './components/pages/InterviewPractice';
+import { Navigation } from './components/layout/Navigation';
+import { AnalyticsDashboard } from './components/pages/AnalyticsDashboard';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('landing');
   const [user, setUser] = useState<AppUser | null>(null);
-  const [showAuth, setShowAuth] = useState(false);
-  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signup');
-  const [firebaseUser, loading] = useAuthState(auth);
   const [initializing, setInitializing] = useState(true);
+  const [interviewType, setInterviewType] = useState<string | undefined>(undefined);
 
-  // Handle Firebase auth state changes
   useEffect(() => {
-    const initializeUser = async () => {
-      if (firebaseUser) {
-        try {
-          const userData = await AuthService.getUserData(firebaseUser);
-          setUser(userData);
-          setCurrentPage('dashboard');
-        } catch (error) {
-          console.error('Error fetching user data:', error);
-          await AuthService.signOut();
-        }
-      } else {
-        setUser(null);
-        setCurrentPage('landing');
+    // Check if there's a guest user in localStorage
+    const guestData = localStorage.getItem('interviewace-guest');
+    if (guestData) {
+      try {
+        const guest = JSON.parse(guestData);
+        setUser(guest);
+        setCurrentPage('dashboard');
+      } catch {
+        // Invalid guest data
       }
-      setInitializing(false);
+    }
+    setInitializing(false);
+  }, []);
+
+  const handleStart = () => {
+    const guestUser: AppUser = {
+      id: 'guest_' + Date.now(),
+      name: 'Guest User',
+      email: 'guest@interviewace.local',
+      subscription: 'free'
     };
-
-    if (!loading) {
-      initializeUser();
-    }
-  }, [firebaseUser, loading]);
-
-  const handleAuth = (userData: AppUser) => {
-    setUser(userData);
+    localStorage.setItem('interviewace-guest', JSON.stringify(guestUser));
+    setUser(guestUser);
     setCurrentPage('dashboard');
-    setShowAuth(false);
   };
 
-  const handleSignUp = () => {
-    setAuthMode('signup');
-    setShowAuth(true);
+  const handleLogout = () => {
+    localStorage.removeItem('interviewace-guest');
+    setUser(null);
+    setCurrentPage('landing');
   };
 
-  const handleSignIn = () => {
-    setAuthMode('signin');
-    setShowAuth(true);
-  };
-
-  const handleLogout = async () => {
-    try {
-      await AuthService.signOut();
-      setUser(null);
-      setCurrentPage('landing');
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
-
-
-
-  // Show loading spinner while initializing
-  if (initializing || loading) {
+  if (initializing) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">Loading InterviewAce...</p>
         </div>
       </div>
     );
@@ -89,22 +58,20 @@ function App() {
 
   const renderPage = () => {
     if (!user && currentPage !== 'landing') {
-      return <LandingPage onSignUp={handleSignUp} onSignIn={handleSignIn} />;
+      return <LandingPage onStart={handleStart} />;
     }
 
     switch (currentPage) {
       case 'landing':
-        return <LandingPage onSignUp={handleSignUp} onSignIn={handleSignIn} />;
+        return <LandingPage onStart={handleStart} />;
       case 'dashboard':
-        return <Dashboard user={user!} onNavigate={setCurrentPage} />;
+        return <Dashboard user={user!} onNavigate={(page: Page) => setCurrentPage(page)} onStartInterview={(type) => { setInterviewType(type); setCurrentPage('interview'); }} />;
       case 'interview':
-        return <InterviewPractice user={user!} onBack={() => setCurrentPage('dashboard')} />;
+        return <InterviewPractice user={user!} onBack={() => { setInterviewType(undefined); setCurrentPage('dashboard'); }} autoStartType={interviewType} />;
       case 'analytics':
         return <AnalyticsDashboard user={user!} onBack={() => setCurrentPage('dashboard')} />;
-      case 'pricing':
-        return <PricingPage user={user!} onBack={() => setCurrentPage('dashboard')} />;
       default:
-        return <Dashboard user={user!} onNavigate={setCurrentPage} />;
+        return <Dashboard user={user!} onNavigate={(page: Page) => setCurrentPage(page)} onStartInterview={(type) => { setInterviewType(type); setCurrentPage('interview'); }} />;
     }
   };
 
@@ -114,7 +81,7 @@ function App() {
         <Navigation 
           user={user} 
           currentPage={currentPage}
-          onNavigate={setCurrentPage}
+          onNavigate={(page: Page) => setCurrentPage(page)}
           onLogout={handleLogout}
         />
       )}
@@ -122,16 +89,6 @@ function App() {
       <main className={user ? 'pt-16' : ''}>
         {renderPage()}
       </main>
-
-      {showAuth && (
-        <AuthModal 
-          onClose={() => setShowAuth(false)}
-          onAuth={handleAuth}
-          initialMode={authMode}
-        />
-      )}
-
-      <AuthDebug user={user} />
     </div>
   );
 }

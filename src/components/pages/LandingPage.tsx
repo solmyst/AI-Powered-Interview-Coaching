@@ -1,4 +1,3 @@
-import React from 'react';
 import { 
   Video, 
   Brain, 
@@ -14,11 +13,10 @@ import {
 } from 'lucide-react';
 
 interface LandingPageProps {
-  onSignUp: () => void;
-  onSignIn: () => void;
+  onStart: () => void;
 }
 
-export function LandingPage({ onSignUp, onSignIn }: LandingPageProps) {
+export function LandingPage({ onStart }: LandingPageProps) {
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
@@ -32,16 +30,10 @@ export function LandingPage({ onSignUp, onSignIn }: LandingPageProps) {
             
             <div className="flex items-center space-x-4">
               <button 
-                onClick={onSignIn}
-                className="text-gray-700 hover:text-gray-900 font-medium transition-colors"
-              >
-                Sign In
-              </button>
-              <button 
-                onClick={onSignUp}
+                onClick={onStart}
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
               >
-                Start Free Trial
+                Get Started
               </button>
             </div>
           </div>
@@ -70,31 +62,26 @@ export function LandingPage({ onSignUp, onSignIn }: LandingPageProps) {
               
               <div className="flex flex-col sm:flex-row gap-4 mb-8">
                 <button 
-                  onClick={onSignUp}
-                  className="bg-blue-600 text-white px-8 py-4 rounded-xl hover:bg-blue-700 transition-all duration-300 font-semibold text-lg flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl"
+                  onClick={onStart}
+                  className="bg-blue-600 text-white px-8 py-4 rounded-xl hover:bg-blue-700 transition-all duration-300 font-semibold text-lg flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl w-full sm:w-auto"
                 >
                   <Play className="h-5 w-5" />
                   <span>Start Practicing Now</span>
-                </button>
-                
-                <button className="border-2 border-gray-300 text-gray-700 px-8 py-4 rounded-xl hover:border-gray-400 transition-all duration-300 font-semibold text-lg flex items-center justify-center space-x-2">
-                  <Video className="h-5 w-5" />
-                  <span>Watch Demo</span>
                 </button>
               </div>
               
               <div className="flex items-center space-x-6 text-sm text-gray-500">
                 <div className="flex items-center space-x-1">
                   <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span>Free 3 sessions</span>
+                  <span>100% Free & Local</span>
                 </div>
                 <div className="flex items-center space-x-1">
                   <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span>No credit card required</span>
+                  <span>No API keys needed</span>
                 </div>
                 <div className="flex items-center space-x-1">
                   <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span>Instant feedback</span>
+                  <span>Real-time AI feedback</span>
                 </div>
               </div>
             </div>
@@ -194,8 +181,8 @@ export function LandingPage({ onSignUp, onSignIn }: LandingPageProps) {
               },
               {
                 icon: Shield,
-                title: "Privacy First",
-                description: "Your practice sessions are private and secure. No data is shared with third parties.",
+                title: "Privacy First — Runs Locally",
+                description: "All AI analysis runs in your browser using MediaPipe & Web Speech API. No data leaves your device.",
                 color: "bg-red-100 text-red-600"
               }
             ].map((feature, index) => (
@@ -211,104 +198,42 @@ export function LandingPage({ onSignUp, onSignIn }: LandingPageProps) {
         </div>
       </section>
 
-      {/* Pricing Section */}
+      {/* How It Works Section */}
       <section className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Choose Your Plan
+              How It Works
             </h2>
             <p className="text-lg text-gray-600">
-              Start free and upgrade as you progress in your interview preparation journey.
+              Three simple steps to improve your interview performance.
             </p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
             {[
               {
-                name: "Free",
-                price: "$0",
-                period: "/month",
-                description: "Perfect for getting started",
-                features: [
-                  "3 practice sessions per month",
-                  "Basic speech feedback",
-                  "Generic interview questions",
-                  "Simple progress tracking"
-                ],
-                cta: "Start Free",
-                popular: false
+                step: '1',
+                title: 'Start a Session',
+                description: 'Choose your interview type — quick practice, technical, behavioral, or full mock interview.'
               },
               {
-                name: "Premium",
-                price: "$19.99",
-                period: "/month",
-                description: "For serious job seekers",
-                features: [
-                  "Unlimited practice sessions",
-                  "Full multi-modal feedback",
-                  "Industry-specific questions",
-                  "Detailed analytics",
-                  "Resume-based questions",
-                  "Progress improvement plans"
-                ],
-                cta: "Start Premium",
-                popular: true
+                step: '2',
+                title: 'Practice with AI',
+                description: 'Answer questions while our AI analyzes your eye contact, speech patterns, body language, and filler words in real-time.'
               },
               {
-                name: "Professional",
-                price: "$39.99",
-                period: "/month",
-                description: "Complete interview mastery",
-                features: [
-                  "Everything in Premium",
-                  "1-on-1 AI coaching sessions",
-                  "Mock panel interviews",
-                  "Custom question sets",
-                  "Priority support",
-                  "Interview scheduling assistant"
-                ],
-                cta: "Go Professional",
-                popular: false
+                step: '3',
+                title: 'Review & Improve',
+                description: 'Get a detailed report with scores, transcript, and personalized tips. Track your progress across sessions.'
               }
-            ].map((plan, index) => (
-              <div key={index} className={`p-8 rounded-2xl ${plan.popular ? 'ring-2 ring-blue-600 bg-white shadow-xl' : 'bg-white border border-gray-200'}`}>
-                {plan.popular && (
-                  <div className="text-center mb-4">
-                    <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-medium">
-                      Most Popular
-                    </span>
-                  </div>
-                )}
-                
-                <div className="text-center mb-6">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-                  <div className="flex items-center justify-center">
-                    <span className="text-4xl font-bold text-gray-900">{plan.price}</span>
-                    <span className="text-gray-500 ml-1">{plan.period}</span>
-                  </div>
-                  <p className="text-gray-600 mt-2">{plan.description}</p>
+            ].map((item, index) => (
+              <div key={index} className="text-center">
+                <div className="w-14 h-14 bg-blue-600 text-white rounded-full flex items-center justify-center text-xl font-bold mx-auto mb-4">
+                  {item.step}
                 </div>
-                
-                <ul className="space-y-3 mb-8">
-                  {plan.features.map((feature, featureIndex) => (
-                    <li key={featureIndex} className="flex items-center space-x-3">
-                      <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
-                      <span className="text-gray-700">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-                
-                <button 
-                  onClick={onSignUp}
-                  className={`w-full py-3 rounded-xl font-semibold transition-colors ${
-                    plan.popular 
-                      ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                      : 'border-2 border-gray-300 text-gray-700 hover:border-gray-400'
-                  }`}
-                >
-                  {plan.cta}
-                </button>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">{item.title}</h3>
+                <p className="text-gray-600">{item.description}</p>
               </div>
             ))}
           </div>
@@ -326,10 +251,10 @@ export function LandingPage({ onSignUp, onSignIn }: LandingPageProps) {
           </p>
           
           <button 
-            onClick={onSignUp}
+            onClick={onStart}
             className="bg-white text-blue-600 px-8 py-4 rounded-xl hover:bg-gray-50 transition-colors font-semibold text-lg inline-flex items-center space-x-2"
           >
-            <span>Start Your Free Trial</span>
+            <span>Start Practicing — It's Free</span>
             <ArrowRight className="h-5 w-5" />
           </button>
           
@@ -364,9 +289,8 @@ export function LandingPage({ onSignUp, onSignIn }: LandingPageProps) {
               <h4 className="font-semibold mb-4">Product</h4>
               <ul className="space-y-2 text-gray-400">
                 <li>Features</li>
-                <li>Pricing</li>
-                <li>Enterprise</li>
-                <li>API</li>
+                <li>How It Works</li>
+                <li>Open Source</li>
               </ul>
             </div>
             
@@ -392,7 +316,7 @@ export function LandingPage({ onSignUp, onSignIn }: LandingPageProps) {
           </div>
           
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2025 InterviewAce. All rights reserved.</p>
+            <p>&copy; 2026 InterviewAce. All rights reserved. Powered by MediaPipe & Web Speech API.</p>
           </div>
         </div>
       </footer>

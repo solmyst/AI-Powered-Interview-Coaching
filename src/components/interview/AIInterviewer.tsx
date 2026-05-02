@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Clock, MessageCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { MessageCircle, CheckCircle2, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type InterviewSession = {
@@ -12,11 +12,13 @@ type InterviewSession = {
 
 type Props = {
   session: InterviewSession;
+  userTranscript: string;
   onQuestionChange: (questionIndex: number) => void;
+  onFinishInterview: () => void;
 };
 
-export function AIInterviewer({ session, onQuestionChange }: Props) {
-  const [currentQuestion, setCurrentQuestion] = useState(0);
+export function AIInterviewer({ session, userTranscript, onQuestionChange, onFinishInterview }: Props) {
+  const [currentQuestion, setCurrentQuestion] = useState(session.currentQuestion);
   const [isThinking, setIsThinking] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [interviewerPersonality] = useState({
@@ -25,6 +27,13 @@ export function AIInterviewer({ session, onQuestionChange }: Props) {
     company: 'TechCorp',
     avatar: '👨‍💼'
   });
+
+  // Sync with parent's currentQuestion (for skip/repeat from SessionControls)
+  useEffect(() => {
+    if (session.currentQuestion !== currentQuestion && session.currentQuestion >= 0) {
+      setCurrentQuestion(session.currentQuestion);
+    }
+  }, [session.currentQuestion, currentQuestion]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -43,30 +52,72 @@ export function AIInterviewer({ session, onQuestionChange }: Props) {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const isLastQuestion = currentQuestion >= session.questions.length - 1;
+
   const nextQuestion = () => {
-    if (currentQuestion < session.questions.length - 1) {
+    if (!isLastQuestion) {
       setIsThinking(true);
       setTimeout(() => {
         const nextIndex = currentQuestion + 1;
         setCurrentQuestion(nextIndex);
         onQuestionChange(nextIndex);
         setIsThinking(false);
-      }, 2000);
+      }, 1500);
     }
   };
 
-  const generateFollowUp = () => {
-    const followUps = [
-      "Can you give me a specific example?",
-      "How did that make you feel?",
-      "What would you do differently next time?",
-      "How did your team react to that?",
-      "What was the outcome?",
-      "How did you measure success?",
-      "What challenges did you face?",
-      "How long did that take?"
+  const [ollamaAvailable, setOllamaAvailable] = useState(false);
+  const [isGeneratingFollowUp, setIsGeneratingFollowUp] = useState(false);
+  const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check if Ollama is available
+    import('../../services/ollamaService').then(({ OllamaService }) => {
+      OllamaService.checkAvailability().then(status => {
+        setOllamaAvailable(status.available);
+      });
+    });
+  }, []);
+
+  const handleGenerateFollowUp = async () => {
+    setIsGeneratingFollowUp(true);
+    setFollowUpQuestion(null);
+    try {
+      const { OllamaService } = await import('../../services/ollamaService');
+      const question = await OllamaService.generateFollowUp(
+        session.questions[currentQuestion], 
+        userTranscript
+      );
+      setFollowUpQuestion(question);
+    } catch {
+      console.error('Failed to generate follow-up');
+      // Smart fallback based on question type
+      const fallbacks = getSmartFallback(session.questions[currentQuestion]);
+      setFollowUpQuestion(fallbacks);
+    } finally {
+      setIsGeneratingFollowUp(false);
+    }
+  };
+
+  const getSmartFallback = (question: string): string => {
+    const q = question.toLowerCase();
+    if (q.includes('tell me about yourself')) return "What specific experience makes you the best fit for this role?";
+    if (q.includes('strength')) return "Can you give me a concrete example where that strength made a measurable impact?";
+    if (q.includes('weakness') || q.includes('failed')) return "What steps have you taken since then to improve?";
+    if (q.includes('team')) return "What was your specific role and contribution within that team?";
+    if (q.includes('challenge') || q.includes('difficult')) return "How did you measure the success of your approach?";
+    if (q.includes('5 years') || q.includes('future')) return "How does this role align with those long-term goals?";
+    if (q.includes('leadership')) return "How did you handle disagreement within the team?";
+    if (q.includes('stress') || q.includes('pressure')) return "Can you walk me through a specific high-pressure situation?";
+    
+    const generic = [
+      "Can you give me a specific example of that?",
+      "What was the measurable outcome?",
+      "How did your team or stakeholders react?",
+      "What would you do differently if you faced this again?",
+      "What was the biggest lesson you took from that experience?",
     ];
-    return followUps[Math.floor(Math.random() * followUps.length)];
+    return generic[Math.floor(Math.random() * generic.length)];
   };
 
   return (
@@ -128,26 +179,52 @@ export function AIInterviewer({ session, onQuestionChange }: Props) {
                 <p className="text-xl text-gray-100 leading-relaxed mb-6">
                   {session.questions[currentQuestion]}
                 </p>
+
+                <AnimatePresence>
+                  {followUpQuestion && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="mt-6 p-4 bg-blue-900/30 border border-blue-500/30 rounded-lg"
+                    >
+                      <h5 className="text-sm font-semibold text-blue-400 mb-2 flex items-center gap-2">
+                        <MessageCircle className="w-4 h-4" />
+                        Follow-up:
+                      </h5>
+                      <p className="text-lg text-blue-100">"{followUpQuestion}"</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-3">
+              <div className="flex gap-3 flex-wrap">
+                {isLastQuestion ? (
+                  <button
+                    onClick={onFinishInterview}
+                    className="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 font-medium"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    Finish Interview
+                  </button>
+                ) : (
+                  <button
+                    onClick={nextQuestion}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Next Question
+                  </button>
+                )}
                 <button
-                  onClick={nextQuestion}
-                  disabled={currentQuestion >= session.questions.length - 1}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  onClick={handleGenerateFollowUp}
+                  disabled={isGeneratingFollowUp}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 transition-colors flex items-center gap-2"
                 >
-                  Next Question
-                </button>
-                <button
-                  onClick={() => {
-                    const followUp = generateFollowUp();
-                    // In a real app, this would add the follow-up to the conversation
-                    alert(`Follow-up: ${followUp}`);
-                  }}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                >
-                  Follow-up
+                  {isGeneratingFollowUp ? (
+                    <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Generating...</>
+                  ) : (
+                    <>Ask Follow-up {ollamaAvailable && <span className="text-xs bg-blue-500 px-1.5 py-0.5 rounded text-white font-bold ml-1">AI</span>}</>
+                  )}
                 </button>
               </div>
             </motion.div>

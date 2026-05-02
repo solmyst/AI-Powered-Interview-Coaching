@@ -1,62 +1,16 @@
-import React from 'react';
-import { ArrowLeft, RotateCcw, Download, Share2, TrendingUp, Eye, Volume2, MessageSquare, Award } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Download, TrendingUp, Eye, Volume2, MessageSquare, Award, Gauge, Users, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { SessionRecord } from '../../services/sessionStorageService';
 
-type InterviewSession = {
-  id: string;
-  type: 'quick' | 'full' | 'technical' | 'behavioral';
-  duration: number;
-  questions: string[];
-  currentQuestion: number;
-  isActive: boolean;
-  startTime?: Date;
-  feedback: {
-    speech: Record<string, unknown>;
-    visual: Record<string, unknown>;
-    content: Record<string, unknown>;
-  };
-};
 
 type Props = {
-  session: InterviewSession;
+  sessionResult: SessionRecord;
   onClose: () => void;
   onRetry: () => void;
   onBack: () => void;
 };
 
-export function FeedbackReport({ session, onClose, onRetry, onBack }: Props) {
-  // Mock data for demonstration - in real app this would come from AI analysis
-  const analysisResults = {
-    overall: {
-      score: 78,
-      grade: 'B+',
-      improvement: '+12%'
-    },
-    categories: {
-      eyeContact: { score: 85, feedback: 'Excellent eye contact throughout the interview' },
-      speechClarity: { score: 72, feedback: 'Good pace, but reduce filler words' },
-      bodyLanguage: { score: 80, feedback: 'Confident posture, natural gestures' },
-      contentQuality: { score: 75, feedback: 'Strong examples, could be more specific' }
-    },
-    strengths: [
-      'Maintained excellent eye contact',
-      'Spoke with confidence and clarity',
-      'Used relevant examples from experience',
-      'Showed enthusiasm for the role'
-    ],
-    improvements: [
-      'Reduce filler words ("um", "uh") by 40%',
-      'Provide more specific metrics in examples',
-      'Practice STAR method for behavioral questions',
-      'Slow down speaking pace slightly'
-    ],
-    keyMoments: [
-      { time: '2:15', type: 'strength', note: 'Excellent leadership example' },
-      { time: '5:42', type: 'improvement', note: 'Could be more specific about results' },
-      { time: '8:30', type: 'strength', note: 'Great follow-up question' }
-    ]
-  };
-
+export function FeedbackReport({ sessionResult, onClose, onRetry, onBack }: Props) {
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -75,6 +29,54 @@ export function FeedbackReport({ session, onClose, onRetry, onBack }: Props) {
     return 'bg-red-500';
   };
 
+  const getGrade = (score: number): string => {
+    if (score >= 90) return 'A+';
+    if (score >= 85) return 'A';
+    if (score >= 80) return 'B+';
+    if (score >= 75) return 'B';
+    if (score >= 70) return 'B-';
+    if (score >= 65) return 'C+';
+    if (score >= 60) return 'C';
+    if (score >= 55) return 'C-';
+    return 'D';
+  };
+
+  const handleDownload = () => {
+    const report = {
+      title: 'InterviewAce Session Report',
+      date: new Date(sessionResult.date).toLocaleDateString(),
+      type: sessionResult.type,
+      duration: formatDuration(sessionResult.duration),
+      overallScore: sessionResult.overallScore,
+      grade: getGrade(sessionResult.overallScore),
+      scores: sessionResult.scores,
+      fillerWords: sessionResult.fillerWords,
+      fillerWordCount: sessionResult.fillerWordCount,
+      wordsPerMinute: sessionResult.wordsPerMinute,
+      totalWords: sessionResult.totalWords,
+      strengths: sessionResult.strengths,
+      improvements: sessionResult.improvements,
+      transcript: sessionResult.transcript
+    };
+
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `interviewace-report-${new Date(sessionResult.date).toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const categories = [
+    { key: 'eyeContact', label: 'Eye Contact', icon: Eye, score: sessionResult.scores.eyeContact },
+    { key: 'speechClarity', label: 'Speech Clarity', icon: Volume2, score: sessionResult.scores.speechClarity },
+    { key: 'bodyLanguage', label: 'Body Language', icon: Users, score: sessionResult.scores.bodyLanguage },
+    { key: 'contentQuality', label: 'Content Quality', icon: MessageSquare, score: sessionResult.scores.contentQuality },
+    { key: 'confidence', label: 'Confidence', icon: TrendingUp, score: sessionResult.scores.confidence },
+    { key: 'speakingPace', label: 'Speaking Pace', icon: Gauge, score: sessionResult.scores.speakingPace },
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-4xl mx-auto">
@@ -89,10 +91,11 @@ export function FeedbackReport({ session, onClose, onRetry, onBack }: Props) {
           </button>
           <h1 className="text-3xl font-bold text-gray-800">Interview Report</h1>
           <div className="flex gap-2">
-            <button className="p-2 text-gray-600 hover:text-gray-800 transition-colors">
-              <Share2 className="w-5 h-5" />
-            </button>
-            <button className="p-2 text-gray-600 hover:text-gray-800 transition-colors">
+            <button 
+              onClick={handleDownload}
+              className="p-2 text-gray-600 hover:text-gray-800 transition-colors"
+              title="Download report"
+            >
               <Download className="w-5 h-5" />
             </button>
           </div>
@@ -124,30 +127,29 @@ export function FeedbackReport({ session, onClose, onRetry, onBack }: Props) {
                   strokeWidth="8"
                   fill="none"
                   strokeDasharray={`${2 * Math.PI * 56}`}
-                  strokeDashoffset={`${2 * Math.PI * 56 * (1 - analysisResults.overall.score / 100)}`}
-                  className={getScoreColor(analysisResults.overall.score)}
+                  strokeDashoffset={`${2 * Math.PI * 56 * (1 - sessionResult.overallScore / 100)}`}
+                  className={getScoreColor(sessionResult.overallScore)}
                   strokeLinecap="round"
                 />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-gray-800">{analysisResults.overall.score}</div>
+                  <div className="text-3xl font-bold text-gray-800">{sessionResult.overallScore}</div>
                   <div className="text-sm text-gray-600">Score</div>
                 </div>
               </div>
             </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              Grade: {analysisResults.overall.grade}
+              Grade: {getGrade(sessionResult.overallScore)}
             </h2>
-            <p className="text-gray-600 mb-4">
-              {analysisResults.overall.improvement} improvement from last session
-            </p>
-            <div className="flex justify-center gap-4 text-sm text-gray-500">
-              <span>Duration: {formatDuration(session.duration || 1200)}</span>
+            <div className="flex justify-center gap-4 text-sm text-gray-500 flex-wrap">
+              <span>Duration: {formatDuration(sessionResult.duration)}</span>
               <span>•</span>
-              <span>Questions: {session.questions.length}</span>
+              <span>Questions: {sessionResult.questionsAnswered}/{sessionResult.questionsCount}</span>
               <span>•</span>
-              <span className="capitalize">{session.type} Interview</span>
+              <span className="capitalize">{sessionResult.type} Interview</span>
+              <span>•</span>
+              <span>{sessionResult.totalWords} words spoken</span>
             </div>
           </div>
         </motion.div>
@@ -161,41 +163,78 @@ export function FeedbackReport({ session, onClose, onRetry, onBack }: Props) {
         >
           <h3 className="text-xl font-bold text-gray-800 mb-6">Performance Breakdown</h3>
           <div className="grid md:grid-cols-2 gap-6">
-            {Object.entries(analysisResults.categories).map(([key, data]) => {
-              const icons = {
-                eyeContact: Eye,
-                speechClarity: Volume2,
-                bodyLanguage: TrendingUp,
-                contentQuality: MessageSquare
-              };
-              const Icon = icons[key as keyof typeof icons];
-              
-              return (
-                <div key={key} className="flex items-start gap-4">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Icon className="w-5 h-5 text-blue-600" />
+            {categories.map(({ key, label, icon: Icon, score }) => (
+              <div key={key} className="flex items-start gap-4">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Icon className="w-5 h-5 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-gray-800">{label}</h4>
+                    <span className={`font-bold ${getScoreColor(score)}`}>
+                      {score}%
+                    </span>
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-gray-800 capitalize">
-                        {key.replace(/([A-Z])/g, ' $1').trim()}
-                      </h4>
-                      <span className={`font-bold ${getScoreColor(data.score)}`}>
-                        {data.score}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                      <div
-                        className={`h-2 rounded-full ${getScoreBgColor(data.score)}`}
-                        style={{ width: `${data.score}%` }}
-                      />
-                    </div>
-                    <p className="text-sm text-gray-600">{data.feedback}</p>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full ${getScoreBgColor(score)}`}
+                      style={{ width: `${score}%` }}
+                    />
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
+        </motion.div>
+
+        {/* Speech Stats */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="bg-white rounded-xl p-6 shadow-lg mb-8"
+        >
+          <h3 className="text-xl font-bold text-gray-800 mb-6">Speech Analysis</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div className="text-center p-4 bg-gray-50 rounded-xl">
+              <div className="text-2xl font-bold text-blue-600">{sessionResult.wordsPerMinute}</div>
+              <div className="text-sm text-gray-600">Words/Min</div>
+              <div className="text-xs text-gray-400 mt-1">Ideal: 120-150</div>
+            </div>
+            <div className="text-center p-4 bg-gray-50 rounded-xl">
+              <div className={`text-2xl font-bold ${sessionResult.fillerWordCount > 5 ? 'text-red-500' : sessionResult.fillerWordCount > 2 ? 'text-yellow-500' : 'text-green-500'}`}>
+                {sessionResult.fillerWordCount}
+              </div>
+              <div className="text-sm text-gray-600">Filler Words</div>
+            </div>
+            <div className="text-center p-4 bg-gray-50 rounded-xl">
+              <div className="text-2xl font-bold text-purple-600">{sessionResult.totalWords}</div>
+              <div className="text-sm text-gray-600">Total Words</div>
+            </div>
+            <div className="text-center p-4 bg-gray-50 rounded-xl">
+              <div className={`text-2xl font-bold ${sessionResult.longestSilence > 8 ? 'text-red-500' : 'text-green-500'}`}>
+                {sessionResult.longestSilence}s
+              </div>
+              <div className="text-sm text-gray-600">Longest Pause</div>
+            </div>
+          </div>
+
+          {/* Filler Word Breakdown */}
+          {sessionResult.fillerWords.length > 0 && (
+            <div className="mt-4 p-4 bg-orange-50 rounded-xl">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="w-4 h-4 text-orange-500" />
+                <h4 className="font-medium text-orange-800">Filler Words Detected</h4>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {sessionResult.fillerWords.map((fw, i) => (
+                  <span key={i} className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-sm">
+                    "{fw.word}" × {fw.count}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </motion.div>
 
         {/* Strengths and Improvements */}
@@ -211,7 +250,7 @@ export function FeedbackReport({ session, onClose, onRetry, onBack }: Props) {
               <h3 className="text-lg font-bold text-gray-800">Strengths</h3>
             </div>
             <ul className="space-y-3">
-              {analysisResults.strengths.map((strength, index) => (
+              {sessionResult.strengths.map((strength, index) => (
                 <li key={index} className="flex items-start gap-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0" />
                   <span className="text-gray-700">{strength}</span>
@@ -231,7 +270,7 @@ export function FeedbackReport({ session, onClose, onRetry, onBack }: Props) {
               <h3 className="text-lg font-bold text-gray-800">Areas for Improvement</h3>
             </div>
             <ul className="space-y-3">
-              {analysisResults.improvements.map((improvement, index) => (
+              {sessionResult.improvements.map((improvement, index) => (
                 <li key={index} className="flex items-start gap-2">
                   <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0" />
                   <span className="text-gray-700">{improvement}</span>
@@ -240,6 +279,26 @@ export function FeedbackReport({ session, onClose, onRetry, onBack }: Props) {
             </ul>
           </motion.div>
         </div>
+
+        {/* Transcript */}
+        {sessionResult.transcript && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="bg-white rounded-xl p-6 shadow-lg mb-8"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <MessageSquare className="w-5 h-5 text-gray-600" />
+              <h3 className="text-lg font-bold text-gray-800">Full Transcript</h3>
+            </div>
+            <div className="max-h-48 overflow-y-auto p-4 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                {sessionResult.transcript}
+              </p>
+            </div>
+          </motion.div>
+        )}
 
         {/* Action Buttons */}
         <motion.div

@@ -1,23 +1,32 @@
-import React from 'react';
-import { Camera, CameraOff } from 'lucide-react';
+import { Camera, CameraOff, Eye } from 'lucide-react';
 
 type Props = {
   videoRef: React.RefObject<HTMLVideoElement>;
+  canvasRef: React.RefObject<HTMLCanvasElement>;
   cameraEnabled: boolean;
   onToggleCamera: () => void;
+  faceDetected: boolean;
+  eyeContact: number;
 };
 
-export function VideoFeed({ videoRef, cameraEnabled, onToggleCamera }: Props) {
+export function VideoFeed({ videoRef, canvasRef, cameraEnabled, onToggleCamera, faceDetected, eyeContact }: Props) {
   return (
     <div className="relative bg-gray-800 rounded-lg overflow-hidden">
       {cameraEnabled ? (
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          playsInline
-          className="w-full h-64 object-cover"
-        />
+        <div className="relative">
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            className="w-full h-64 object-cover"
+          />
+          {/* MediaPipe face landmark overlay */}
+          <canvas
+            ref={canvasRef}
+            className="absolute inset-0 w-full h-64 object-cover pointer-events-none"
+          />
+        </div>
       ) : (
         <div className="w-full h-64 flex items-center justify-center bg-gray-700">
           <div className="text-center">
@@ -49,13 +58,25 @@ export function VideoFeed({ videoRef, cameraEnabled, onToggleCamera }: Props) {
         <span className="text-white text-sm font-medium">Recording</span>
       </div>
 
-      {/* AI Analysis Overlay */}
+      {/* AI Analysis Status */}
       <div className="absolute top-4 right-4 bg-black bg-opacity-50 rounded-lg p-2">
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-          <span className="text-white text-xs">AI Analyzing</span>
+          <div className={`w-2 h-2 rounded-full animate-pulse ${faceDetected ? 'bg-green-400' : 'bg-red-400'}`} />
+          <span className="text-white text-xs">
+            {faceDetected ? 'AI Tracking' : 'No Face'}
+          </span>
         </div>
       </div>
+
+      {/* Eye Contact Indicator - shows on video */}
+      {faceDetected && (
+        <div className="absolute bottom-4 left-4 bg-black bg-opacity-60 rounded-lg px-3 py-1.5 flex items-center gap-2">
+          <Eye className={`w-4 h-4 ${eyeContact >= 70 ? 'text-green-400' : eyeContact >= 40 ? 'text-yellow-400' : 'text-red-400'}`} />
+          <span className={`text-sm font-medium ${eyeContact >= 70 ? 'text-green-400' : eyeContact >= 40 ? 'text-yellow-400' : 'text-red-400'}`}>
+            {eyeContact}%
+          </span>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,36 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, Mic, Video, ArrowLeft, Play, AlertTriangle, Cpu } from 'lucide-react';
-import { AIInterviewer } from './interview/AIInterviewer';
-import { RealTimeFeedback } from './interview/RealTimeFeedback';
-import { VideoFeed } from './interview/VideoFeed';
-import { SessionControls } from './interview/SessionControls';
-import { FeedbackReport } from './interview/FeedbackReport';
-import { FaceAnalysisService, FaceAnalysisData } from '../services/faceAnalysisService';
-import { SpeechAnalysisService, SpeechAnalysisData } from '../services/speechAnalysisService';
-import { WhisperService, WhisperProgress } from '../services/whisperService';
-import { SessionStorageService, SessionRecord } from '../services/sessionStorageService';
-
-type User = {
-  id: string;
-  name: string;
-  email: string;
-  subscription: 'free' | 'premium' | 'professional';
-};
-
-type InterviewSession = {
-  id: string;
-  type: 'quick' | 'full' | 'technical' | 'behavioral';
-  duration: number;
-  questions: string[];
-  currentQuestion: number;
-  isActive: boolean;
-  startTime?: Date;
-  feedback: {
-    speech: Record<string, unknown>;
-    visual: Record<string, unknown>;
-    content: Record<string, unknown>;
-  };
-};
+import { AIInterviewer } from '../interview/AIInterviewer';
+import { RealTimeFeedback } from '../interview/RealTimeFeedback';
+import { VideoFeed } from '../interview/VideoFeed';
+import { SessionControls } from '../interview/SessionControls';
+import { FeedbackReport } from '../interview/FeedbackReport';
+import { FaceAnalysisService, FaceAnalysisData } from '../../services/faceAnalysisService';
+import { SpeechAnalysisService, SpeechAnalysisData } from '../../services/speechAnalysisService';
+import { WhisperService, WhisperProgress } from '../../services/whisperService';
+import { SessionStorageService, SessionRecord } from '../../services/sessionStorageService';
+import { User, InterviewSession } from '../../types';
 
 type Props = {
   user: User;
@@ -121,17 +100,17 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
     const eyeContactScore = avg(eyeContactSamples.current);
     const confidenceScore = avg(confidenceSamples.current);
     const bodyLanguageScore = avg(postureSamples.current);
-
-    const speechClarityScore = hasSpeech ? (finalSpeechData?.clarity ?? 70) : 0;
+    
+    const speechClarityScore = hasSpeech ? (finalSpeechData?.clarity ?? 0) : 0;
     const wpm = finalSpeechData?.wordsPerMinute ?? 0;
     const paceScore = hasSpeech ? (wpm >= 100 && wpm <= 160 ? 85 : wpm > 0 ? 60 : 70) : 0;
 
     const scores = {
-      eyeContact: eyeContactScore,
+      eyeContact: hasVisual ? eyeContactScore : 0,
       speechClarity: speechClarityScore,
-      bodyLanguage: bodyLanguageScore,
+      bodyLanguage: hasVisual ? bodyLanguageScore : 0,
       contentQuality: hasSpeech ? Math.round((speechClarityScore + confidenceScore) / 2) : 0,
-      confidence: confidenceScore,
+      confidence: hasSpeech ? confidenceScore : 0,
       speakingPace: paceScore
     };
 
@@ -208,7 +187,7 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
   useEffect(() => {
     if (pendingStartType && !isInitializing && !session) {
       let activeStream: MediaStream | null = null;
-
+      
       const checkMedia = async () => {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -224,7 +203,7 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
           } catch {
             setMediaStatus(prev => ({ ...prev, camera: 'error' }));
           }
-
+          
           try {
             await navigator.mediaDevices.getUserMedia({ audio: true });
             setMediaStatus(prev => ({ ...prev, mic: 'ready' }));
@@ -387,7 +366,7 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
         if (videoRef.current && !videoRef.current.srcObject) {
           videoRef.current.srcObject = stream;
         }
-
+        
         if (videoRef.current && faceServiceRef.current) {
           faceServiceRef.current.start(videoRef.current, handleFaceData);
           if (canvasRef.current) {
@@ -530,7 +509,7 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
     faceDetected: faceData?.faceDetected ?? false,
     transcript: speechData?.transcript ?? '',
     interimTranscript: speechData?.interimTranscript ?? '',
-    clarity: speechData?.clarity ?? 80,
+    clarity: speechData?.clarity ?? 0,
     totalWords: speechData?.totalWords ?? 0,
     fillerWordList: speechData?.fillerWords ?? [],
     silenceDuration: speechData?.silenceDuration ?? 0,
@@ -565,8 +544,8 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
             <AIInterviewer
               session={session}
               userTranscript={speechData?.transcript || ''}
-              onQuestionChange={(questionIndex) =>
-                setSession(prev => prev ? { ...prev, currentQuestion: questionIndex } : null)
+              onQuestionChange={(questionIndex: number) => 
+                setSession(prev => prev ? {...prev, currentQuestion: questionIndex} : null)
               }
               onFinishInterview={stopInterview}
             />
@@ -620,7 +599,7 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
           <h1 className="text-3xl font-bold text-white mb-3">Ready to Begin</h1>
           <p className="text-gray-400 mb-2 text-lg capitalize">{selectedType?.name || pendingStartType} Interview</p>
           <p className="text-gray-500 mb-8 text-sm">{selectedType?.description} • {selectedType?.questions} questions</p>
-
+          
           <div className="space-y-4 mb-8">
             {/* Media Preview / Hardware Status */}
             <div className="bg-black/40 rounded-xl overflow-hidden border border-white/10 aspect-video relative flex items-center justify-center">
@@ -638,19 +617,21 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
                   <span className="text-xs">Camera Preview Unavailable</span>
                 </div>
               )}
-
+              
               <div className="absolute bottom-3 left-3 right-3 flex justify-between gap-2">
-                <div className={`px-3 py-1.5 rounded-full text-xs flex items-center gap-2 backdrop-blur-md ${mediaStatus.camera === 'ready' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
-                  mediaStatus.camera === 'error' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                    'bg-white/10 text-gray-400 border border-white/10'
-                  }`}>
+                <div className={`px-3 py-1.5 rounded-full text-xs flex items-center gap-2 backdrop-blur-md ${
+                  mediaStatus.camera === 'ready' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 
+                  mediaStatus.camera === 'error' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 
+                  'bg-white/10 text-gray-400 border border-white/10'
+                }`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${mediaStatus.camera === 'ready' ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
                   Camera {mediaStatus.camera === 'ready' ? 'Active' : mediaStatus.camera === 'error' ? 'Error' : 'Checking...'}
                 </div>
-                <div className={`px-3 py-1.5 rounded-full text-xs flex items-center gap-2 backdrop-blur-md ${mediaStatus.mic === 'ready' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
-                  mediaStatus.mic === 'error' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                    'bg-white/10 text-gray-400 border border-white/10'
-                  }`}>
+                <div className={`px-3 py-1.5 rounded-full text-xs flex items-center gap-2 backdrop-blur-md ${
+                  mediaStatus.mic === 'ready' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 
+                  mediaStatus.mic === 'error' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 
+                  'bg-white/10 text-gray-400 border border-white/10'
+                }`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${mediaStatus.mic === 'ready' ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
                   Microphone {mediaStatus.mic === 'ready' ? 'Active' : mediaStatus.mic === 'error' ? 'Error' : 'Checking...'}
                 </div>
@@ -678,22 +659,23 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
               startInterview(pendingStartType);
             }}
             disabled={!isReady}
-            className={`w-full py-4 rounded-xl font-semibold text-lg transition-all shadow-lg flex items-center justify-center gap-3 ${isReady
-              ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 shadow-blue-500/25'
-              : 'bg-gray-800 text-gray-500 cursor-not-allowed border border-white/5'
-              }`}
+            className={`w-full py-4 rounded-xl font-semibold text-lg transition-all shadow-lg flex items-center justify-center gap-3 ${
+              isReady 
+                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 shadow-blue-500/25' 
+                : 'bg-gray-800 text-gray-500 cursor-not-allowed border border-white/5'
+            }`}
           >
             <Play className="w-6 h-6" />
             {isReady ? 'Start Interview' : 'Checking Hardware...'}
           </button>
-
+          
           <button
-            onClick={() => {
+            onClick={() => { 
               if (mediaStatus.stream) {
                 mediaStatus.stream.getTracks().forEach(t => t.stop());
               }
-              setPendingStartType(undefined);
-              onBack();
+              setPendingStartType(undefined); 
+              onBack(); 
             }}
             className="mt-4 text-gray-500 hover:text-gray-300 transition-colors text-sm"
           >

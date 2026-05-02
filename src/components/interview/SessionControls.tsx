@@ -1,5 +1,4 @@
-import React from 'react';
-import { Mic, MicOff, Square } from 'lucide-react';
+import { Mic, MicOff, Square, SkipForward, RotateCcw } from 'lucide-react';
 
 type InterviewSession = {
   id: string;
@@ -14,9 +13,12 @@ type Props = {
   micEnabled: boolean;
   onToggleMic: () => void;
   onStop: () => void;
+  onSkipQuestion: () => void;
+  onRepeatQuestion: () => void;
+  canSkip: boolean;
 };
 
-export function SessionControls({ session, isRecording, micEnabled, onToggleMic, onStop }: Props) {
+export function SessionControls({ session, isRecording, micEnabled, onToggleMic, onStop, onSkipQuestion, onRepeatQuestion, canSkip }: Props) {
   return (
     <div className="bg-gray-800 rounded-lg p-4">
       <div className="flex items-center justify-between mb-4">
@@ -75,10 +77,19 @@ export function SessionControls({ session, isRecording, micEnabled, onToggleMic,
 
       {/* Quick Actions */}
       <div className="mt-4 flex gap-2">
-        <button className="flex-1 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm">
+        <button
+          onClick={onSkipQuestion}
+          disabled={!canSkip}
+          className="flex-1 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-sm flex items-center justify-center gap-1.5"
+        >
+          <SkipForward className="w-3.5 h-3.5" />
           Skip Question
         </button>
-        <button className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">
+        <button
+          onClick={onRepeatQuestion}
+          className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center justify-center gap-1.5"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
           Repeat Question
         </button>
       </div>

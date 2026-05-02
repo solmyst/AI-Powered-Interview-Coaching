@@ -14,16 +14,15 @@
     "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
-    "@dataconnect/generated": "file:src/dataconnect-generated",
     "@headlessui/react": "^1.7.17",
+    "@mediapipe/tasks-vision": "^0.10.34",
+    "@xenova/transformers": "^2.17.2",
     "clsx": "^2.0.0",
-    "firebase": "^10.7.1",
     "framer-motion": "^10.16.0",
+    "idb": "^8.0.3",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-firebase-hooks": "^5.1.1",
-    "react-webcam": "^7.1.1",
     "recharts": "^2.8.0",
     "uuid": "^9.0.1"
   },
