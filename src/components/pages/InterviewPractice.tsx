@@ -25,6 +25,7 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
   const [showReport, setShowReport] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [showExitWarning, setShowExitWarning] = useState(false);
 
   // Whisper loading state
   const [whisperProgress, setWhisperProgress] = useState<WhisperProgress | null>(null);
@@ -127,11 +128,26 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
       );
     }
 
-    const { strengths, improvements } = SessionStorageService.generateFeedback(
+    // Rule-based feedback (as fallback)
+    let { strengths, improvements } = SessionStorageService.generateFeedback(
       scores,
       finalSpeechData?.fillerWordCount ?? 0,
       wpm
     );
+
+    // Try to get AI-powered feedback if Ollama is available
+    try {
+      const { OllamaService } = await import('../../services/ollamaService');
+      const aiFeedback = await OllamaService.generateSessionFeedback(
+        session?.type || 'quick',
+        finalSpeechData?.transcript || '',
+        scores
+      );
+      if (aiFeedback.strengths.length > 0) strengths = aiFeedback.strengths;
+      if (aiFeedback.improvements.length > 0) improvements = aiFeedback.improvements;
+    } catch {
+      // Use existing rule-based feedback
+    }
 
     const sessionRecord: SessionRecord = {
       id: session?.id || Date.now().toString(),
@@ -189,26 +205,64 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
       let activeStream: MediaStream | null = null;
       
       const checkMedia = async () => {
+        setMediaStatus({ camera: 'checking', mic: 'checking', stream: null });
+        
         try {
+          // Try to get both first
           const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
           activeStream = stream;
-          setMediaStatus({ camera: 'ready', mic: 'ready', stream });
-        } catch (err) {
-          console.error('Media check failed:', err);
-          // Try to check individual permissions
-          try {
-            const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
-            setMediaStatus(prev => ({ ...prev, camera: 'ready', stream: videoStream }));
-            activeStream = videoStream;
-          } catch {
-            setMediaStatus(prev => ({ ...prev, camera: 'error' }));
-          }
           
+          const hasVideo = stream.getVideoTracks().length > 0 && stream.getVideoTracks()[0].enabled;
+          const hasAudio = stream.getAudioTracks().length > 0 && stream.getAudioTracks()[0].enabled;
+          
+          setMediaStatus({ 
+            camera: hasVideo ? 'ready' : 'error', 
+            mic: hasAudio ? 'ready' : 'error', 
+            stream 
+          });
+        } catch (err) {
+          console.warn('[HardwareCheck] Combined check failed, trying individual:', err);
+          
+          let videoStream: MediaStream | null = null;
+          let audioStream: MediaStream | null = null;
+          let cameraStatus: 'ready' | 'error' = 'error';
+          let micStatus: 'ready' | 'error' = 'error';
+
+          // Individual Camera Check
           try {
-            await navigator.mediaDevices.getUserMedia({ audio: true });
-            setMediaStatus(prev => ({ ...prev, mic: 'ready' }));
-          } catch {
-            setMediaStatus(prev => ({ ...prev, mic: 'error' }));
+            videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            if (videoStream.getVideoTracks().length > 0) {
+              cameraStatus = 'ready';
+            }
+          } catch (e) {
+            console.error('[HardwareCheck] Camera individual check failed:', e);
+            cameraStatus = 'error';
+          }
+
+          // Individual Mic Check
+          try {
+            audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            if (audioStream.getAudioTracks().length > 0) {
+              micStatus = 'ready';
+            }
+          } catch (e) {
+            console.error('[HardwareCheck] Mic individual check failed:', e);
+            micStatus = 'error';
+          }
+
+          // Combine streams if possible
+          if (videoStream && audioStream) {
+            const combined = new MediaStream([...videoStream.getTracks(), ...audioStream.getTracks()]);
+            activeStream = combined;
+            setMediaStatus({ camera: cameraStatus, mic: micStatus, stream: combined });
+          } else if (videoStream) {
+            activeStream = videoStream;
+            setMediaStatus({ camera: cameraStatus, mic: micStatus, stream: videoStream });
+          } else if (audioStream) {
+            activeStream = audioStream;
+            setMediaStatus({ camera: cameraStatus, mic: micStatus, stream: audioStream });
+          } else {
+            setMediaStatus({ camera: 'error', mic: 'error', stream: null });
           }
         }
       };
@@ -227,14 +281,17 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
   useEffect(() => {
     const handleFullscreenChange = () => {
       if (session && !document.fullscreenElement && isRecording) {
-        // User exited fullscreen — stop the interview
-        stopInterview();
+        // User exited fullscreen — show warning instead of stopping immediately
+        setShowExitWarning(true);
+      } else if (document.fullscreenElement) {
+        // User returned to fullscreen
+        setShowExitWarning(false);
       }
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, [session, isRecording, stopInterview]);
+  }, [session, isRecording]);
 
   const interviewTypes = [
     {
@@ -537,50 +594,103 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
 
   if (session && isRecording) {
     return (
-      <div ref={interviewContainerRef} className="h-screen bg-gray-900 text-white overflow-hidden">
-        <div className="flex h-full">
-          {/* Left Panel - AI Interviewer */}
-          <div className="w-full md:w-1/2 p-6 border-r border-gray-700 flex flex-col overflow-y-auto">
-            <AIInterviewer
-              session={session}
-              userTranscript={speechData?.transcript || ''}
-              onQuestionChange={(questionIndex: number) => 
-                setSession(prev => prev ? {...prev, currentQuestion: questionIndex} : null)
-              }
-              onFinishInterview={stopInterview}
-            />
+      <div ref={interviewContainerRef} className="h-screen bg-[#0a0a0c] text-white overflow-hidden selection:bg-blue-500/30">
+        <div className="flex h-full p-4 lg:p-8 gap-8">
+          {/* Left Panel - AI Interviewer (60% width) */}
+          <div className="w-full lg:w-[60%] flex flex-col">
+            <div className="flex-1 bg-white/[0.02] border border-white/10 rounded-3xl backdrop-blur-3xl overflow-hidden flex flex-col shadow-2xl relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/[0.03] to-purple-500/[0.03] pointer-events-none" />
+              <div className="p-8 flex-1 overflow-y-auto custom-scrollbar">
+                <AIInterviewer
+                  session={session}
+                  userTranscript={speechData?.transcript || ''}
+                  onQuestionChange={(questionIndex: number) => 
+                    setSession(prev => prev ? {...prev, currentQuestion: questionIndex} : null)
+                  }
+                  onFinishInterview={stopInterview}
+                />
+              </div>
+            </div>
           </div>
 
-          {/* Right Panel - User Video & Feedback */}
-          <div className="w-full md:w-1/2 p-6 flex flex-col overflow-y-auto">
-            <div className="flex-1 space-y-4 max-w-2xl w-full mx-auto">
+          {/* Right Panel - User Video & Feedback (40% width) */}
+          <div className="hidden lg:flex lg:w-[40%] flex-col gap-6">
+            <div className="flex-1 flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2">
               {/* User Video Feed with AI overlay */}
-              <VideoFeed
-                videoRef={videoRef}
-                canvasRef={canvasRef}
-                cameraEnabled={cameraEnabled}
-                onToggleCamera={() => setCameraEnabled(!cameraEnabled)}
-                faceDetected={faceData?.faceDetected ?? false}
-                eyeContact={faceData?.eyeContact ?? 0}
-              />
+              <div className="bg-white/[0.02] border border-white/10 rounded-3xl backdrop-blur-3xl overflow-hidden shadow-xl min-h-[240px] flex items-center justify-center relative">
+                <div className="w-full h-full">
+                  <VideoFeed
+                    videoRef={videoRef}
+                    canvasRef={canvasRef}
+                    cameraEnabled={cameraEnabled}
+                    onToggleCamera={() => setCameraEnabled(!cameraEnabled)}
+                    faceDetected={faceData?.faceDetected ?? false}
+                    eyeContact={faceData?.eyeContact ?? 0}
+                  />
+                </div>
+              </div>
 
-              {/* Real-time Feedback — now with REAL data */}
-              <RealTimeFeedback feedback={realTimeFeedback} />
+              {/* Real-time Feedback */}
+              <div className="bg-white/[0.02] border border-white/10 rounded-3xl backdrop-blur-3xl p-6 shadow-xl">
+                <RealTimeFeedback feedback={realTimeFeedback} />
+              </div>
 
               {/* Session Controls */}
-              <SessionControls
-                session={session}
-                isRecording={isRecording}
-                micEnabled={micEnabled}
-                onToggleMic={handleToggleMic}
-                onStop={stopInterview}
-                onSkipQuestion={handleSkipQuestion}
-                onRepeatQuestion={handleRepeatQuestion}
-                canSkip={session.currentQuestion < session.questions.length - 1}
-              />
+              <div className="mt-auto">
+                <SessionControls
+                  session={session}
+                  isRecording={isRecording}
+                  micEnabled={micEnabled}
+                  onToggleMic={handleToggleMic}
+                  onStop={stopInterview}
+                  onSkipQuestion={handleSkipQuestion}
+                  onRepeatQuestion={handleRepeatQuestion}
+                  canSkip={session.currentQuestion < session.questions.length - 1}
+                />
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Exit Warning Modal */}
+        {showExitWarning && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="bg-gray-800 border border-red-500/30 rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
+              <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <AlertTriangle className="w-8 h-8 text-red-500" />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Fullscreen Required</h2>
+              <p className="text-gray-400 mb-8">
+                To ensure a fair and focused interview environment, you must remain in fullscreen mode. 
+                Leaving fullscreen will invalidate this session.
+              </p>
+              <div className="space-y-3">
+                <button
+                  onClick={async () => {
+                    try {
+                      await document.documentElement.requestFullscreen();
+                      setShowExitWarning(false);
+                    } catch (err) {
+                      console.error('Failed to re-enter fullscreen:', err);
+                    }
+                  }}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-colors"
+                >
+                  Return to Fullscreen
+                </button>
+                <button
+                  onClick={() => {
+                    setShowExitWarning(false);
+                    stopInterview();
+                  }}
+                  className="w-full py-3 bg-transparent border border-gray-600 hover:bg-gray-700 text-gray-300 rounded-xl font-medium transition-colors"
+                >
+                  End Interview Session
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -591,96 +701,146 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
     const isReady = mediaStatus.camera === 'ready' && mediaStatus.mic === 'ready';
 
     return (
-      <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-gray-900 via-blue-950 to-indigo-950 flex items-center justify-center p-6">
-        <div className="max-w-lg w-full text-center">
-          <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-500/30">
-            <Cpu className="w-10 h-10 text-white" />
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-6 relative overflow-hidden">
+        {/* Animated Background Elements */}
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
+        
+        <div className="max-w-4xl w-full grid lg:grid-cols-2 gap-12 items-center relative z-10">
+          {/* Left: Info & Status */}
+          <div className="space-y-8 text-left">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium mb-6">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                System Ready
+              </div>
+              <h1 className="text-5xl font-bold text-white mb-4 tracking-tight">
+                Ready to <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 text-6xl block mt-2">Practice?</span>
+              </h1>
+              <p className="text-gray-400 text-lg max-w-md leading-relaxed">
+                Your AI-powered mock interview is prepared. We'll analyze your speech, posture, and confidence in real-time.
+              </p>
+            </div>
+
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl space-y-4 shadow-2xl">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 text-sm">Selected Type</span>
+                <span className="text-white font-semibold capitalize bg-white/10 px-3 py-1 rounded-lg border border-white/10">{selectedType?.name || pendingStartType}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 text-sm">Questions</span>
+                <span className="text-white font-semibold">{selectedType?.questions} Scenarios</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 text-sm">Est. Duration</span>
+                <span className="text-white font-semibold">{selectedType?.duration}</span>
+              </div>
+              <div className="pt-4 border-t border-white/5 space-y-3">
+                <div className="flex items-center gap-3 text-sm">
+                  <div className={`w-2 h-2 rounded-full ${
+                    mediaStatus.camera === 'ready' ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 
+                    mediaStatus.camera === 'checking' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'
+                  }`} />
+                  <span className="text-gray-300">
+                    Camera: {
+                      mediaStatus.camera === 'ready' ? 'Active & Ready' : 
+                      mediaStatus.camera === 'checking' ? 'Checking Permissions...' : 'Access Blocked'
+                    }
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-sm">
+                  <div className={`w-2 h-2 rounded-full ${
+                    mediaStatus.mic === 'ready' ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 
+                    mediaStatus.mic === 'checking' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'
+                  }`} />
+                  <span className="text-gray-300">
+                    Microphone: {
+                      mediaStatus.mic === 'ready' ? 'Active & Ready' : 
+                      mediaStatus.mic === 'checking' ? 'Checking Permissions...' : 'Access Blocked'
+                    }
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <button
+                onClick={() => {
+                  if (mediaStatus.stream) {
+                    mediaStatus.stream.getTracks().forEach(t => t.stop());
+                  }
+                  setPendingStartType(undefined);
+                  startInterview(pendingStartType);
+                }}
+                disabled={!isReady}
+                className={`group relative w-full py-5 rounded-2xl font-bold text-xl transition-all flex items-center justify-center gap-3 overflow-hidden ${
+                  isReady 
+                    ? 'text-white' 
+                    : 'bg-gray-800 text-gray-500 cursor-not-allowed grayscale'
+                }`}
+              >
+                {isReady && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 group-hover:scale-110 transition-transform duration-500" />
+                )}
+                <span className="relative flex items-center gap-3">
+                  <Play className={`w-6 h-6 ${isReady ? 'fill-current' : ''}`} />
+                  {isReady ? 'Begin Session' : 'Hardware Check Failed'}
+                </span>
+              </button>
+              
+              <button
+                onClick={() => { 
+                  if (mediaStatus.stream) {
+                    mediaStatus.stream.getTracks().forEach(t => t.stop());
+                  }
+                  setPendingStartType(undefined); 
+                  onBack(); 
+                }}
+                className="text-gray-500 hover:text-gray-300 transition-colors text-sm font-medium"
+              >
+                ← Back to Dashboard
+              </button>
+            </div>
           </div>
-          <h1 className="text-3xl font-bold text-white mb-3">Ready to Begin</h1>
-          <p className="text-gray-400 mb-2 text-lg capitalize">{selectedType?.name || pendingStartType} Interview</p>
-          <p className="text-gray-500 mb-8 text-sm">{selectedType?.description} • {selectedType?.questions} questions</p>
-          
-          <div className="space-y-4 mb-8">
-            {/* Media Preview / Hardware Status */}
-            <div className="bg-black/40 rounded-xl overflow-hidden border border-white/10 aspect-video relative flex items-center justify-center">
+
+          {/* Right: Camera Preview */}
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-purple-600 rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000" />
+            <div className="relative aspect-[4/3] bg-black rounded-3xl overflow-hidden border border-white/10 shadow-3xl">
               {mediaStatus.stream && mediaStatus.camera === 'ready' ? (
-                <video
-                  autoPlay
-                  muted
-                  playsInline
-                  ref={(el) => { if (el) el.srcObject = mediaStatus.stream; }}
-                  className="w-full h-full object-cover mirror"
-                />
+                <>
+                  <video
+                    autoPlay
+                    muted
+                    playsInline
+                    ref={(el) => { if (el) el.srcObject = mediaStatus.stream; }}
+                    className="w-full h-full object-cover mirror"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                  <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                    <span className="text-[10px] font-bold text-white uppercase tracking-wider">Live Preview</span>
+                  </div>
+                </>
               ) : (
-                <div className="text-gray-500 flex flex-col items-center gap-2">
-                  <Camera className="w-8 h-8 opacity-20" />
-                  <span className="text-xs">Camera Preview Unavailable</span>
+                <div className="w-full h-full flex flex-col items-center justify-center gap-6 bg-gray-900/50">
+                  <div className="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                    <Camera className="w-10 h-10 text-gray-500" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-white font-medium mb-1">Camera Off</p>
+                    <p className="text-gray-500 text-xs">Enable camera to continue</p>
+                  </div>
                 </div>
               )}
-              
-              <div className="absolute bottom-3 left-3 right-3 flex justify-between gap-2">
-                <div className={`px-3 py-1.5 rounded-full text-xs flex items-center gap-2 backdrop-blur-md ${
-                  mediaStatus.camera === 'ready' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 
-                  mediaStatus.camera === 'error' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 
-                  'bg-white/10 text-gray-400 border border-white/10'
-                }`}>
-                  <div className={`w-1.5 h-1.5 rounded-full ${mediaStatus.camera === 'ready' ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
-                  Camera {mediaStatus.camera === 'ready' ? 'Active' : mediaStatus.camera === 'error' ? 'Error' : 'Checking...'}
-                </div>
-                <div className={`px-3 py-1.5 rounded-full text-xs flex items-center gap-2 backdrop-blur-md ${
-                  mediaStatus.mic === 'ready' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 
-                  mediaStatus.mic === 'error' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 
-                  'bg-white/10 text-gray-400 border border-white/10'
-                }`}>
-                  <div className={`w-1.5 h-1.5 rounded-full ${mediaStatus.mic === 'ready' ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
-                  Microphone {mediaStatus.mic === 'ready' ? 'Active' : mediaStatus.mic === 'error' ? 'Error' : 'Checking...'}
-                </div>
-              </div>
             </div>
-
-            <div className="space-y-2 text-left bg-white/5 rounded-xl p-4 border border-white/10">
-              <div className="flex items-center gap-3 text-gray-300 text-xs">
-                <Cpu className="w-3.5 h-3.5 text-purple-400" />
-                <span>Whisper AI runs locally in your browser</span>
-              </div>
-              <div className="flex items-center gap-3 text-gray-300 text-xs">
-                <Video className="w-3.5 h-3.5 text-green-400" />
-                <span>Session enters fullscreen for focus</span>
-              </div>
-            </div>
+            
+            {/* Decorative corners */}
+            <div className="absolute -top-2 -left-2 w-8 h-8 border-t-2 border-l-2 border-blue-500/50 rounded-tl-lg" />
+            <div className="absolute -top-2 -right-2 w-8 h-8 border-t-2 border-r-2 border-purple-500/50 rounded-tr-lg" />
+            <div className="absolute -bottom-2 -left-2 w-8 h-8 border-b-2 border-l-2 border-blue-500/50 rounded-bl-lg" />
+            <div className="absolute -bottom-2 -right-2 w-8 h-8 border-b-2 border-r-2 border-purple-500/50 rounded-br-lg" />
           </div>
-
-          <button
-            onClick={() => {
-              if (mediaStatus.stream) {
-                mediaStatus.stream.getTracks().forEach(t => t.stop());
-              }
-              setPendingStartType(undefined);
-              startInterview(pendingStartType);
-            }}
-            disabled={!isReady}
-            className={`w-full py-4 rounded-xl font-semibold text-lg transition-all shadow-lg flex items-center justify-center gap-3 ${
-              isReady 
-                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 shadow-blue-500/25' 
-                : 'bg-gray-800 text-gray-500 cursor-not-allowed border border-white/5'
-            }`}
-          >
-            <Play className="w-6 h-6" />
-            {isReady ? 'Start Interview' : 'Checking Hardware...'}
-          </button>
-          
-          <button
-            onClick={() => { 
-              if (mediaStatus.stream) {
-                mediaStatus.stream.getTracks().forEach(t => t.stop());
-              }
-              setPendingStartType(undefined); 
-              onBack(); 
-            }}
-            className="mt-4 text-gray-500 hover:text-gray-300 transition-colors text-sm"
-          >
-            ← Back to Dashboard
-          </button>
         </div>
       </div>
     );

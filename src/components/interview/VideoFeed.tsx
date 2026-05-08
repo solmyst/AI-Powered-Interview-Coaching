@@ -11,27 +11,30 @@ type Props = {
 
 export function VideoFeed({ videoRef, canvasRef, cameraEnabled, onToggleCamera, faceDetected, eyeContact }: Props) {
   return (
-    <div className="relative bg-gray-800 rounded-lg overflow-hidden">
+    <div className="relative group w-full h-full min-h-[240px]">
       {cameraEnabled ? (
-        <div className="relative">
+        <div className="relative aspect-video w-full h-full bg-black">
           <video
             ref={videoRef}
             autoPlay
             muted
             playsInline
-            className="w-full h-64 object-cover"
+            className="w-full h-full object-cover"
           />
           {/* MediaPipe face landmark overlay */}
           <canvas
             ref={canvasRef}
-            className="absolute inset-0 w-full h-64 object-cover pointer-events-none"
+            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
           />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
         </div>
       ) : (
-        <div className="w-full h-64 flex items-center justify-center bg-gray-700">
+        <div className="aspect-video flex items-center justify-center bg-gray-900/50">
           <div className="text-center">
-            <CameraOff className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-            <p className="text-gray-400 text-sm">Camera is off</p>
+            <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10">
+              <CameraOff className="w-8 h-8 text-gray-600" />
+            </div>
+            <p className="text-gray-500 text-sm font-medium">Camera Disabled</p>
           </div>
         </div>
       )}

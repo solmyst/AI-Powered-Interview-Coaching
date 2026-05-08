@@ -122,16 +122,23 @@ export function AIInterviewer({ session, userTranscript, onQuestionChange, onFin
 
   return (
     <div className="h-full flex flex-col">
-      {/* Interviewer Header */}
-      <div className="bg-gray-800 rounded-lg p-4 mb-6">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-2xl">
-            {interviewerPersonality.avatar}
+      {/* Interviewer Profile Card */}
+      <div className="relative group mb-8">
+        <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition duration-500" />
+        <div className="relative bg-black/40 border border-white/10 rounded-2xl p-5 backdrop-blur-xl flex items-center gap-5">
+          <div className="relative">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center text-3xl shadow-inner relative overflow-hidden">
+              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20" />
+              <span className="relative z-10">{interviewerPersonality.avatar}</span>
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 border-4 border-[#0a0a0c] rounded-full" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">{interviewerPersonality.name}</h3>
-            <p className="text-gray-300 text-sm">{interviewerPersonality.role}</p>
-            <p className="text-gray-400 text-xs">{interviewerPersonality.company}</p>
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="text-xl font-bold text-white tracking-tight">{interviewerPersonality.name}</h3>
+              <span className="px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-[10px] font-bold text-blue-400 uppercase tracking-widest">AI Agent</span>
+            </div>
+            <p className="text-gray-400 text-sm font-medium">{interviewerPersonality.role} @ {interviewerPersonality.company}</p>
           </div>
         </div>
       </div>
@@ -173,12 +180,14 @@ export function AIInterviewer({ session, userTranscript, onQuestionChange, onFin
               className="h-full flex flex-col"
             >
               <div className="flex-1">
-                <h4 className="text-lg font-medium text-white mb-4">
-                  Question {currentQuestion + 1}:
-                </h4>
-                <p className="text-xl text-gray-100 leading-relaxed mb-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="text-blue-500 font-mono text-sm tracking-widest uppercase">Question {currentQuestion + 1}</span>
+                  <div className="h-px flex-1 bg-gradient-to-r from-blue-500/50 to-transparent" />
+                </div>
+                
+                <h4 className="text-3xl font-bold text-white leading-tight mb-8">
                   {session.questions[currentQuestion]}
-                </p>
+                </h4>
 
                 <AnimatePresence>
                   {followUpQuestion && (

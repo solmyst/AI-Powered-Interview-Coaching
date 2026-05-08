@@ -11,6 +11,28 @@ function App() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [initializing, setInitializing] = useState(true);
   const [interviewType, setInterviewType] = useState<string | undefined>(undefined);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (currentPage === 'interview' && document.fullscreenElement) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [currentPage]);
 
   useEffect(() => {
     // Check if there's a guest user in localStorage
@@ -77,7 +99,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {user && (
+      {user && !isFullscreen && (
         <Navigation 
           user={user} 
           currentPage={currentPage}
@@ -86,7 +108,7 @@ function App() {
         />
       )}
       
-      <main className={user ? 'pt-16' : ''}>
+      <main className={user && !isFullscreen ? 'pt-16' : ''}>
         {renderPage()}
       </main>
     </div>
