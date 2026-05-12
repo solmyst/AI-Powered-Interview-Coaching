@@ -148,11 +148,28 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
       );
     }
 
-    const { strengths, improvements } = SessionStorageService.generateFeedback(
-      scores,
-      finalSpeechData?.fillerWordCount ?? 0,
-      wpm
-    );
+    let strengths: string[] = [];
+    let improvements: string[] = [];
+
+    try {
+      const { AIProviderService } = await import('../services/aiProviderService');
+      const aiFeedback = await AIProviderService.generateFeedback(
+        session?.type || 'quick',
+        finalSpeechData?.transcript || '',
+        scores
+      );
+      strengths = aiFeedback.strengths;
+      improvements = aiFeedback.improvements;
+    } catch (error) {
+      console.warn('AI Feedback generation failed, falling back to rule-based feedback:', error);
+      const fallback = SessionStorageService.generateFeedback(
+        scores,
+        finalSpeechData?.fillerWordCount ?? 0,
+        wpm
+      );
+      strengths = fallback.strengths;
+      improvements = fallback.improvements;
+    }
 
     const sessionRecord: SessionRecord = {
       id: session?.id || Date.now().toString(),

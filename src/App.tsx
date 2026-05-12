@@ -5,6 +5,7 @@ import { Dashboard } from './components/pages/Dashboard';
 import { InterviewPractice } from './components/pages/InterviewPractice';
 import { Navigation } from './components/layout/Navigation';
 import { AnalyticsDashboard } from './components/pages/AnalyticsDashboard';
+import { Settings } from './components/pages/Settings';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('landing');
@@ -92,6 +93,8 @@ function App() {
         return <InterviewPractice user={user!} onBack={() => { setInterviewType(undefined); setCurrentPage('dashboard'); }} autoStartType={interviewType} />;
       case 'analytics':
         return <AnalyticsDashboard user={user!} onBack={() => setCurrentPage('dashboard')} />;
+      case 'settings':
+        return <Settings />;
       default:
         return <Dashboard user={user!} onNavigate={(page: Page) => setCurrentPage(page)} onStartInterview={(type) => { setInterviewType(type); setCurrentPage('interview'); }} />;
     }

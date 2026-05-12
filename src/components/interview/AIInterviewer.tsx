@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MessageCircle, CheckCircle2, Clock } from 'lucide-react';
+import { MessageCircle, CheckCircle2, Clock, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type InterviewSession = {
@@ -77,20 +77,28 @@ export function AIInterviewer({ session, userTranscript, onQuestionChange, onFin
         setOllamaAvailable(status.available);
       });
     });
+    
+    // Also check if OpenAI key is configured
+    import('../../services/aiProviderService').then(({ AIProviderService }) => {
+      const config = AIProviderService.getConfig();
+      if (config.provider === 'openai' && config.apiKey) {
+        setOllamaAvailable(true); // Treat as "AI available"
+      }
+    });
   }, []);
 
   const handleGenerateFollowUp = async () => {
     setIsGeneratingFollowUp(true);
     setFollowUpQuestion(null);
     try {
-      const { OllamaService } = await import('../../services/ollamaService');
-      const question = await OllamaService.generateFollowUp(
+      const { AIProviderService } = await import('../../services/aiProviderService');
+      const question = await AIProviderService.generateFollowUp(
         session.questions[currentQuestion], 
         userTranscript
       );
       setFollowUpQuestion(question);
-    } catch {
-      console.error('Failed to generate follow-up');
+    } catch (error) {
+      console.error('Failed to generate follow-up:', error);
       // Smart fallback based on question type
       const fallbacks = getSmartFallback(session.questions[currentQuestion]);
       setFollowUpQuestion(fallbacks);

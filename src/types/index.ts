@@ -21,4 +21,4 @@ export type InterviewSession = {
   };
 };
 
-export type Page = 'landing' | 'dashboard' | 'interview' | 'analytics';
+export type Page = 'landing' | 'dashboard' | 'interview' | 'analytics' | 'settings';

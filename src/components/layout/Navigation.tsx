@@ -6,6 +6,7 @@ import {
   TrendingUp, 
   LogOut,
   ChevronDown,
+  Settings as SettingsIcon,
   User as UserIcon
 } from 'lucide-react';
 import { Page, User } from '../../types';
@@ -94,6 +95,19 @@ export function Navigation({ user, currentPage, onNavigate, onLogout }: Navigati
                     <p className="text-sm font-medium text-gray-900">{user.name}</p>
                     <p className="text-xs text-gray-500">{user.email}</p>
                   </div>
+
+                  <button 
+                    onClick={() => {
+                      onNavigate('settings');
+                      setShowUserMenu(false);
+                    }}
+                    className={`w-full flex items-center space-x-2 px-4 py-2 text-sm transition-colors ${
+                      currentPage === 'settings' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <SettingsIcon className="h-4 w-4" />
+                    <span>Settings</span>
+                  </button>
                   
                   <button 
                     onClick={() => {

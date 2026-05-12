@@ -32,7 +32,6 @@ export class WhisperService {
 
   // Audio capture
   private audioContext: AudioContext | null = null;
-  private mediaStream: MediaStream | null = null;
   private sourceNode: MediaStreamAudioSourceNode | null = null;
   private scriptProcessor: ScriptProcessorNode | null = null;
 
@@ -124,7 +123,6 @@ export class WhisperService {
     }
 
     this.transcriptCallback = onTranscript;
-    this.mediaStream = stream;
     this.fullTranscript = '';
     this.audioBuffer = [];
     this.bufferSampleCount = 0;
