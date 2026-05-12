@@ -948,7 +948,7 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
                 <Video className="w-8 h-8 text-purple-600" />
               </div>
               <h3 className="font-semibold text-gray-800 mb-2">Smart Feedback</h3>
-              <p className="text-sm text-gray-600">All analysis runs locally in your browser — no data sent to servers</p>
+              <p className="text-sm text-gray-600">All analysis runs locally. You can switch models (Ollama/OpenAI) in Settings.</p>
             </div>
           </div>
         </div>

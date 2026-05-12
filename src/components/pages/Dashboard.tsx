@@ -295,7 +295,7 @@ export function Dashboard({ user, onNavigate, onStartInterview }: DashboardProps
           {/* Tips */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-bold text-gray-900 mb-4">Quick Tips</h3>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {[
                 { tip: 'Use the STAR method', desc: 'Situation → Task → Action → Result' },
                 { tip: 'Maintain eye contact', desc: 'Look at the camera, not the screen' },
@@ -309,6 +309,20 @@ export function Dashboard({ user, onNavigate, onStartInterview }: DashboardProps
                   </div>
                 </div>
               ))}
+              
+              <div 
+                className="p-3 bg-blue-50 rounded-lg border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors"
+                onClick={() => onNavigate('settings')}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Brain className="h-4 w-4 text-blue-600" />
+                  <p className="text-sm font-bold text-blue-900">Customize AI</p>
+                </div>
+                <p className="text-xs text-blue-700 leading-relaxed">
+                  You can change your AI provider and model (Ollama or OpenAI) from the 
+                  <span className="font-semibold underline ml-1">Settings</span>.
+                </p>
+              </div>
             </div>
           </div>
 
