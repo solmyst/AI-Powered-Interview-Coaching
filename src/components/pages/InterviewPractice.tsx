@@ -594,12 +594,12 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
 
   if (session && isRecording) {
     return (
-      <div ref={interviewContainerRef} className="h-screen bg-[#0a0a0c] text-white overflow-hidden selection:bg-blue-500/30">
+      <div ref={interviewContainerRef} className="h-screen bg-void text-parchment overflow-hidden selection:bg-clay/35 font-sans">
         <div className="flex h-full p-4 lg:p-8 gap-8">
           {/* Left Panel - AI Interviewer (60% width) */}
           <div className="w-full lg:w-[60%] flex flex-col">
-            <div className="flex-1 bg-white/[0.02] border border-white/10 rounded-3xl backdrop-blur-3xl overflow-hidden flex flex-col shadow-2xl relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/[0.03] to-purple-500/[0.03] pointer-events-none" />
+            <div className="flex-1 bg-carbon/50 border border-mist/20 rounded-3xl backdrop-blur-3xl overflow-hidden flex flex-col shadow-2xl relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-clay-pale/[0.02] to-transparent pointer-events-none" />
               <div className="p-8 flex-1 overflow-y-auto custom-scrollbar">
                 <AIInterviewer
                   session={session}
@@ -617,7 +617,7 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
           <div className="hidden lg:flex lg:w-[40%] flex-col gap-6">
             <div className="flex-1 flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2">
               {/* User Video Feed with AI overlay */}
-              <div className="bg-white/[0.02] border border-white/10 rounded-3xl backdrop-blur-3xl overflow-hidden shadow-xl min-h-[240px] flex items-center justify-center relative">
+              <div className="bg-carbon/50 border border-mist/20 rounded-3xl backdrop-blur-3xl overflow-hidden shadow-xl min-h-[240px] flex items-center justify-center relative">
                 <div className="w-full h-full">
                   <VideoFeed
                     videoRef={videoRef}
@@ -631,7 +631,7 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
               </div>
 
               {/* Real-time Feedback */}
-              <div className="bg-white/[0.02] border border-white/10 rounded-3xl backdrop-blur-3xl p-6 shadow-xl">
+              <div className="bg-carbon/50 border border-mist/20 rounded-3xl backdrop-blur-3xl p-6 shadow-xl">
                 <RealTimeFeedback feedback={realTimeFeedback} />
               </div>
 
@@ -654,13 +654,13 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
 
         {/* Exit Warning Modal */}
         {showExitWarning && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-gray-800 border border-red-500/30 rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
-              <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                <AlertTriangle className="w-8 h-8 text-red-500" />
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-void/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-carbon border border-clay/35 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl">
+              <div className="w-16 h-16 bg-clay/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <AlertTriangle className="w-8 h-8 text-clay" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Fullscreen Required</h2>
-              <p className="text-gray-400 mb-8">
+              <h2 className="text-2xl font-bold font-serif text-parchment mb-2">Fullscreen Required</h2>
+              <p className="text-mist mb-8 leading-relaxed text-sm">
                 To ensure a fair and focused interview environment, you must remain in fullscreen mode. 
                 Leaving fullscreen will invalidate this session.
               </p>
@@ -674,7 +674,7 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
                       console.error('Failed to re-enter fullscreen:', err);
                     }
                   }}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-colors"
+                  className="w-full py-3 bg-clay hover:bg-clay/90 text-parchment rounded-xl font-semibold transition-colors"
                 >
                   Return to Fullscreen
                 </button>
@@ -701,47 +701,47 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
     const isReady = mediaStatus.camera === 'ready' && mediaStatus.mic === 'ready';
 
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-6 relative overflow-hidden">
+      <div className="min-h-screen bg-void flex items-center justify-center p-6 relative overflow-hidden font-sans">
         {/* Animated Background Elements */}
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-clay/10 blur-[120px] rounded-full animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-clay-pale/10 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
         
         <div className="max-w-4xl w-full grid lg:grid-cols-2 gap-12 items-center relative z-10">
           {/* Left: Info & Status */}
           <div className="space-y-8 text-left">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium mb-6">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-clay-pale/10 border border-clay-pale/25 text-clay-pale text-xs font-semibold uppercase tracking-wider mb-6">
+                <div className="w-1.5 h-1.5 rounded-full bg-clay-pale animate-pulse" />
                 System Ready
               </div>
-              <h1 className="text-5xl font-bold text-white mb-4 tracking-tight">
-                Ready to <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 text-6xl block mt-2">Practice?</span>
+              <h1 className="text-5xl font-bold font-serif text-parchment mb-4 tracking-tight leading-none">
+                Ready to <span className="text-transparent bg-clip-text bg-gradient-to-r from-clay-pale to-clay text-6xl block mt-2">Practice?</span>
               </h1>
-              <p className="text-gray-400 text-lg max-w-md leading-relaxed">
+              <p className="text-mist text-lg max-w-md leading-relaxed">
                 Your AI-powered mock interview is prepared. We'll analyze your speech, posture, and confidence in real-time.
               </p>
             </div>
 
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl space-y-4 shadow-2xl">
+            <div className="bg-carbon border border-mist/20 rounded-3xl p-6 backdrop-blur-xl space-y-4 shadow-2xl">
               <div className="flex items-center justify-between">
-                <span className="text-gray-400 text-sm">Selected Type</span>
-                <span className="text-white font-semibold capitalize bg-white/10 px-3 py-1 rounded-lg border border-white/10">{selectedType?.name || pendingStartType}</span>
+                <span className="text-mist text-sm font-semibold">Selected Type</span>
+                <span className="text-parchment font-bold capitalize bg-void px-3 py-1 rounded-lg border border-mist/10">{selectedType?.name || pendingStartType}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-400 text-sm">Questions</span>
-                <span className="text-white font-semibold">{selectedType?.questions} Scenarios</span>
+                <span className="text-mist text-sm font-semibold">Questions</span>
+                <span className="text-parchment font-bold">{selectedType?.questions} Scenarios</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-400 text-sm">Est. Duration</span>
-                <span className="text-white font-semibold">{selectedType?.duration}</span>
+                <span className="text-mist text-sm font-semibold">Est. Duration</span>
+                <span className="text-parchment font-bold">{selectedType?.duration}</span>
               </div>
-              <div className="pt-4 border-t border-white/5 space-y-3">
+              <div className="pt-4 border-t border-mist/10 space-y-3">
                 <div className="flex items-center gap-3 text-sm">
                   <div className={`w-2 h-2 rounded-full ${
                     mediaStatus.camera === 'ready' ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 
                     mediaStatus.camera === 'checking' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'
                   }`} />
-                  <span className="text-gray-300">
+                  <span className="text-parchment/80 font-medium">
                     Camera: {
                       mediaStatus.camera === 'ready' ? 'Active & Ready' : 
                       mediaStatus.camera === 'checking' ? 'Checking Permissions...' : 'Access Blocked'
@@ -753,7 +753,7 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
                     mediaStatus.mic === 'ready' ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 
                     mediaStatus.mic === 'checking' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'
                   }`} />
-                  <span className="text-gray-300">
+                  <span className="text-parchment/80 font-medium">
                     Microphone: {
                       mediaStatus.mic === 'ready' ? 'Active & Ready' : 
                       mediaStatus.mic === 'checking' ? 'Checking Permissions...' : 'Access Blocked'
@@ -775,12 +775,12 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
                 disabled={!isReady}
                 className={`group relative w-full py-5 rounded-2xl font-bold text-xl transition-all flex items-center justify-center gap-3 overflow-hidden ${
                   isReady 
-                    ? 'text-white' 
+                    ? 'text-void' 
                     : 'bg-gray-800 text-gray-500 cursor-not-allowed grayscale'
                 }`}
               >
                 {isReady && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 group-hover:scale-110 transition-transform duration-500" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-clay to-clay-pale group-hover:scale-110 transition-transform duration-500" />
                 )}
                 <span className="relative flex items-center gap-3">
                   <Play className={`w-6 h-6 ${isReady ? 'fill-current' : ''}`} />
@@ -796,7 +796,7 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
                   setPendingStartType(undefined); 
                   onBack(); 
                 }}
-                className="text-gray-500 hover:text-gray-300 transition-colors text-sm font-medium"
+                className="text-mist hover:text-parchment transition-colors text-sm font-semibold"
               >
                 ← Back to Dashboard
               </button>
@@ -805,8 +805,8 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
 
           {/* Right: Camera Preview */}
           <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-purple-600 rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000" />
-            <div className="relative aspect-[4/3] bg-black rounded-3xl overflow-hidden border border-white/10 shadow-3xl">
+            <div className="absolute -inset-1 bg-gradient-to-r from-clay to-clay-pale rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000" />
+            <div className="relative aspect-[4/3] bg-black rounded-3xl overflow-hidden border border-mist/20 shadow-3xl">
               {mediaStatus.stream && mediaStatus.camera === 'ready' ? (
                 <>
                   <video
@@ -836,10 +836,10 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
             </div>
             
             {/* Decorative corners */}
-            <div className="absolute -top-2 -left-2 w-8 h-8 border-t-2 border-l-2 border-blue-500/50 rounded-tl-lg" />
-            <div className="absolute -top-2 -right-2 w-8 h-8 border-t-2 border-r-2 border-purple-500/50 rounded-tr-lg" />
-            <div className="absolute -bottom-2 -left-2 w-8 h-8 border-b-2 border-l-2 border-blue-500/50 rounded-bl-lg" />
-            <div className="absolute -bottom-2 -right-2 w-8 h-8 border-b-2 border-r-2 border-purple-500/50 rounded-br-lg" />
+            <div className="absolute -top-2 -left-2 w-8 h-8 border-t-2 border-l-2 border-clay-pale/60 rounded-tl-lg" />
+            <div className="absolute -top-2 -right-2 w-8 h-8 border-t-2 border-r-2 border-clay-pale/60 rounded-tr-lg" />
+            <div className="absolute -bottom-2 -left-2 w-8 h-8 border-b-2 border-l-2 border-clay-pale/60 rounded-bl-lg" />
+            <div className="absolute -bottom-2 -right-2 w-8 h-8 border-b-2 border-r-2 border-clay-pale/60 rounded-br-lg" />
           </div>
         </div>
       </div>
@@ -849,28 +849,28 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
   // Show loading state during initialization (Whisper download, camera setup)
   if (isInitializing) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-gray-900 via-blue-950 to-indigo-950 flex items-center justify-center p-6">
+      <div className="min-h-[calc(100vh-4rem)] bg-void flex items-center justify-center p-6 font-sans">
         <div className="max-w-lg w-full text-center">
           {whisperProgress ? (
-            <div className="bg-white/5 rounded-xl p-8 border border-white/10">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-6">
-                <Cpu className="w-8 h-8 text-white animate-pulse" />
+            <div className="bg-carbon rounded-3xl p-8 border border-mist/20 shadow-2xl">
+              <div className="w-16 h-16 bg-gradient-to-br from-clay to-clay-pale rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-clay/10">
+                <Cpu className="w-8 h-8 text-void animate-pulse" />
               </div>
-              <h2 className="text-xl font-semibold text-white mb-2">Loading AI Speech Engine</h2>
-              <p className="text-gray-400 text-sm mb-6">Powered by OpenAI Whisper • Runs locally in your browser</p>
-              <div className="w-full bg-gray-700 rounded-full h-3 mb-3">
+              <h2 className="text-xl font-bold font-serif text-parchment mb-2">Loading AI Speech Engine</h2>
+              <p className="text-mist text-sm mb-6">Powered by OpenAI Whisper • Runs locally in your browser</p>
+              <div className="w-full bg-void border border-mist/10 rounded-full h-3 mb-3">
                 <div
-                  className="h-3 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-300"
+                  className="h-full rounded-full bg-gradient-to-r from-clay to-clay-pale transition-all duration-300"
                   style={{ width: `${whisperProgress.progress}%` }}
                 />
               </div>
-              <p className="text-xs text-gray-500">{whisperProgress.message}</p>
+              <p className="text-xs text-mist font-semibold">{whisperProgress.message}</p>
             </div>
           ) : (
-            <div>
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto mb-6"></div>
-              <p className="text-white font-medium">Initializing AI Analysis Engine...</p>
-              <p className="text-gray-400 text-sm mt-2">Requesting camera and microphone access</p>
+            <div className="bg-carbon border border-mist/20 rounded-3xl p-8 shadow-2xl">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-clay mx-auto mb-6"></div>
+              <h2 className="text-xl font-bold font-serif text-parchment mb-2">Initializing Local AI</h2>
+              <p className="text-mist text-sm">Requesting camera and microphone access</p>
             </div>
           )}
 
@@ -889,66 +889,66 @@ export function InterviewPractice({ onBack, autoStartType }: Props) {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+    <div className="min-h-[calc(100vh-4rem)] bg-parchment p-6 text-left font-sans">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
+            className="flex items-center gap-2 text-ash hover:text-void transition-colors font-bold"
           >
             <ArrowLeft className="w-5 h-5" />
             Back to Dashboard
           </button>
-          <h1 className="text-3xl font-bold text-gray-800">Interview Practice</h1>
+          <h1 className="text-3xl font-bold font-serif text-void tracking-tight">Interview Practice</h1>
           <div className="w-24"></div>
         </div>
 
         {/* Interview Type Selection */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
           {interviewTypes.map((type) => (
             <div
               key={type.id}
-              className="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow cursor-pointer border-2 border-transparent hover:border-blue-200"
+              className="bg-vellum/35 backdrop-blur-sm rounded-2xl p-6 shadow-sm hover:shadow-md hover:border-clay/40 border border-mist/20 transition-all duration-300 cursor-pointer group"
               onClick={() => !isInitializing && startInterview(type.id)}
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">{type.name}</h3>
-                <Play className="w-6 h-6 text-blue-600" />
+                <h3 className="text-lg font-bold font-serif text-void">{type.name}</h3>
+                <Play className="w-5 h-5 text-clay group-hover:scale-110 transition-transform fill-current" />
               </div>
-              <p className="text-sm text-gray-600 mb-3">{type.description}</p>
-              <div className="flex justify-between text-sm">
-                <span className="text-blue-600 font-medium">{type.duration}</span>
-                <span className="text-gray-500">{type.questions} questions</span>
+              <p className="text-sm text-ash mb-4 leading-relaxed">{type.description}</p>
+              <div className="flex justify-between text-xs">
+                <span className="text-clay font-bold uppercase tracking-wider">{type.duration}</span>
+                <span className="text-mist font-semibold">{type.questions} questions</span>
               </div>
             </div>
           ))}
         </div>
 
         {/* Features Overview */}
-        <div className="bg-white rounded-xl p-8 shadow-lg">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">Real AI-Powered Analysis</h2>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Camera className="w-8 h-8 text-blue-600" />
+        <div className="bg-vellum/35 backdrop-blur-sm border border-mist/20 rounded-3xl p-8 shadow-sm">
+          <h2 className="text-2xl font-bold font-serif text-void mb-6 tracking-tight">Real AI-Powered Analysis</h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="text-center group">
+              <div className="w-16 h-16 bg-clay/10 border border-clay/10 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-105 transition-transform">
+                <Camera className="w-7 h-7 text-clay" />
               </div>
-              <h3 className="font-semibold text-gray-800 mb-2">Face & Eye Tracking</h3>
-              <p className="text-sm text-gray-600">MediaPipe AI tracks your eye contact, head pose, and facial expressions in real-time</p>
+              <h3 className="font-bold font-serif text-void text-lg mb-2">Face & Eye Tracking</h3>
+              <p className="text-sm text-ash leading-relaxed">MediaPipe AI tracks your eye contact, head pose, and posture indicators locally in real-time.</p>
             </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Mic className="w-8 h-8 text-green-600" />
+            <div className="text-center group">
+              <div className="w-16 h-16 bg-clay/10 border border-clay/10 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-105 transition-transform">
+                <Mic className="w-7 h-7 text-clay" />
               </div>
-              <h3 className="font-semibold text-gray-800 mb-2">Whisper Speech AI</h3>
-              <p className="text-sm text-gray-600">OpenAI Whisper runs locally for accurate transcription, filler word detection, and pace analysis</p>
+              <h3 className="font-bold font-serif text-void text-lg mb-2">Whisper Speech AI</h3>
+              <p className="text-sm text-ash leading-relaxed">OpenAI Whisper compiles locally for accurate transcription, speech clarity, filler word tracking, and pace stats.</p>
             </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Video className="w-8 h-8 text-purple-600" />
+            <div className="text-center group">
+              <div className="w-16 h-16 bg-clay/10 border border-clay/10 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-105 transition-transform">
+                <Video className="w-7 h-7 text-clay" />
               </div>
-              <h3 className="font-semibold text-gray-800 mb-2">Smart Feedback</h3>
-              <p className="text-sm text-gray-600">All analysis runs locally. You can switch models (Ollama/OpenAI) in Settings.</p>
+              <h3 className="font-bold font-serif text-void text-lg mb-2">Smart Local Feedback</h3>
+              <p className="text-sm text-ash leading-relaxed">Everything runs on-device securely. Modify engine prompts or setup OpenAI keys in settings.</p>
             </div>
           </div>
         </div>

@@ -28,16 +28,18 @@ export function Navigation({ user, currentPage, onNavigate, onLogout }: Navigati
   ];
 
   return (
-    <nav className="fixed top-0 w-full bg-white/95 backdrop-blur-sm border-b border-gray-200 z-50">
+    <nav className="fixed top-0 w-full bg-parchment/90 backdrop-blur-md border-b border-mist/20 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div 
-            className="flex items-center space-x-2 cursor-pointer"
+            className="flex items-center space-x-2 cursor-pointer group"
             onClick={() => onNavigate('dashboard')}
           >
-            <Brain className="h-8 w-8 text-blue-600" />
-            <span className="text-xl font-bold text-gray-900">InterviewAce</span>
+            <div className="w-10 h-10 bg-clay/10 rounded-xl flex items-center justify-center group-hover:bg-clay/20 transition-colors">
+              <Brain className="h-6 w-6 text-clay" />
+            </div>
+            <span className="text-2xl font-bold font-serif text-void tracking-tight">InterviewAce</span>
           </div>
 
           {/* Navigation Items */}
@@ -46,14 +48,14 @@ export function Navigation({ user, currentPage, onNavigate, onLogout }: Navigati
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
                   currentPage === item.id
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                    ? 'bg-clay/10 text-clay font-semibold shadow-sm'
+                    : 'text-ash hover:text-void hover:bg-vellum/50 font-medium'
                 }`}
               >
                 <item.icon className="h-4 w-4" />
-                <span className="font-medium">{item.label}</span>
+                <span>{item.label}</span>
               </button>
             ))}
           </div>
@@ -62,10 +64,10 @@ export function Navigation({ user, currentPage, onNavigate, onLogout }: Navigati
           <div className="relative">
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              className="flex items-center space-x-3 p-2 rounded-lg hover:bg-vellum/50 transition-colors"
             >
               <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                <div className="w-8 h-8 bg-clay/10 rounded-full flex items-center justify-center border border-clay/25">
                   {user.avatar ? (
                     <img 
                       src={user.avatar} 
@@ -73,14 +75,14 @@ export function Navigation({ user, currentPage, onNavigate, onLogout }: Navigati
                       className="w-8 h-8 rounded-full object-cover"
                     />
                   ) : (
-                    <UserIcon className="h-4 w-4 text-blue-600" />
+                    <UserIcon className="h-4 w-4 text-clay" />
                   )}
                 </div>
                 <div className="hidden sm:block">
-                  <span className="text-sm font-medium text-gray-900">{user.name}</span>
+                  <span className="text-sm font-semibold text-ash">{user.name}</span>
                 </div>
               </div>
-              <ChevronDown className="h-4 w-4 text-gray-500" />
+              <ChevronDown className="h-4 w-4 text-mist" />
             </button>
 
             {showUserMenu && (
@@ -90,10 +92,10 @@ export function Navigation({ user, currentPage, onNavigate, onLogout }: Navigati
                   className="fixed inset-0 z-40" 
                   onClick={() => setShowUserMenu(false)} 
                 />
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                  <div className="px-4 py-2 border-b border-gray-100">
-                    <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                    <p className="text-xs text-gray-500">{user.email}</p>
+                <div className="absolute right-0 mt-2 w-56 bg-vellum rounded-xl shadow-xl border border-mist/25 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                  <div className="px-4 py-2 border-b border-mist/10">
+                    <p className="text-sm font-bold text-void">{user.name}</p>
+                    <p className="text-xs text-ash">{user.email}</p>
                   </div>
 
                   <button 
@@ -101,8 +103,10 @@ export function Navigation({ user, currentPage, onNavigate, onLogout }: Navigati
                       onNavigate('settings');
                       setShowUserMenu(false);
                     }}
-                    className={`w-full flex items-center space-x-2 px-4 py-2 text-sm transition-colors ${
-                      currentPage === 'settings' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
+                    className={`w-full flex items-center space-x-2 px-4 py-2.5 text-sm transition-colors ${
+                      currentPage === 'settings' 
+                        ? 'bg-clay/10 text-clay font-semibold' 
+                        : 'text-ash hover:text-void hover:bg-parchment/50'
                     }`}
                   >
                     <SettingsIcon className="h-4 w-4" />
@@ -114,7 +118,7 @@ export function Navigation({ user, currentPage, onNavigate, onLogout }: Navigati
                       onLogout();
                       setShowUserMenu(false);
                     }}
-                    className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    className="w-full flex items-center space-x-2 px-4 py-2.5 text-sm text-clay hover:bg-clay/5 transition-colors font-medium"
                   >
                     <LogOut className="h-4 w-4" />
                     <span>Sign Out</span>
@@ -127,7 +131,7 @@ export function Navigation({ user, currentPage, onNavigate, onLogout }: Navigati
       </div>
 
       {/* Mobile Navigation */}
-      <div className="md:hidden border-t border-gray-200 bg-white">
+      <div className="md:hidden border-t border-mist/20 bg-parchment">
         <div className="grid grid-cols-3 gap-1 p-2">
           {navItems.map((item) => (
             <button
@@ -135,12 +139,12 @@ export function Navigation({ user, currentPage, onNavigate, onLogout }: Navigati
               onClick={() => onNavigate(item.id)}
               className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors ${
                 currentPage === item.id
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  ? 'bg-clay/10 text-clay font-semibold shadow-sm'
+                  : 'text-ash hover:text-void hover:bg-vellum/50 font-medium'
               }`}
             >
               <item.icon className="h-5 w-5" />
-              <span className="text-xs font-medium">{item.label}</span>
+              <span className="text-[10px]">{item.label}</span>
             </button>
           ))}
         </div>

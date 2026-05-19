@@ -64,66 +64,66 @@ export function Settings() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Settings</h1>
-        <p className="text-gray-600">Configure your AI providers and application preferences.</p>
+    <div className="max-w-4xl mx-auto px-4 py-12 text-left font-sans text-ash">
+      <div className="mb-10">
+        <h1 className="text-4xl font-bold font-serif text-void mb-2 tracking-tight">Settings</h1>
+        <p className="text-ash/90 text-md">Configure your AI providers and application preferences.</p>
       </div>
 
       <div className="space-y-6">
         {/* AI Provider Section */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 bg-gray-50/50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                <Cpu className="w-5 h-5 text-blue-600" />
+        <div className="bg-vellum/35 backdrop-blur-sm rounded-3xl border border-mist/20 overflow-hidden shadow-sm">
+          <div className="p-6 border-b border-mist/25 bg-vellum/45">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-clay/10 border border-clay/15 rounded-xl flex items-center justify-center">
+                <Cpu className="w-6 h-6 text-clay" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">AI Engine Configuration</h2>
-                <p className="text-sm text-gray-500">Choose between local or cloud-based AI for interview intelligence.</p>
+                <h2 className="text-xl font-bold font-serif text-void">AI Engine Configuration</h2>
+                <p className="text-sm text-ash/80">Choose between local or cloud-based AI for interview intelligence.</p>
               </div>
             </div>
           </div>
 
-          <div className="p-6 space-y-6">
+          <div className="p-6 sm:p-8 space-y-6">
             {/* Provider Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">AI Provider</label>
+              <label className="block text-sm font-bold text-void mb-3">AI Provider</label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button
                   onClick={() => handleProviderSwitch('ollama')}
-                  className={`relative p-4 rounded-xl border-2 text-left transition-all ${
+                  className={`relative p-5 rounded-2xl border-2 text-left transition-all duration-300 ${
                     config.provider === 'ollama'
-                      ? 'border-blue-600 bg-blue-50/30'
-                      : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-clay bg-clay/5 shadow-sm'
+                      : 'border-mist/20 bg-vellum/10 hover:border-clay/40 hover:bg-vellum/20'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-gray-900">Ollama (Local)</span>
-                    {config.provider === 'ollama' && <CheckCircle2 className="w-5 h-5 text-blue-600" />}
+                    <span className="font-bold text-void">Ollama (Local)</span>
+                    {config.provider === 'ollama' && <CheckCircle2 className="w-5 h-5 text-clay" />}
                   </div>
-                  <p className="text-xs text-gray-500 mb-2">Privacy-first. Runs entirely on your machine. Requires Ollama installed.</p>
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-blue-600 uppercase tracking-wider">
-                    <Shield className="w-3 h-3" />
+                  <p className="text-xs text-ash/90 mb-4 leading-relaxed">Privacy-first. Runs entirely on your machine. Requires Ollama installed.</p>
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-clay uppercase tracking-wider">
+                    <Shield className="w-3.5 h-3.5" />
                     Offline Capable
                   </div>
                 </button>
 
                 <button
                   onClick={() => handleProviderSwitch('openai')}
-                  className={`relative p-4 rounded-xl border-2 text-left transition-all ${
+                  className={`relative p-5 rounded-2xl border-2 text-left transition-all duration-300 ${
                     config.provider === 'openai'
-                      ? 'border-blue-600 bg-blue-50/30'
-                      : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-clay bg-clay/5 shadow-sm'
+                      : 'border-mist/20 bg-vellum/10 hover:border-clay/40 hover:bg-vellum/20'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-gray-900">OpenAI (Cloud)</span>
-                    {config.provider === 'openai' && <CheckCircle2 className="w-5 h-5 text-blue-600" />}
+                    <span className="font-bold text-void">OpenAI (Cloud)</span>
+                    {config.provider === 'openai' && <CheckCircle2 className="w-5 h-5 text-clay" />}
                   </div>
-                  <p className="text-xs text-gray-500 mb-2">Highest quality responses. Requires an active internet connection and API key.</p>
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-purple-600 uppercase tracking-wider">
-                    <Cpu className="w-3 h-3" />
+                  <p className="text-xs text-ash/90 mb-4 leading-relaxed">Highest quality responses. Requires an active internet connection and API key.</p>
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-clay uppercase tracking-wider">
+                    <Cpu className="w-3.5 h-3.5" />
                     GPT-4 Support
                   </div>
                 </button>
@@ -131,39 +131,39 @@ export function Settings() {
             </div>
 
             {/* Provider-specific Settings */}
-            <div className="pt-4 border-t border-gray-100">
+            <div className="pt-6 border-t border-mist/20">
               {config.provider === 'openai' ? (
-                <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                <div className="space-y-5 animate-in fade-in slide-in-from-top-2 duration-200">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-bold text-void mb-1.5">
                       OpenAI API Key
                     </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Key className="h-4 w-4 text-gray-400" />
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                        <Key className="h-4 w-4 text-mist" />
                       </div>
                       <input
                         type="password"
                         value={config.apiKey}
                         onChange={(e) => setConfig({ ...config, apiKey: e.target.value })}
-                        className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        className="block w-full pl-10 pr-3.5 py-3 border border-mist/25 bg-vellum/10 focus:ring-2 focus:ring-clay/35 focus:border-clay text-sm rounded-xl text-void"
                         placeholder="sk-..."
                       />
                     </div>
-                    <p className="mt-2 text-xs text-gray-500 flex items-center gap-1.5">
-                      <Info className="w-3.5 h-3.5" />
+                    <p className="mt-2 text-xs text-mist font-semibold flex items-center gap-1.5">
+                      <Info className="w-4 h-4 text-clay" />
                       Your key is stored locally in your browser and never sent to our servers.
                     </p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-bold text-void mb-1.5">
                       Model
                     </label>
                     <select
                       value={config.model}
                       onChange={(e) => setConfig({ ...config, model: e.target.value })}
-                      className="block w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      className="block w-full px-3.5 py-3 border border-mist/25 bg-vellum/10 focus:ring-2 focus:ring-clay/35 focus:border-clay text-sm rounded-xl text-void font-medium"
                     >
                       <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Fast & Balanced)</option>
                       <option value="gpt-4-turbo">GPT-4 Turbo (Smartest)</option>
@@ -175,22 +175,22 @@ export function Settings() {
                     href="https://platform.openai.com/api-keys" 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium"
+                    className="inline-flex items-center gap-1.5 text-xs text-clay hover:text-clay/80 font-bold border-b border-transparent hover:border-clay transition-all mt-1"
                   >
-                    Get your API key from OpenAI dashboard
-                    <ExternalLink className="w-3 h-3" />
+                    <span>Get your API key from OpenAI dashboard</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 </div>
               ) : (
-                <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                <div className="space-y-5 animate-in fade-in slide-in-from-top-2 duration-200">
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-sm font-medium text-gray-700">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-sm font-bold text-void">
                         Ollama Model Name
                       </label>
                       <button 
                         onClick={fetchOllamaModels}
-                        className="text-[10px] font-bold text-blue-600 uppercase tracking-tight hover:text-blue-700 transition-colors"
+                        className="text-[10px] font-bold text-clay uppercase tracking-wider hover:text-clay/80 transition-colors"
                       >
                         {isCheckingOllama ? 'Fetching...' : 'Refresh Models'}
                       </button>
@@ -200,7 +200,7 @@ export function Settings() {
                       <select
                         value={config.model}
                         onChange={(e) => setConfig({ ...config, model: e.target.value })}
-                        className="block w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm mb-2"
+                        className="block w-full px-3.5 py-3 border border-mist/25 bg-vellum/10 focus:ring-2 focus:ring-clay/35 focus:border-clay text-sm rounded-xl text-void font-medium mb-2"
                       >
                         {availableOllamaModels.map(model => (
                           <option key={model} value={model}>{model}</option>
@@ -211,22 +211,22 @@ export function Settings() {
                         type="text"
                         value={config.model}
                         onChange={(e) => setConfig({ ...config, model: e.target.value })}
-                        className="block w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm mb-2"
+                        className="block w-full px-3.5 py-3 border border-mist/25 bg-vellum/10 focus:ring-2 focus:ring-clay/35 focus:border-clay text-sm rounded-xl text-void mb-2"
                         placeholder="llama3.2"
                       />
                     )}
                     
-                    <p className="mt-2 text-xs text-gray-500">
-                      Make sure you have run `ollama pull {config.model}` on your machine.
+                    <p className="mt-2 text-xs text-mist font-semibold">
+                      Make sure you have run <code className="bg-vellum/60 px-1.5 py-0.5 rounded font-mono text-void text-[11px]">ollama pull {config.model}</code> on your machine.
                     </p>
                   </div>
                   
-                  <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                  <div className="p-5 bg-clay/5 border border-clay/15 rounded-2xl">
                     <div className="flex gap-3">
-                      <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                      <AlertCircle className="w-5 h-5 text-clay shrink-0 mt-0.5" />
                       <div>
-                        <h4 className="text-sm font-semibold text-amber-900">Local Requirement</h4>
-                        <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                        <h4 className="text-sm font-bold font-serif text-void">Local Requirement</h4>
+                        <p className="text-xs text-ash mt-1 leading-relaxed">
                           Ollama must be running on your local machine with CORS enabled. 
                           If you are using the deployed version, cloud providers like OpenAI are recommended for a seamless experience.
                         </p>
@@ -238,20 +238,20 @@ export function Settings() {
             </div>
           </div>
 
-          <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-end">
+          <div className="p-6 bg-vellum/45 border-t border-mist/20 flex justify-end">
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold transition-all ${
+              className={`flex items-center gap-2 px-6 py-3.5 rounded-xl font-bold transition-all duration-300 ${
                 showSuccess 
-                  ? 'bg-green-600 text-white'
-                  : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30'
-              } disabled:opacity-50`}
+                  ? 'bg-clay/20 text-clay border border-clay/25'
+                  : 'bg-clay text-parchment hover:bg-clay/90 hover:scale-105 active:scale-95 shadow-md shadow-clay/10'
+              } disabled:opacity-50 text-sm`}
             >
               {isSaving ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-parchment/30 border-t-parchment rounded-full animate-spin" />
               ) : showSuccess ? (
-                <><CheckCircle2 className="w-5 h-5" /> Saved!</>
+                <><CheckCircle2 className="w-5 h-5 text-clay" /> Saved!</>
               ) : (
                 <><Save className="w-5 h-5" /> Save Configuration</>
               )}

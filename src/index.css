@@ -1,6 +1,20 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  /* Terroir — solmyst signature palette */
+  --color-void: #0D0B09;        /* warm near-black, dark bg */
+  --color-carbon: #1E1C19;      /* dark surface, cards */
+  --color-ash: #4A4640;         /* body text, light mode */
+  --color-mist: #9A9188;        /* muted / secondary text */
+  --color-vellum: #EAE4D9;      /* elegant card/section bg */
+  --color-parchment: #F6F4F0;   /* crisp editorial off-white, light page bg */
+  --color-clay: #BE5F3C;        /* ★ signature accent */
+  --color-clay-pale: #E5A88A;   /* accent on dark bg */
+}
 
 @layer utilities {
   .mirror {
@@ -12,21 +26,23 @@ body {
   margin: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #0f172a;
-  color: #f8fafc;
+  background-color: var(--color-parchment);
+  color: var(--color-ash);
+  font-family: 'Outfit', sans-serif;
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #1e293b;
+  background: var(--color-parchment);
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--color-vellum);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: var(--color-mist);
 }
