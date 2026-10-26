@@ -245,7 +245,7 @@ export function Setup({
             <small aria-live="polite">
               {busy
                 ? "Your model is thinking. Local generation may take up to two minutes."
-                : "Answers are shared with the configured AI provider. No camera access is needed."}
+                : "The call requests camera and microphone access only after you join. Answer transcripts are shared with the configured AI provider."}
             </small>
           </div>
         </aside>

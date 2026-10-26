@@ -7,6 +7,8 @@ export function useWhisper(append: (text: string) => void) {
     deadline = useRef<ReturnType<typeof setTimeout>>(),
     started = useRef(0),
     duration = useRef(0),
+    monitor = useRef<AudioContext | null>(null),
+    monitorFrame = useRef(0),
     epoch = useRef(0),
     callback = useRef(append);
   callback.current = append;
@@ -22,6 +24,9 @@ export function useWhisper(append: (text: string) => void) {
   const [error, setError] = useState("");
   function release() {
     clearTimeout(timer.current);
+    cancelAnimationFrame(monitorFrame.current);
+    void monitor.current?.close().catch(() => {});
+    monitor.current = null;
     stream.current?.getTracks().forEach((t) => t.stop());
     stream.current = null;
   }
@@ -44,7 +49,7 @@ export function useWhisper(append: (text: string) => void) {
       cancel();
       setStatus("error");
       setError(
-        "Local transcription timed out. Reload Whisper or use browser dictation / text.",
+        "Local transcription timed out. Retry this question.",
       );
     }, 120000);
   }
@@ -70,18 +75,18 @@ export function useWhisper(append: (text: string) => void) {
       } else {
         setStatus("error");
         setError(
-          `Whisper could not run. Check the local speech assets, or use browser dictation. ${e.data.message || ""}`,
+          `Whisper could not run. Check the local speech assets and retry. ${e.data.message || ""}`,
         );
       }
     };
     w.onerror = () => {
       cancel();
       setStatus("error");
-      setError("The local Whisper worker failed. Try again or use text.");
+      setError("The local Whisper worker failed. Retry this question.");
     };
     w.postMessage({ type: "load" });
   }
-  async function record() {
+  async function record(options: { autoStop?: boolean } = {}) {
     setError("");
     setStatus("requesting");
     const generation = epoch.current;
@@ -129,7 +134,7 @@ export function useWhisper(append: (text: string) => void) {
             clearTimeout(deadline.current);
             setStatus("ready");
             setError(
-              "No audible speech detected. Check your microphone, or type.",
+              "No audible speech detected. Check your microphone and try again.",
             );
             return;
           }
@@ -142,7 +147,7 @@ export function useWhisper(append: (text: string) => void) {
             clearTimeout(deadline.current);
             setStatus("error");
             setError(
-              "Could not decode microphone audio. Try browser dictation or text.",
+              "Could not decode microphone audio. Retry this question.",
             );
           }
         }
@@ -155,6 +160,39 @@ export function useWhisper(append: (text: string) => void) {
       r.start();
       started.current = Date.now();
       setStatus("recording");
+      if (options.autoStop) {
+        const context = new AudioContext();
+        monitor.current = context;
+        const source = context.createMediaStreamSource(acquired);
+        const analyser = context.createAnalyser();
+        analyser.fftSize = 1024;
+        source.connect(analyser);
+        const levels = new Uint8Array(analyser.fftSize);
+        let heardSpeech = false;
+        let quietSince = 0;
+        const detectEnd = (time: number) => {
+          if (r.state !== "recording") return;
+          analyser.getByteTimeDomainData(levels);
+          const rms = Math.sqrt(
+            levels.reduce((sum, value) => {
+              const normalized = (value - 128) / 128;
+              return sum + normalized * normalized;
+            }, 0) / levels.length,
+          );
+          if (rms > 0.018) {
+            heardSpeech = true;
+            quietSince = 0;
+          } else if (heardSpeech) {
+            quietSince ||= time;
+            if (time - quietSince > 1800 && Date.now() - started.current > 2500) {
+              r.stop();
+              return;
+            }
+          }
+          monitorFrame.current = requestAnimationFrame(detectEnd);
+        };
+        monitorFrame.current = requestAnimationFrame(detectEnd);
+      }
       timer.current = setTimeout(() => {
         if (r.state === "recording") r.stop();
       }, 120000);
@@ -163,8 +201,8 @@ export function useWhisper(append: (text: string) => void) {
       setStatus("ready");
       setError(
         err instanceof DOMException && err.name === "NotAllowedError"
-          ? "Microphone permission was denied. Allow it in browser settings or type your answer."
-          : "No usable microphone was found. Try browser dictation or text.",
+          ? "Microphone permission was denied. Allow it in browser settings, then retry."
+          : "No usable microphone was found. Connect one, then retry.",
       );
     }
   }

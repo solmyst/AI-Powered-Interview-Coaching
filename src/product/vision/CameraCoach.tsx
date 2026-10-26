@@ -12,10 +12,14 @@ export function CameraCoach({
   paused,
   turn,
   onSummary,
+  autoStart = false,
+  callMode = false,
 }: {
   paused: boolean;
   turn: number;
   onSummary: (summary: VisualSummary) => void;
+  autoStart?: boolean;
+  callMode?: boolean;
 }) {
   const video = useRef<HTMLVideoElement>(null),
     canvas = useRef<HTMLCanvasElement>(null);
@@ -233,8 +237,13 @@ export function CameraCoach({
       );
     }
   }
+  useEffect(() => {
+    if (autoStart) void enable();
+    // Start once when the call tile mounts; reconnect remains an explicit action.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart]);
   return (
-    <section className="panel camera-coach">
+    <section className={`panel camera-coach ${callMode ? "call-camera" : ""}`}>
       <div className="camera-heading">
         <h2>Your interview presence</h2>
         <span>

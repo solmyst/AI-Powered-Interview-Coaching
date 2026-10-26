@@ -6,6 +6,7 @@
 - Replaced fixed interview question lists with validated server-side Ollama/NVIDIA generation, adaptive follow-ups and answer-based coaching reports.
 - Added role/resume/job-description setup, persisted progress, revision bookmarks and optional browser voice controls.
 - Restored optional camera coaching with local MediaPipe face/pose analysis, local Whisper transcription and a distinct delivery report. Added self-reported confidence instead of face-based emotion/confidence claims.
+- Rebuilt the practice room as a voice-first video call with preflight, automatic TTS/STT turns, silence-based answer completion, clear Speaking/Listening/Thinking states and no typed-answer form.
 - Updated landing, onboarding, dashboard, room and reports while retaining the original cream/clay visual identity.
 - Removed unsupported landing claims and browser-stored API-key settings from the active application. Preserved prototype source under legacy/.
 - Replaced static GitHub Pages deployment with full-stack validation CI and persistent-server deployment documentation.

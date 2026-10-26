@@ -27,8 +27,9 @@ The API listens on loopback port 3001 and Vite proxies `/api` to it. SQLite is c
 - One generated question at a time, content-based evaluations, adaptive follow-ups, answer-version conflict protection, retryable errors and resume-after-reload.
 - Reports with eight equally weighted dimensions, per-answer reasoning and example answers, missing concepts, strengths, improvements, and a study plan.
 - Dashboard, history, practice-score timeline, bookmarks and revision library. Recent report weaknesses inform new interviews.
-- Optional camera coaching with on-device MediaPipe face/pose landmarks, a live mirrored preview and a separate delivery report for face visibility, approximate lens direction, framing and alignment. Video, frames and landmarks are never saved.
-- Optional local Whisper transcription in a web worker, browser dictation and spoken questions, stop/interruption controls, explicit camera/microphone opt-ins and text fallback.
+- A voice-first interview call: one preflight and Join action, then automatic spoken questions, automatic microphone capture, silence-based turn completion, local transcription, answer submission and adaptive follow-ups. There is no typed-answer form in the interview room.
+- A private camera tile with on-device MediaPipe face/pose landmarks and a separate delivery report for face visibility, approximate lens direction, framing and alignment. Video, audio, frames and landmarks are never saved.
+- Local Whisper transcription in a web worker and browser speech synthesis for the interviewer. Clear Speaking, Listening and Thinking states prevent turn-taking ambiguity.
 - Self-reported confidence check-ins. The application deliberately does not claim to infer confidence or emotion from a face.
 - Profile edits, JSON export, individual interview deletion and full account deletion.
 - Durable daily session caps, request and sign-in rate limiting, same-origin mutation checks, schema validation, bounded AI concurrency, timeout handling, transient HTTP retries, token usage tracking and logs without answer bodies or credentials.
@@ -105,4 +106,4 @@ Unit/integration fixtures are test-only and never used in the application. The l
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for persistent-disk hosting, HTTPS, backups, and a production smoke check. This is a functioning pilot, **not a claim that public SaaS launch checks are complete**. It must be deployed as a Node service; static GitHub Pages is not suitable. CI validates code rather than publishing an incomplete static app.
 
-Known limits: no payments, email verification or password recovery; `.txt` resume upload only; no sandboxed code execution; no guaranteed full-duplex real-time voice; browser/hardware support varies; gaze is an approximate direction signal, not calibrated eye tracking; AI scores are uncalibrated coaching estimates. SQLite and in-process locks/rate limits support one API instance, not horizontal scaling. See [docs/ROADMAP.md](docs/ROADMAP.md).
+Known limits: no payments, email verification or password recovery; `.txt` resume upload only; no sandboxed code execution; this is turn-based voice rather than interruptible full-duplex audio; browser/hardware support varies; gaze is an approximate direction signal, not calibrated eye tracking; AI scores are uncalibrated coaching estimates. Headphones are recommended to keep synthesized interviewer speech out of microphone capture. See [docs/ROADMAP.md](docs/ROADMAP.md).

@@ -89,23 +89,28 @@ export function useVoice(append: (text: string) => void) {
       setError("Could not start the microphone. Please type or retry.");
     }
   }
-  function speak(text: string) {
+  function speak(text: string, onDone?: () => void) {
     setError("");
     recognition.current?.stop();
     if (!window.speechSynthesis) {
       setError(
         "Spoken questions are unavailable in this browser. Read the question on screen.",
       );
+      onDone?.();
       return;
     }
     window.speechSynthesis.cancel();
     const speech = new SpeechSynthesisUtterance(text);
     speech.rate = 0.95;
-    speech.onend = () => setSpeaking(false);
+    speech.onend = () => {
+      setSpeaking(false);
+      onDone?.();
+    };
     speech.onerror = (e) => {
       setSpeaking(false);
       if (e.error !== "canceled" && e.error !== "interrupted")
         setError("Speech playback failed. The question is available as text.");
+      if (e.error !== "canceled" && e.error !== "interrupted") onDone?.();
     };
     setSpeaking(true);
     window.speechSynthesis.speak(speech);

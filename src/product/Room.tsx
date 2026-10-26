@@ -1,67 +1,174 @@
-import { CameraCoach } from "./vision/CameraCoach";
-import { emptyVisual } from "./vision/metrics";
-import { useWhisper } from "./speech/useWhisper";
 import { useEffect, useRef, useState } from "react";
 import {
-  ArrowRight,
-  AudioLines,
   Brain,
+  Camera,
+  Check,
+  Headphones,
   Mic,
-  Square,
+  PhoneOff,
+  RotateCcw,
+  ShieldCheck,
+  Sparkles,
   Volume2,
 } from "lucide-react";
 import { api } from "./api";
 import { useVoice } from "./useVoice";
+import { useWhisper } from "./speech/useWhisper";
+import { CameraCoach } from "./vision/CameraCoach";
+import { emptyVisual } from "./vision/metrics";
 import type { Session } from "./types";
+
+type CallPhase =
+  | "preflight"
+  | "joining"
+  | "interviewer"
+  | "listening"
+  | "transcribing"
+  | "thinking"
+  | "complete";
+
 export function Room({
   session,
   update,
   back,
 }: {
   session: Session;
-  update: (s: Session) => void;
+  update: (value: Session) => void;
   back: () => void;
 }) {
-  const [answer, setAnswer] = useState("");
   const visual = useRef(emptyVisual());
-  const [selfConfidence, setSelfConfidence] = useState(0);
-  const [autoSpeak, setAutoSpeak] = useState(false);
-  const [speechEngine, setSpeechEngine] = useState<"browser" | "whisper">(
-    "browser",
-  );
   const spoken = useRef({ words: 0, fillers: 0 });
-  function appendSpeech(text: string) {
+  const deliveredTurn = useRef(-1);
+  const reportStarted = useRef(false);
+  const callStartedAt = useRef(0);
+  const [joined, setJoined] = useState(false);
+  const [phase, setPhase] = useState<CallPhase>("preflight");
+  const [elapsed, setElapsed] = useState(0);
+  const [lastAnswer, setLastAnswer] = useState("");
+  const [error, setError] = useState("");
+  const [retry, setRetry] = useState(0);
+
+  async function submitSpokenAnswer(text: string) {
+    const answer = text.trim().slice(0, 8000);
+    if (answer.length < 2) {
+      setError("I couldn’t hear a complete answer. Try that response again.");
+      setPhase("listening");
+      return;
+    }
+    setLastAnswer(answer);
+    setPhase("thinking");
+    setError("");
+    try {
+      const next = await api<Session>(`/interviews/${session.id}/answers`, {
+        method: "POST",
+        body: JSON.stringify({
+          answer,
+          expectedTurn: session.turns.length,
+          delivery: {
+            ...(visual.current.samples ? { visual: visual.current } : {}),
+            speech: {
+              source: "whisper",
+              captureMs: whisper.durationMs(),
+              words: spoken.current.words,
+              fillers: spoken.current.fillers,
+            },
+          },
+        }),
+      });
+      visual.current = emptyVisual();
+      spoken.current = { words: 0, fillers: 0 };
+      whisper.reset();
+      update(next);
+    } catch (reason) {
+      setError((reason as Error).message);
+      setPhase("listening");
+    }
+  }
+
+  function receiveTranscript(text: string) {
     spoken.current.words += text.trim().split(/\s+/).filter(Boolean).length;
     spoken.current.fillers += (
       text.match(/\b(um|uh|erm|hmm)\b/gi) || []
     ).length;
-    setAnswer((previous) => (previous + " " + text).trim().slice(0, 8000));
+    void submitSpokenAnswer(text);
   }
-  const whisper = useWhisper(appendSpeech);
-  const speechBusy = [
-    "loading",
-    "requesting",
-    "recording",
-    "transcribing",
-  ].includes(whisper.status);
 
-  const [busy, setBusy] = useState(false);
-  const [reporting, setReporting] = useState(false);
-  const [error, setError] = useState("");
-  const [consent, setConsent] = useState(false);
-  const questionRef = useRef<HTMLHeadingElement>(null);
-  const voice = useVoice(appendSpeech);
+  const whisper = useWhisper(receiveTranscript);
+  const voice = useVoice(() => {});
+  const question = session.currentQuestion?.question || "";
+
   useEffect(() => {
-    questionRef.current?.focus();
-    if (autoSpeak && session.currentQuestion)
-      voice.speak(session.currentQuestion.question);
-    // Playback is deliberately triggered only for a new question or user opt-in.
+    if (whisper.status === "off") whisper.load();
+    // The model is prepared before Join; media permissions still require the click.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.turns.length, autoSpeak]);
-  async function report() {
-    setReporting(true);
+  }, []);
+
+  useEffect(() => {
+    if (!joined) return;
+    const timer = window.setInterval(
+      () => setElapsed(Math.floor((Date.now() - callStartedAt.current) / 1000)),
+      1000,
+    );
+    return () => window.clearInterval(timer);
+  }, [joined]);
+
+  useEffect(() => {
+    if (
+      !joined ||
+      !question ||
+      whisper.status !== "ready" ||
+      deliveredTurn.current === session.turns.length ||
+      session.state !== "active"
+    )
+      return;
+    deliveredTurn.current = session.turns.length;
+    setPhase("interviewer");
+    setLastAnswer("");
+    setError("");
+    voice.speak(question, () => {
+      setPhase("listening");
+      void whisper.record({ autoStop: true });
+    });
+    // retry intentionally replays the current turn.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [joined, question, session.turns.length, session.state, whisper.status, retry]);
+
+  useEffect(() => {
+    if (whisper.status === "transcribing") setPhase("transcribing");
+    if (whisper.status === "recording") setPhase("listening");
+  }, [whisper.status]);
+
+  useEffect(() => {
+    if (session.state !== "report_pending" || reportStarted.current) return;
+    reportStarted.current = true;
+    setPhase("complete");
     voice.stop();
-    setBusy(true);
+    whisper.cancel();
+    void api<Session>(`/interviews/${session.id}/report`, {
+      method: "POST",
+      body: "{}",
+    })
+      .then(update)
+      .catch((reason) => setError((reason as Error).message));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.state]);
+
+  function repeatQuestion() {
+    voice.stop();
+    whisper.cancel();
+    whisper.load();
+    deliveredTurn.current = -1;
+    setRetry((value) => value + 1);
+  }
+
+  async function endInterview() {
+    voice.stop();
+    whisper.cancel();
+    if (!session.turns.length) {
+      back();
+      return;
+    }
+    setPhase("complete");
     setError("");
     try {
       update(
@@ -70,411 +177,132 @@ export function Room({
           body: "{}",
         }),
       );
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setReporting(false);
-      setBusy(false);
+    } catch (reason) {
+      setError((reason as Error).message);
     }
   }
-  return (
-    <div className="wrap workspace">
-      <div className="room-heading">
-        <div>
-          <p className="eyebrow">THE PRACTICE ROOM</p>
-          <h1>{session.setup.track} interview</h1>
-          <p>
-            {session.setup.role} <span className="separator">/</span>{" "}
-            {session.setup.experience}
+
+  const status =
+    phase === "interviewer"
+      ? "Interviewer speaking"
+      : phase === "listening"
+        ? "Listening to you"
+        : phase === "transcribing"
+          ? "Understanding your answer"
+          : phase === "thinking"
+            ? "Preparing a follow-up"
+            : phase === "complete"
+              ? "Writing your debrief"
+              : "Preparing interview";
+  const formatTime = (seconds: number) =>
+    `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+
+  if (!joined)
+    return (
+      <div className="call-preflight">
+        <div className="preflight-copy">
+          <p className="eyebrow">PRIVATE PRACTICE INTERVIEW</p>
+          <h1>Your interviewer is ready.</h1>
+          <p className="preflight-lead">
+            This works like a real video call. The interviewer asks every
+            question aloud, listens to your spoken answer, and responds with an
+            adaptive follow-up. There is nothing to type.
           </p>
-        </div>
-        <button
-          className="secondary"
-          disabled={busy || speechBusy}
-          onClick={() => {
-            voice.stop();
-            back();
-          }}
-        >
-          Leave interview
-        </button>
-      </div>
-      <div className="room-grid">
-        <section className="interview-panel">
-          <div className="room-top">
-            <span>
-              <span className="dot" />{" "}
-              {busy
-                ? "Thinking…"
-                : session.state === "report_pending"
-                  ? "Practice complete"
-                  : "Your interviewer"}
-            </span>
-            <span>
-              {Math.min(session.turns.length + 1, session.setup.questionCount)}{" "}
-              / {session.setup.questionCount}
-            </span>
+          <div className="preflight-checks" aria-label="Interview readiness">
+            <div><Camera /><span><strong>Camera</strong>Private self-view and on-device presence coaching</span></div>
+            <div><Mic /><span><strong>Microphone</strong>Automatic local transcription with Whisper</span></div>
+            <div><Headphones /><span><strong>Headphones recommended</strong>Prevents the interviewer’s voice entering your answer</span></div>
+            <div><ShieldCheck /><span><strong>Private by design</strong>No video, audio, frames, or raw landmarks are stored</span></div>
           </div>
-          <div className="progress-track">
-            <i
-              style={{
-                width: `${(session.turns.length / session.setup.questionCount) * 100}%`,
-              }}
-            />
-          </div>
-          <div className="question-area">
-            <div className="interviewer-mark">
-              <Brain size={32} />
-            </div>
-            <p className="eyebrow">
-              {session.currentQuestion?.focus || "TIME TO REFLECT"}
-            </p>
-            <h2 ref={questionRef} tabIndex={-1}>
-              {session.currentQuestion?.question ||
-                "You’ve done the practice. Let’s turn it into progress."}
-            </h2>
-            {session.currentQuestion && (
-              <button
-                className="question-audio"
-                disabled={busy || speechBusy || voice.listening}
-                onClick={() =>
-                  voice.speaking
-                    ? voice.stop()
-                    : voice.speak(session.currentQuestion!.question)
-                }
-              >
-                {voice.speaking ? <Square size={16} /> : <Volume2 size={18} />}{" "}
-                {voice.speaking ? "Stop playback" : "Read question aloud"}
-              </button>
-            )}
-          </div>
-          {session.state === "active" ? (
-            <form
-              className="answer-area"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                voice.stop();
-                setBusy(true);
-                setError("");
-                try {
-                  const next = await api<Session>(
-                    `/interviews/${session.id}/answers`,
-                    {
-                      method: "POST",
-                      body: JSON.stringify({
-                        answer,
-                        expectedTurn: session.turns.length,
-                        delivery: {
-                          ...(visual.current.samples
-                            ? { visual: visual.current }
-                            : {}),
-                          ...(selfConfidence ? { selfConfidence } : {}),
-                          ...(whisper.durationMs() + voice.durationMs() > 0
-                            ? {
-                                speech: {
-                                  source:
-                                    whisper.durationMs() && voice.durationMs()
-                                      ? "mixed"
-                                      : whisper.durationMs()
-                                        ? "whisper"
-                                        : "browser-dictation",
-                                  captureMs:
-                                    whisper.durationMs() + voice.durationMs(),
-                                  words: spoken.current.words,
-                                  fillers: spoken.current.fillers,
-                                },
-                              }
-                            : {}),
-                        },
-                      }),
-                    },
-                  );
-                  setAnswer("");
-                  voice.reset();
-                  whisper.reset();
-                  spoken.current = { words: 0, fillers: 0 };
-                  setSelfConfidence(0);
-                  update(next);
-                } catch (err) {
-                  setError((err as Error).message);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              <label htmlFor="answer">
-                Your answer <span>{answer.length} / 8,000</span>
-              </label>
-              <textarea
-                id="answer"
-                rows={7}
-                placeholder={
-                  session.setup.track === "Coding"
-                    ? "Write your approach and code. Include edge cases and time / space complexity. Code is reviewed, not executed."
-                    : "Take a moment to think. Explain your approach, give a specific example, and share the outcome."
-                }
-                value={answer}
-                maxLength={8000}
-                disabled={busy}
-                onChange={(e) => setAnswer(e.target.value)}
-              />
-              <label>
-                Confidence check-in (optional, your own rating)
-                <select
-                  value={selfConfidence}
-                  onChange={(e) => setSelfConfidence(Number(e.target.value))}
-                  disabled={busy}
-                >
-                  <option value={0}>Prefer not to rate</option>
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <option key={n} value={n}>
-                      {n} / 5
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="answer-controls">
-                <button
-                  type="button"
-                  className={`secondary ${voice.listening ? "recording" : ""}`}
-                  disabled={
-                    busy ||
-                    !consent ||
-                    !voice.available ||
-                    speechEngine !== "browser" ||
-                    speechBusy
-                  }
-                  onClick={voice.dictate}
-                >
-                  {voice.listening ? <Square size={16} /> : <Mic size={16} />}{" "}
-                  {voice.listening ? "Stop dictation" : "Dictate answer"}
-                </button>
-                <button
-                  className="primary"
-                  disabled={
-                    busy ||
-                    answer.trim().length < 2 ||
-                    voice.listening ||
-                    speechBusy
-                  }
-                >
-                  {reporting
-                    ? "Building your report…"
-                    : busy
-                      ? "Reviewing your answer…"
-                      : "Submit answer"}
-                  <ArrowRight size={18} />
-                </button>
-              </div>
-              <small aria-live="polite">
-                {voice.listening
-                  ? "Listening. Stop dictation and review your text before submitting."
-                  : reporting
-                    ? "Your saved answers are being turned into a coaching report."
-                    : busy
-                      ? "The model is reviewing your reasoning. Your answer stays here until saved."
-                      : "Only submitted answers are saved. Unsent text is lost when you leave or reload."}
-              </small>
-            </form>
-          ) : (
-            <div className="answer-area">
-              <p>
-                All {session.turns.length} answers are saved. Generate your
-                report to see strengths, missing concepts, and your next steps.
-              </p>
-              <button className="primary" disabled={busy} onClick={report}>
-                {busy ? "Building your coaching report…" : "Generate my report"}
-                <ArrowRight size={18} />
-              </button>
-            </div>
-          )}
-          {(error || voice.error) && (
-            <div className="error" role="alert">
-              {error || voice.error}
-              {error && (
-                <button
-                  className="text-button"
-                  disabled={busy}
-                  onClick={async () => {
-                    try {
-                      update(await api<Session>(`/interviews/${session.id}`));
-                      setError("");
-                    } catch (err) {
-                      setError((err as Error).message);
-                    }
-                  }}
-                >
-                  Reload saved progress
-                </button>
-              )}
-            </div>
-          )}
-        </section>
-        <aside className="room-aside">
-          <CameraCoach
-            paused={
-              busy ||
-              voice.speaking ||
-              whisper.status === "transcribing" ||
-              session.state !== "active"
-            }
-            turn={session.turns.length}
-            onSummary={(summary) => {
-              visual.current = summary;
-            }}
-          />
-
-          <section className="panel">
-            <p className="eyebrow">SESSION FOCUS</p>
-            <h3>{session.setup.difficulty}</h3>
-            <p>{session.setup.company || session.setup.industry}</p>
-            <hr />
-            <h3>Make your thinking visible.</h3>
-            <p>
-              Clarify assumptions. Explain trade-offs. If you’re unsure, say
-              what you would investigate next.
-            </p>
-            <p>Feedback stays out of your way until the final report.</p>
-          </section>
-          <section className="panel voice-panel">
-            <AudioLines size={23} />
-            <h3>A conversation, at your pace.</h3>
-            <label className="checkbox">
-              <input
-                type="checkbox"
-                checked={autoSpeak}
-                onChange={(e) => {
-                  setAutoSpeak(e.target.checked);
-                  if (!e.target.checked) voice.stop();
-                }}
-              />
-              Speak each question automatically
-            </label>
-            <label>
-              Speech engine
-              <select
-                value={speechEngine}
-                disabled={voice.listening || speechBusy}
-                onChange={(e) => {
-                  voice.stop();
-                  setSpeechEngine(e.target.value as "browser" | "whisper");
-                }}
-              >
-                <option value="browser">Browser live dictation</option>
-                <option value="whisper">Whisper on this device</option>
-              </select>
-            </label>
-            {speechEngine === "whisper" && (
-              <div className="whisper-controls">
-                <p>
-                  Record one answer, then stop to transcribe. Whisper runs
-                  locally in a worker; audio is never uploaded. Maximum two
-                  minutes per recording.
-                </p>
-                {(whisper.status === "off" || whisper.status === "error") && (
-                  <button
-                    className="secondary"
-                    disabled={busy || !consent}
-                    onClick={whisper.load}
-                  >
-                    Load local Whisper
-                  </button>
-                )}
-                {whisper.status === "ready" && (
-                  <button
-                    className="secondary"
-                    disabled={busy || !consent}
-                    onClick={() => {
-                      voice.stop();
-                      void whisper.record();
-                    }}
-                  >
-                    Record answer with Whisper
-                  </button>
-                )}
-                {whisper.status === "recording" && (
-                  <button className="primary" onClick={whisper.stop}>
-                    Stop & transcribe
-                  </button>
-                )}
-                {["loading", "requesting", "transcribing"].includes(
-                  whisper.status,
-                ) && (
-                  <p role="status">
-                    {whisper.status === "loading"
-                      ? "Loading local speech model…"
-                      : whisper.status === "requesting"
-                        ? "Waiting for microphone permission…"
-                        : "Transcribing your answer locally…"}
-                  </p>
-                )}
-                {speechBusy && (
-                  <button className="text-button" onClick={whisper.cancel}>
-                    Cancel Whisper
-                  </button>
-                )}
-                {whisper.error && (
-                  <p className="error" role="alert">
-                    {whisper.error}
-                  </p>
-                )}
-              </div>
-            )}
-
-            <label className="checkbox">
-              <input
-                type="checkbox"
-                checked={consent}
-                onChange={(e) => {
-                  setConsent(e.target.checked);
-                  if (!e.target.checked) {
-                    voice.stop();
-                    whisper.cancel();
-                  }
-                }}
-              />
-              <span>Enable optional dictation</span>
-            </label>
-            <small>
-              Your browser may send audio to its speech service. InterviewAce
-              receives the transcript, not a recording. English dictation;
-              availability depends on your browser.
-            </small>
-            {!voice.available && (
-              <p className="notice">
-                Dictation isn’t supported here. Text answers and available
-                speech playback still work.
-              </p>
-            )}
-          </section>
-          {session.turns.length > 0 && session.state === "active" && (
+          {(whisper.error || error) && <div className="call-error" role="alert">{whisper.error || error}</div>}
+          <div className="preflight-actions">
             <button
-              className="text-button"
-              disabled={
-                busy || Boolean(answer.trim()) || speechBusy || voice.listening
-              }
-              onClick={report}
+              className="join-call"
+              disabled={whisper.status !== "ready"}
+              onClick={() => {
+                callStartedAt.current = Date.now();
+                setPhase("joining");
+                setJoined(true);
+              }}
             >
-              Finish early & review {session.turns.length} saved answers
+              <Volume2 size={20} />
+              {whisper.status === "ready" ? "Join interview" : "Preparing voice engine…"}
             </button>
-          )}
-        </aside>
+            <button className="text-button" onClick={back}>Return to dashboard</button>
+          </div>
+        </div>
+        <div className="preflight-interviewer" aria-label="AI interviewer preview">
+          <div className="interviewer-orbit"><Brain size={54} /></div>
+          <span className="availability"><i /> Ready now</span>
+          <h2>Maya</h2>
+          <p>AI interview coach</p>
+          <small>{session.setup.role} · {session.setup.track} round</small>
+        </div>
       </div>
-      {session.turns.length > 0 && (
-        <details className="transcript panel">
-          <summary>
-            Review saved conversation ({session.turns.length} answers)
-          </summary>
-          {session.turns.map((t, i) => (
-            <article key={i}>
-              <h3>
-                {i + 1}. {t.question.question}
-              </h3>
-              <p className="prewrap">{t.answer}</p>
-            </article>
-          ))}
-        </details>
+    );
+
+  return (
+    <div className="interview-call-shell">
+      <header className="call-topbar">
+        <div className="call-brand"><Brain size={21} /> InterviewAce</div>
+        <div className={`call-status phase-${phase}`}><i /> {status}</div>
+        <div className="call-meta">
+          <span>{formatTime(elapsed)}</span>
+          <span>Question {Math.min(session.turns.length + 1, session.setup.questionCount)} of {session.setup.questionCount}</span>
+        </div>
+      </header>
+
+      <main className="call-stage">
+        <section className="interviewer-tile" aria-label="AI interviewer">
+          <div className={`interviewer-presence ${phase === "interviewer" ? "speaking" : ""}`}>
+            <div className="voice-ring ring-one" />
+            <div className="voice-ring ring-two" />
+            <div className="interviewer-avatar"><Brain size={48} /></div>
+          </div>
+          <div className="interviewer-identity">
+            <strong>Maya</strong><span>AI interview coach</span>
+          </div>
+          <div className="question-caption" aria-live="polite">
+            <span>{phase === "thinking" ? "MAYA IS PREPARING YOUR FOLLOW-UP" : "MAYA ASKS"}</span>
+            <h1>{phase === "thinking" ? "Thank you. Give me a moment to consider that." : question}</h1>
+          </div>
+          {phase === "listening" && (
+            <div className="listening-prompt"><span className="audio-wave"><i/><i/><i/><i/><i/></span> Answer naturally. I’ll continue when you finish.</div>
+          )}
+          {phase === "transcribing" && <div className="listening-prompt"><Sparkles size={18}/> Understanding your response…</div>}
+          {lastAnswer && phase === "thinking" && <p className="answer-received"><Check size={16}/> Answer received</p>}
+        </section>
+
+        <CameraCoach
+          autoStart
+          callMode
+          paused={phase !== "listening"}
+          turn={session.turns.length}
+          onSummary={(summary) => { visual.current = summary; }}
+        />
+      </main>
+
+      {(error || whisper.error || voice.error) && (
+        <div className="call-error" role="alert">
+          {error || whisper.error || voice.error}
+          <button onClick={repeatQuestion}>Retry this question</button>
+        </div>
       )}
+
+      <footer className="call-controls" aria-label="Interview controls">
+        <button
+          className="round-control"
+          disabled={phase === "thinking" || phase === "complete"}
+          onClick={repeatQuestion}
+          aria-label="Repeat question"
+        ><RotateCcw /></button>
+        <div className="active-mic" aria-label="Microphone is automatic">
+          <Mic /><span>{phase === "listening" ? "Mic live" : "Mic paused"}</span>
+        </div>
+        <button className="hang-up" onClick={() => void endInterview()} aria-label="End interview">
+          <PhoneOff />
+        </button>
+      </footer>
     </div>
   );
 }

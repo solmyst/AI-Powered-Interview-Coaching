@@ -144,7 +144,7 @@ function App() {
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      <header className="site-header">
+      {page !== "room" && <header className="site-header">
         <div className="wrap header-inner">
           <button
             className="brand"
@@ -196,7 +196,7 @@ function App() {
             </nav>
           )}
         </div>
-      </header>
+      </header>}
       <main id="main">
         {error && (
           <div className="wrap error" role="alert">

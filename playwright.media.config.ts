@@ -13,7 +13,7 @@ export default defineConfig({
         "--use-fake-ui-for-media-stream",
         "--use-fake-device-for-media-stream",
         `--use-file-for-fake-video-capture=${resolve("tests/fixtures/camera.y4m")}`,
-        `--use-file-for-fake-audio-capture=${resolve("tests/fixtures/jfk.wav")}`,
+        `--use-file-for-fake-audio-capture=${resolve("tests/fixtures/jfk-padded.wav")}`,
       ],
     },
   },

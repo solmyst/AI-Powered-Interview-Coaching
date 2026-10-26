@@ -37,7 +37,7 @@ export function Landing({ start }: { start: () => void }) {
               <Check size={15} /> Free practice access
             </span>
             <span>
-              <Check size={15} /> No camera required
+              <Check size={15} /> Voice-first video practice
             </span>
           </div>
         </div>

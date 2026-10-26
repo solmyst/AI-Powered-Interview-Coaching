@@ -1496,6 +1496,512 @@ details p {
     padding: 8px 12px;
   }
 }
+
+/* Voice-first interview call */
+.call-preflight {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.7fr);
+  align-items: center;
+  gap: 8vw;
+  padding: clamp(32px, 7vw, 100px);
+  background: #111510;
+  color: #f6f3e9;
+}
+.preflight-copy {
+  max-width: 720px;
+}
+.call-preflight .eyebrow {
+  color: #a9bea9;
+  margin-bottom: 18px;
+}
+.call-preflight h1 {
+  font-size: clamp(48px, 6vw, 82px);
+  letter-spacing: -3px;
+}
+.preflight-lead {
+  color: #b9bdb3;
+  font-size: 18px;
+  max-width: 650px;
+  margin-top: 24px;
+}
+.preflight-checks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  margin: 40px 0;
+  background: #33382f;
+  border: 1px solid #33382f;
+}
+.preflight-checks > div {
+  display: flex;
+  gap: 15px;
+  padding: 19px;
+  background: #181d17;
+}
+.preflight-checks svg {
+  color: #a9bea9;
+  flex: 0 0 auto;
+}
+.preflight-checks span,
+.preflight-checks strong {
+  display: block;
+}
+.preflight-checks span {
+  color: #9fa59a;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.preflight-checks strong {
+  color: #f6f3e9;
+  font-size: 14px;
+  margin-bottom: 3px;
+}
+.preflight-actions {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.join-call {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 14px 24px;
+  border-radius: 8px;
+  background: #d7a08d;
+  color: #171713;
+  font-weight: 600;
+}
+.call-preflight .text-button {
+  color: #c9cec3;
+}
+.preflight-interviewer {
+  position: relative;
+  min-height: 520px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: radial-gradient(circle at 50% 35%, #3b4939, #1c221b 58%, #171b16);
+  border: 1px solid #3b4338;
+  border-radius: 16px;
+  overflow: hidden;
+}
+.interviewer-orbit,
+.interviewer-avatar {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #dce4d5;
+  color: #27362b;
+  box-shadow: 0 0 0 18px #ffffff0a, 0 0 0 38px #ffffff05;
+}
+.interviewer-orbit {
+  width: 150px;
+  height: 150px;
+  margin-bottom: 44px;
+}
+.preflight-interviewer h2 {
+  font-family: inherit;
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.preflight-interviewer p,
+.preflight-interviewer small {
+  color: #aeb5a9;
+}
+.availability {
+  position: absolute;
+  top: 22px;
+  right: 22px;
+  padding: 7px 11px;
+  border: 1px solid #ffffff18;
+  border-radius: 999px;
+  color: #cfd8ca;
+  font-size: 11px;
+  background: #11151088;
+}
+.availability i,
+.call-status i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: #7eb187;
+}
+.interview-call-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: 68px minmax(0, 1fr) auto;
+  background: #0f120e;
+  color: #f6f3e9;
+}
+.call-topbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0 28px;
+  border-bottom: 1px solid #30362d;
+  background: #151914;
+}
+.call-brand,
+.call-meta,
+.call-status {
+  display: flex;
+  align-items: center;
+}
+.call-brand {
+  gap: 9px;
+  font-size: 17px;
+  font-weight: 600;
+}
+.call-status {
+  padding: 8px 13px;
+  border: 1px solid #394136;
+  border-radius: 999px;
+  color: #d4d8cf;
+  font-size: 12px;
+  background: #1d231c;
+}
+.call-status.phase-interviewer i {
+  background: #d7a08d;
+}
+.call-status.phase-listening i {
+  animation: livePulse 1.4s infinite;
+}
+.call-meta {
+  justify-content: flex-end;
+  gap: 20px;
+  color: #9ba195;
+  font-size: 12px;
+}
+.call-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(320px, 0.65fr);
+  gap: 12px;
+  padding: 12px;
+  min-height: 0;
+}
+.interviewer-tile,
+.call-camera {
+  position: relative;
+  min-height: 0;
+  border: 1px solid #31372f !important;
+  border-radius: 12px !important;
+  background: #171c16 !important;
+  overflow: hidden;
+}
+.interviewer-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(26px, 4vw, 64px);
+  text-align: center;
+  background: radial-gradient(circle at 50% 35%, #344132, #181d17 52%, #131612) !important;
+}
+.interviewer-presence {
+  position: relative;
+  width: 144px;
+  height: 144px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 30px;
+}
+.interviewer-avatar {
+  width: 116px;
+  height: 116px;
+  position: relative;
+  z-index: 2;
+}
+.voice-ring {
+  position: absolute;
+  inset: 8px;
+  border: 1px solid #b9c9b655;
+  border-radius: 50%;
+  opacity: 0;
+}
+.interviewer-presence.speaking .voice-ring {
+  animation: voiceRing 2s infinite;
+}
+.interviewer-presence.speaking .ring-two {
+  animation-delay: 0.7s;
+}
+.interviewer-identity {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin-bottom: 40px;
+}
+.interviewer-identity strong {
+  font-size: 18px;
+}
+.interviewer-identity span {
+  color: #9ba195;
+  font-size: 12px;
+}
+.question-caption {
+  width: min(820px, 90%);
+}
+.question-caption span {
+  color: #9db09c;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.7px;
+}
+.question-caption h1 {
+  margin-top: 12px;
+  font-size: clamp(28px, 3.2vw, 48px);
+  letter-spacing: -1.8px;
+  color: #f4f1e8;
+}
+.listening-prompt,
+.answer-received {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 34px;
+  color: #c8cec3;
+  font-size: 13px;
+}
+.answer-received {
+  color: #9db89f;
+}
+.audio-wave {
+  display: flex;
+  align-items: center;
+  height: 20px;
+  gap: 3px;
+}
+.audio-wave i {
+  display: block;
+  width: 3px;
+  height: 7px;
+  background: #9fc3a4;
+  animation: audioWave 0.8s ease-in-out infinite alternate;
+}
+.audio-wave i:nth-child(2), .audio-wave i:nth-child(4) { animation-delay: 0.2s; }
+.audio-wave i:nth-child(3) { animation-delay: 0.4s; }
+.call-camera {
+  padding: 0 !important;
+}
+.call-camera .camera-heading {
+  position: absolute;
+  z-index: 4;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  justify-content: space-between;
+  color: white;
+}
+.call-camera .camera-heading h2 {
+  font-size: 13px;
+  color: white;
+}
+.call-camera .camera-heading span {
+  color: #d7ded2;
+}
+.call-camera .camera-preview {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+.call-camera .camera-preview video,
+.call-camera .camera-preview canvas {
+  object-fit: cover;
+}
+.call-camera .camera-actions {
+  position: absolute;
+  z-index: 5;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  margin: 0;
+}
+.call-camera .camera-actions button {
+  width: auto;
+  color: white;
+  background: #151914cc;
+  border-color: #ffffff26;
+  backdrop-filter: blur(8px);
+}
+.call-camera .camera-actions .checkbox,
+.call-camera .camera-state,
+.call-camera .camera-signals,
+.call-camera > small {
+  display: none;
+}
+.call-camera > .error {
+  position: absolute;
+  z-index: 7;
+  left: 14px;
+  right: 14px;
+  bottom: 78px;
+  padding: 10px;
+  color: #ffe2da;
+  background: #672f27e8;
+  border: 1px solid #a45b4e;
+  border-radius: 6px;
+  font-size: 11px;
+}
+.call-error {
+  margin: 0 auto 10px;
+  padding: 10px 14px;
+  color: #ffe2da;
+  background: #672f27;
+  border: 1px solid #a45b4e;
+  border-radius: 7px;
+  font-size: 13px;
+}
+.call-error button {
+  margin-left: 16px;
+  text-decoration: underline;
+}
+.call-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  min-height: 86px;
+  border-top: 1px solid #30362d;
+  background: #151914;
+}
+.round-control,
+.hang-up,
+.active-mic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  border-radius: 999px;
+}
+.round-control {
+  width: 48px;
+  color: #f4f1e8;
+  background: #272d25;
+  border: 1px solid #3c4439;
+}
+.active-mic {
+  gap: 9px;
+  padding: 0 18px;
+  color: #dce6d8;
+  background: #243427;
+  font-size: 12px;
+}
+.hang-up {
+  width: 58px;
+  color: white;
+  background: #a43f35;
+}
+@keyframes voiceRing {
+  0% { transform: scale(0.8); opacity: 0.7; }
+  100% { transform: scale(1.45); opacity: 0; }
+}
+@keyframes audioWave {
+  from { height: 5px; }
+  to { height: 18px; }
+}
+@keyframes livePulse {
+  50% { opacity: 0.35; }
+}
+@media (max-width: 900px) {
+  .call-preflight {
+    grid-template-columns: 1fr;
+  }
+  .preflight-interviewer {
+    min-height: 360px;
+  }
+  .call-stage {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(430px, 1fr) 220px;
+  }
+  .call-camera {
+    width: 300px;
+    height: 190px;
+    position: absolute;
+    right: 26px;
+    bottom: 104px;
+    z-index: 6;
+    box-shadow: 0 18px 50px #0008;
+  }
+}
+@media (max-width: 600px) {
+  .call-preflight {
+    padding: 30px 20px;
+  }
+  .call-preflight h1 {
+    font-size: 45px;
+  }
+  .preflight-checks {
+    grid-template-columns: 1fr;
+  }
+  .preflight-interviewer {
+    display: none;
+  }
+  .preflight-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .call-topbar {
+    grid-template-columns: 1fr auto;
+    padding: 0 14px;
+  }
+  .call-status {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: center;
+    transform: translateY(-9px);
+  }
+  .call-meta span:last-child,
+  .call-brand {
+    display: none;
+  }
+  .call-stage {
+    padding: 7px;
+    grid-template-rows: 1fr;
+  }
+  .interviewer-tile {
+    padding: 24px 16px 120px;
+  }
+  .interviewer-presence {
+    width: 105px;
+    height: 105px;
+    margin-bottom: 16px;
+  }
+  .interviewer-avatar {
+    width: 82px;
+    height: 82px;
+  }
+  .interviewer-identity {
+    margin-bottom: 24px;
+  }
+  .question-caption h1 {
+    font-size: 27px;
+  }
+  .call-camera {
+    width: 128px;
+    height: 170px;
+    right: 16px;
+    bottom: 96px;
+  }
+  .call-camera .camera-heading,
+  .call-camera .camera-actions {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .voice-ring,
+  .audio-wave i,
+  .call-status i {
+    animation: none !important;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   * {
     scroll-behavior: auto !important;

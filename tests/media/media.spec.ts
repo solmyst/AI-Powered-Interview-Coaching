@@ -4,6 +4,17 @@ test("real MediaPipe and local Whisper pipelines using prerecorded camera/audio 
   page,
 }) => {
   const origin = "http://localhost:5173";
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "speechSynthesis", {
+      configurable: true,
+      value: {
+        cancel() {},
+        speak(utterance: SpeechSynthesisUtterance) {
+          setTimeout(() => utterance.onend?.(new Event("end") as never), 250);
+        },
+      },
+    });
+  });
   await page.request.post("/api/auth/register", {
     headers: { Origin: origin },
     data: {
@@ -31,54 +42,27 @@ test("real MediaPipe and local Whisper pipelines using prerecorded camera/audio 
     expect(created.ok(), await created.text()).toBeTruthy();
     await page.goto("/");
     await page.getByRole("button", { name: "Open Frontend interview" }).click();
-    await page.getByRole("button", { name: "Enable camera coaching" }).click();
-    await expect(page.locator(".camera-state")).toContainText(
-      "Tracking your face",
-      { timeout: 90000 },
-    );
-    await expect(page.locator(".camera-signals")).toContainText("from level");
+    await expect(page.getByRole("button", { name: "Join interview" })).toBeEnabled({ timeout: 120000 });
+    await page.getByRole("button", { name: "Join interview" }).click();
+    await expect(page.getByText("LIVE · LOCAL ONLY")).toBeVisible({ timeout: 90000 });
+    await expect(page.getByText("Listening to you")).toBeVisible({ timeout: 30000 });
     await page.screenshot({
       path: "test-results/camera-live-fixture.png",
       fullPage: true,
     });
-    await page.getByLabel("Enable optional dictation").check();
-    await page.getByLabel("Speech engine").selectOption("whisper");
-    await page.getByRole("button", { name: "Load local Whisper" }).click();
-    await expect(
-      page.getByRole("button", { name: "Record answer with Whisper" }),
-    ).toBeVisible({ timeout: 120000 });
-    await page
-      .getByRole("button", { name: "Record answer with Whisper" })
-      .click();
-    await expect(
-      page.getByRole("button", { name: "Stop & transcribe" }),
-    ).toBeVisible();
-    // Intentionally capture a known prerecorded microphone signal; no human is recorded.
-    await page.waitForTimeout(10000);
-    await page.getByRole("button", { name: "Stop & transcribe" }).click();
-    await expect(page.locator("#answer")).not.toHaveValue("", {
-      timeout: 120000,
-    });
-    const transcript = await page.locator("#answer").inputValue();
-    console.log("Actual local Whisper transcript:", transcript);
-    expect(transcript.toLowerCase()).toMatch(/country|americans|ask|fellow/);
-    await page.getByRole("button", { name: "Turn camera off" }).click();
-    await expect(page.getByText("CAMERA OFF", { exact: true })).toBeVisible();
-    await page.getByLabel("Confidence check-in").selectOption("3");
-    await page
-      .getByRole("button", { name: "Submit answer", exact: true })
-      .click();
-    await expect(
-      page.getByRole("button", { name: /Finish early/ }),
-    ).toBeVisible({ timeout: 150000 });
+    await expect.poll(async () => {
+      const value = await (await page.request.get(`/api/interviews/${(await created.json()).id}`)).json();
+      return value.turns.length;
+    }, { timeout: 180000 }).toBeGreaterThan(0);
     const s = await (
       await page.request.get(`/api/interviews/${(await created.json()).id}`)
     ).json();
+    console.log("Actual local Whisper transcript:", s.turns[0].answer);
+    expect(s.turns[0].answer.toLowerCase()).toMatch(/country|americans|ask|fellow/);
     expect(s.turns[0].delivery.visual.faceSamples).toBeGreaterThan(20);
     expect(s.turns[0].delivery.speech.source).toBe("whisper");
     expect(s.turns[0].delivery.speech.captureMs).toBeGreaterThan(5000);
-    expect(s.turns[0].delivery.selfConfidence).toBe(3);
-    await page.getByRole("button", { name: /Finish early/ }).click();
+    await page.getByRole("button", { name: "End interview" }).click();
     await expect(
       page.getByRole("heading", { name: "How you delivered your answers" }),
     ).toBeVisible({ timeout: 150000 });

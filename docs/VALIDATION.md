@@ -9,7 +9,7 @@
 - `npm audit`: zero reported vulnerabilities at verification time (including development dependencies).
 - `npm run test:e2e`: 3 Chromium tests passed. Landing/dashboard layouts checked at 320/768/1024/1440 widths; setup at desktop and 320; room/report at all four widths. Registration, profile update, persistent login after reload, history/library empty states and account deletion were exercised. Axe WCAG 2 A/AA checks returned zero violations on landing, setup, room and report. This is an automated subset, not a full accessibility certification.
 - Test browser room/report fixtures are explicitly isolated in Playwright and use the recorded synthetic-candidate live result. They do not simulate a production model connection or working voice input.
-- `npm run test:media`: passed a separate 2.5-minute Chromium acceptance test using prerecorded camera/audio fixtures plus the real local Ollama provider. MediaPipe detected and tracked the face, local `whisper-tiny.en` produced the expected JFK excerpt, aggregate delivery data persisted with the answer, and the delivery report rendered. Fixtures are ignored and are not shipped as customer content.
+- `npm run test:media`: passed a Chromium acceptance test using prerecorded camera/audio fixtures plus the real local Ollama provider. After one Join action, the interviewer transitioned automatically through speaking, listening, local transcription, answer submission and follow-up generation. MediaPipe tracked the face, `whisper-tiny.en` produced the expected speech, aggregate delivery data persisted, and the delivery report rendered. Fixtures are ignored and are not shipped as customer content.
 
 ## Real model acceptance
 

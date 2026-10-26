@@ -115,7 +115,7 @@ test("account onboarding, dashboard, setup, history, library and profile", async
   expect(errors).toEqual([]);
 });
 
-test("report and interview room layouts, including unsupported voice fallback (test fixtures)", async ({
+test("report and voice-first interview preflight layouts (test fixtures)", async ({
   page,
 }) => {
   const { readFileSync } = await import("node:fs");
@@ -206,18 +206,11 @@ test("report and interview room layouts, including unsupported voice fallback (t
   await page
     .getByRole("button", { name: `Open ${sample.setup.role} interview` })
     .click();
-  await expect(
-    page.getByText("Dictation isn’t supported here.", { exact: false }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Dictate answer" }),
-  ).toBeDisabled();
-  await page
-    .locator("#answer")
-    .fill("A text answer remains available without a microphone.");
-  await expect(
-    page.getByRole("button", { name: "Submit answer", exact: true }),
-  ).toBeEnabled();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(
+    "Your interviewer is ready",
+  );
+  await expect(page.getByText("There is nothing to type.")).toBeVisible();
+  await expect(page.locator("textarea")).toHaveCount(0);
   for (const width of [320, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     expect(
