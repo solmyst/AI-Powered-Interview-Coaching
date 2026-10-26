@@ -5,11 +5,11 @@
 - `npm run lint`: passed for active TypeScript UI, Node server and API tests. Legacy reference code is deliberately excluded.
 - `npm run typecheck`: passed.
 - `npm test`: 13 tests passed. The original API/provider coverage remains, with added landmark-geometry, aggregation and strict delivery-payload validation tests.
-- `npm run build`: passed, including separately loaded MediaPipe and local Whisper worker/WASM chunks.
+- `npm run build`: passed, including the separately loaded MediaPipe worker with no bundled speech model or inference runtime.
 - `npm audit`: zero reported vulnerabilities at verification time (including development dependencies).
 - `npm run test:e2e`: 3 Chromium tests passed. Landing/dashboard layouts checked at 320/768/1024/1440 widths; setup at desktop and 320; room/report at all four widths. Registration, profile update, persistent login after reload, history/library empty states and account deletion were exercised. Axe WCAG 2 A/AA checks returned zero violations on landing, setup, room and report. This is an automated subset, not a full accessibility certification.
 - Test browser room/report fixtures are explicitly isolated in Playwright and use the recorded synthetic-candidate live result. They do not simulate a production model connection or working voice input.
-- `npm run test:media`: passed a Chromium acceptance test using prerecorded camera/audio fixtures plus the real local Ollama provider. After one Join action, the interviewer transitioned automatically through speaking, listening, local transcription, answer submission and follow-up generation. MediaPipe tracked the face, `whisper-tiny.en` produced the expected speech, aggregate delivery data persisted, and the delivery report rendered. Fixtures are ignored and are not shipped as customer content.
+- `npm run test:media`: exercises Chromium with prerecorded camera/audio fixtures, real MediaPipe analysis, and the AssemblyAI HTTP contract. Live provider verification requires an AssemblyAI key configured only on the server.
 
 ## Real model acceptance
 

@@ -2,7 +2,7 @@ import type { VisualSummary } from "./vision/metrics";
 export type Delivery = {
   visual?: VisualSummary;
   speech?: {
-    source: "browser-dictation" | "whisper" | "mixed";
+    source: "assemblyai";
     captureMs: number;
     words: number;
     fillers: number;
@@ -16,6 +16,11 @@ export type Health = {
   provider: string;
   model: string;
   message: string;
+  transcription: {
+    ready: boolean;
+    provider: string;
+    model: string;
+  };
 };
 export const roles = [
   "Software engineering",

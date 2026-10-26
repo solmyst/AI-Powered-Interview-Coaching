@@ -117,7 +117,7 @@ export const deliverySchema = z
     visual: visualSchema.optional(),
     speech: z
       .object({
-        source: z.enum(["browser-dictation", "whisper", "mixed"]),
+        source: z.literal("assemblyai"),
         captureMs: z.number().int().min(0).max(7200000),
         words: count,
         fillers: count,

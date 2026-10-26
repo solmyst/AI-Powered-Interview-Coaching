@@ -2166,15 +2166,6 @@ details p {
   font-weight: 500;
   margin: 6px 0;
 }
-.whisper-controls {
-  padding: 14px;
-  background: #edf0e8;
-  border-radius: 6px;
-  margin: 12px 0;
-}
-.whisper-controls button {
-  font-size: 12px;
-}
 .room-grid {
   grid-template-columns: minmax(0, 1fr) 340px;
 }

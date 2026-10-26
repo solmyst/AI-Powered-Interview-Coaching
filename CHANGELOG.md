@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Replaced the browser Whisper model with server-owned AssemblyAI Universal-3.5 Pro Sync transcription for faster English/Hindi interview turns and a much smaller initial download.
+
 - Added a Node/SQLite backend with secure sessions, account ownership, durable usage limits and data export/deletion.
 - Replaced fixed interview question lists with validated server-side Ollama/NVIDIA generation, adaptive follow-ups and answer-based coaching reports.
 - Added role/resume/job-description setup, persisted progress, revision bookmarks and optional browser voice controls.

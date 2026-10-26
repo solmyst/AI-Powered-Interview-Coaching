@@ -97,6 +97,10 @@ export function Profile({
           Provider and model are configured on the server. API keys never belong
           in browser settings.
         </small>
+        <h3>Speech connection</h3>
+        <p>
+          {health?.transcription.provider} / {health?.transcription.model}
+        </p>
       </section>
       <section className="panel">
         <h2>Your data, your choice.</h2>
@@ -107,9 +111,9 @@ export function Profile({
           answers may still include personal details.
         </p>
         <p>
-          {health?.provider === "ollama"
-            ? "The configured Ollama instance processes interview text. Browser dictation may separately use your browser vendor’s speech service."
-            : "Interview text is sent to NVIDIA when it is the configured provider. Browser dictation may separately use your browser vendor’s speech service."}
+          Interview text is processed by the configured AI provider. Spoken
+          answers are sent to AssemblyAI for transcription; InterviewAce does
+          not save the raw audio. Camera coaching remains on-device.
         </p>
         <button
           className="secondary"

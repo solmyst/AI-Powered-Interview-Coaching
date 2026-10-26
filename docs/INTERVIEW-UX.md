@@ -5,7 +5,7 @@ Research completed October 2026 before rebuilding the live room.
 ## Patterns worth adopting
 
 - **Conversation, not a form.** micro1 describes Zara as a conversational AI recruiter, while Final Round AI says candidates answer out loud as they would on a face-to-face call. InterviewAce therefore has no typed-answer field in the interview room.
-- **One preflight, then automatic turns.** HireVue checks camera and microphone before the interview; Final Round AI checks the required audio before starting. InterviewAce prepares Whisper first, explains privacy and headphones, and requests media when the candidate joins.
+- **One preflight, then automatic turns.** HireVue checks camera and microphone before the interview; Final Round AI checks the required audio before starting. InterviewAce checks its server-side AssemblyAI connection, explains privacy and headphones, and requests media before the candidate joins.
 - **Unambiguous turn state.** Final Round AI exposes Speaking, Listening and Thinking states so candidates know whose turn it is. InterviewAce uses the same interaction principle.
 - **Interviewer captions, not a live self-transcript.** Final Round AI shows the interviewer’s spoken line but deliberately does not show the candidate’s live transcript, helping the candidate continue speaking naturally instead of editing text. InterviewAce keeps the answer transcript out of the call and exposes it after submission in the report/history.
 - **Private self-view and focused call controls.** Mature tools prioritize the interviewer, camera self-view, timer/progress and a small set of call controls instead of displaying configuration panels during the interview.

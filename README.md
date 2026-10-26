@@ -4,11 +4,11 @@ A working interview-coaching pilot built from the original Solmyst React applica
 
 ## Run locally
 
-Use Node 24 LTS (Node >=22.13 supported), npm, and Ollama. From this directory:
+Use Node 24 LTS (Node >=22.13 supported), npm, Ollama, and an AssemblyAI API key. From this directory:
 
 ```sh
 npm ci
-npm run setup:media
+npm run setup:vision
 cp .env.example .env
 ollama serve
 # In another terminal, if the model is not installed:
@@ -27,9 +27,9 @@ The API listens on loopback port 3001 and Vite proxies `/api` to it. SQLite is c
 - One generated question at a time, content-based evaluations, adaptive follow-ups, answer-version conflict protection, retryable errors and resume-after-reload.
 - Reports with eight equally weighted dimensions, per-answer reasoning and example answers, missing concepts, strengths, improvements, and a study plan.
 - Dashboard, history, practice-score timeline, bookmarks and revision library. Recent report weaknesses inform new interviews.
-- A voice-first interview call: one preflight and Join action, then automatic spoken questions, automatic microphone capture, silence-based turn completion, local transcription, answer submission and adaptive follow-ups. There is no typed-answer form in the interview room.
-- A private camera tile with on-device MediaPipe face/pose landmarks and a separate delivery report for face visibility, approximate lens direction, framing and alignment. Video, audio, frames and landmarks are never saved.
-- Local Whisper transcription in a web worker and browser speech synthesis for the interviewer. Clear Speaking, Listening and Thinking states prevent turn-taking ambiguity.
+- A voice-first interview call: one preflight and Join action, then automatic spoken questions, automatic microphone capture, silence-based turn completion, AssemblyAI English/Hindi transcription, answer submission and adaptive follow-ups. There is no typed-answer form in the interview room.
+- A private camera tile with on-device MediaPipe face/pose landmarks and a separate delivery report for face visibility, approximate lens direction, framing and alignment. Video, frames and landmarks are never saved; InterviewAce does not retain raw audio.
+- AssemblyAI Universal-3.5 Pro Sync transcription and browser speech synthesis for the interviewer. Clear Speaking, Listening and Thinking states prevent turn-taking ambiguity.
 - Self-reported confidence check-ins. The application deliberately does not claim to infer confidence or emotion from a face.
 - Profile edits, JSON export, individual interview deletion and full account deletion.
 - Durable daily session caps, request and sign-in rate limiting, same-origin mutation checks, schema validation, bounded AI concurrency, timeout handling, transient HTTP retries, token usage tracking and logs without answer bodies or credentials.
@@ -51,6 +51,8 @@ The original cream/clay palette and editorial typography are retained, with a qu
 | `DAILY_INTERVIEW_LIMIT` | `5` successful session starts per user per UTC day                                  |
 | `NVIDIA_API_KEY`        | Server-only key; needed only for NVIDIA                                             |
 | `NVIDIA_MODEL`          | Exact model ID available to the NVIDIA account                                      |
+| `ASSEMBLYAI_API_KEY`    | Server-only key required for spoken-answer transcription                            |
+| `ASSEMBLYAI_MODEL`      | `universal-3-5-pro`; English/Hindi Sync transcription                               |
 | `NODE_ENV`              | Set to `production` on deployment for Secure cookies and HTTPS enforcement          |
 
 ### NVIDIA

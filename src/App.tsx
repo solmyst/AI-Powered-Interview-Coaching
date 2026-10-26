@@ -52,6 +52,11 @@ function App() {
           provider: "Unavailable",
           model: "",
           message: "The API server is offline.",
+          transcription: {
+            ready: false,
+            provider: "assemblyai",
+            model: "universal-3-5-pro",
+          },
         }),
       );
   }, []);
@@ -253,6 +258,7 @@ function App() {
               <Room
                 key={session.id}
                 session={session}
+                transcriptionReady={Boolean(health?.transcription.ready)}
                 update={(s) => {
                   opened(s);
                   void refresh().catch((err) => setError(err.message));

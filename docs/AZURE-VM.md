@@ -1,6 +1,6 @@
 # Azure VM deployment
 
-This deployment keeps the application and text-generation model on one Ubuntu VM. Browser camera analysis and Whisper transcription remain on each candidate's device; they are static browser assets, not server inference services.
+This deployment keeps the application on one Ubuntu VM. Browser camera analysis remains on each candidate's device, while completed spoken turns are sent through the VM to AssemblyAI for English/Hindi transcription.
 
 ## Choose the model path first
 
@@ -63,7 +63,7 @@ Install Node 24 LTS, Git, Nginx and Certbot using maintained packages for the Ub
 ```sh
 cd /opt/interviewace
 npm ci
-npm run setup:media
+npm run setup:vision
 npm run lint
 npm run typecheck
 npm test
@@ -132,7 +132,7 @@ Then run a disposable three-question interview in the browser: grant both permis
 
 ## Rollback
 
-Keep the previous Git commit or source archive. To roll back code without touching the database: stop the service, restore the previous source, run `npm ci && npm run setup:media && npm run build`, and restart. Back up `/var/lib/interviewace` before deployment. SQLite supports one application instance; do not add replicas behind a load balancer without migrating the database and locks.
+Keep the previous Git commit or source archive. To roll back code without touching the database: stop the service, restore the previous source, run `npm ci && npm run setup:vision && npm run build`, and restart. Back up `/var/lib/interviewace` before deployment. SQLite supports one application instance; do not add replicas behind a load balancer without migrating the database and locks.
 
 ## Official references
 

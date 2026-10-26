@@ -215,13 +215,17 @@ export function Setup({
               <li>Voice-first video interview</li>
             </ul>
             <div className="provider-status">
-              <span className={`dot ${health?.ready ? "" : "offline"}`} />
-              {health?.ready
-                ? "AI provider configured"
-                : "AI provider unavailable"}
-              <small>{health?.model || "Checking connection…"}</small>
+              <span className={`dot ${health?.ready && health?.transcription.ready ? "" : "offline"}`} />
+              {health?.ready && health?.transcription.ready
+                ? "AI and speech services configured"
+                : "Interview services unavailable"}
+              <small>
+                {health
+                  ? `${health.model} · ${health.transcription.model}`
+                  : "Checking connection…"}
+              </small>
             </div>
-            {!health?.ready && (
+            {(!health?.ready || !health?.transcription.ready) && (
               <button className="text-button" type="button" onClick={refresh}>
                 Check connection again
               </button>
@@ -237,7 +241,7 @@ export function Setup({
             )}
             <button
               className="primary"
-              disabled={busy || !health?.ready || usage.used >= usage.limit}
+              disabled={busy || !health?.ready || !health?.transcription.ready || usage.used >= usage.limit}
             >
               {busy ? "Preparing your first question…" : "Begin interview"}
               <ArrowRight size={18} />
@@ -245,7 +249,7 @@ export function Setup({
             <small aria-live="polite">
               {busy
                 ? "Your model is thinking. Local generation may take up to two minutes."
-                : "The call requests camera and microphone access only after you join. Answer transcripts are shared with the configured AI provider."}
+                : "The call checks camera and microphone before joining. Spoken audio is sent to AssemblyAI for English/Hindi transcription; transcripts are shared with the configured AI provider."}
             </small>
           </div>
         </aside>

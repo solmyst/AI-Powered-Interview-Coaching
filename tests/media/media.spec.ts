@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { randomUUID } from "node:crypto";
-test("real MediaPipe and local Whisper pipelines using prerecorded camera/audio fixtures", async ({
+test("real MediaPipe pipeline and AssemblyAI transcription handoff using prerecorded fixtures", async ({
   page,
 }) => {
   const origin = "http://localhost:5173";
@@ -13,6 +13,18 @@ test("real MediaPipe and local Whisper pipelines using prerecorded camera/audio 
           setTimeout(() => utterance.onend?.(new Event("end") as never), 250);
         },
       },
+    });
+  });
+  await page.route("**/api/transcribe", async (route) => {
+    expect(await route.request().headerValue("content-type")).toContain("audio/wav");
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        text: "Ask not what your country can do for you.",
+        confidence: 0.98,
+        durationMs: 6200,
+      }),
     });
   });
   await page.request.post("/api/auth/register", {
@@ -60,10 +72,10 @@ test("real MediaPipe and local Whisper pipelines using prerecorded camera/audio 
     const s = await (
       await page.request.get(`/api/interviews/${(await created.json()).id}`)
     ).json();
-    console.log("Actual local Whisper transcript:", s.turns[0].answer);
+    console.log("AssemblyAI contract transcript:", s.turns[0].answer);
     expect(s.turns[0].answer.toLowerCase()).toMatch(/country|americans|ask|fellow/);
     expect(s.turns[0].delivery.visual.faceSamples).toBeGreaterThan(20);
-    expect(s.turns[0].delivery.speech.source).toBe("whisper");
+    expect(s.turns[0].delivery.speech.source).toBe("assemblyai");
     expect(s.turns[0].delivery.speech.captureMs).toBeGreaterThan(5000);
     await page.getByRole("button", { name: "End interview" }).click();
     await expect(

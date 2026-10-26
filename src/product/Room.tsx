@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { api } from "./api";
 import { useVoice } from "./useVoice";
-import { useWhisper } from "./speech/useWhisper";
+import { useTranscription } from "./speech/useTranscription";
 import { CameraCoach } from "./vision/CameraCoach";
 import { emptyVisual } from "./vision/metrics";
 import type { Session } from "./types";
@@ -29,10 +29,12 @@ type CallPhase =
 
 export function Room({
   session,
+  transcriptionReady,
   update,
   back,
 }: {
   session: Session;
+  transcriptionReady: boolean;
   update: (value: Session) => void;
   back: () => void;
 }) {
@@ -73,8 +75,8 @@ export function Room({
           delivery: {
             ...(visual.current.samples ? { visual: visual.current } : {}),
             speech: {
-              source: "whisper",
-              captureMs: whisper.durationMs(),
+              source: "assemblyai",
+              captureMs: transcription.durationMs(),
               words: spoken.current.words,
               fillers: spoken.current.fillers,
             },
@@ -83,7 +85,7 @@ export function Room({
       });
       visual.current = emptyVisual();
       spoken.current = { words: 0, fillers: 0 };
-      whisper.reset();
+      transcription.reset();
       update(next);
     } catch (reason) {
       setError((reason as Error).message);
@@ -99,15 +101,9 @@ export function Room({
     void submitSpokenAnswer(text);
   }
 
-  const whisper = useWhisper(receiveTranscript);
+  const transcription = useTranscription(receiveTranscript);
   const voice = useVoice(() => {});
   const question = session.currentQuestion?.question || "";
-
-  useEffect(() => {
-    if (whisper.status === "off") whisper.load();
-    // The model is prepared before Join; media permissions still require the click.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(
     () => () => {
@@ -171,7 +167,7 @@ export function Room({
     if (
       !joined ||
       !question ||
-      whisper.status !== "ready" ||
+      transcription.status !== "ready" ||
       deliveredTurn.current === session.turns.length ||
       session.state !== "active"
     )
@@ -182,26 +178,26 @@ export function Room({
     setError("");
     voice.speak(question, () => {
       setPhase("listening");
-      void whisper.record({
+      void transcription.record({
         autoStop: true,
         mediaStream: sharedStream.current || undefined,
       });
     });
     // retry intentionally replays the current turn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [joined, question, session.turns.length, session.state, whisper.status, retry]);
+  }, [joined, question, session.turns.length, session.state, transcription.status, retry]);
 
   useEffect(() => {
-    if (whisper.status === "transcribing") setPhase("transcribing");
-    if (whisper.status === "recording") setPhase("listening");
-  }, [whisper.status]);
+    if (transcription.status === "transcribing") setPhase("transcribing");
+    if (transcription.status === "recording") setPhase("listening");
+  }, [transcription.status]);
 
   useEffect(() => {
     if (session.state !== "report_pending" || reportStarted.current) return;
     reportStarted.current = true;
     setPhase("complete");
     voice.stop();
-    whisper.cancel();
+    transcription.cancel();
     void api<Session>(`/interviews/${session.id}/report`, {
       method: "POST",
       body: "{}",
@@ -213,15 +209,14 @@ export function Room({
 
   function repeatQuestion() {
     voice.stop();
-    whisper.cancel();
-    whisper.load();
+    transcription.cancel();
     deliveredTurn.current = -1;
     setRetry((value) => value + 1);
   }
 
   async function endInterview() {
     voice.stop();
-    whisper.cancel();
+    transcription.cancel();
     if (!session.turns.length) {
       back();
       return;
@@ -268,11 +263,16 @@ export function Room({
           </p>
           <div className="preflight-checks" aria-label="Interview readiness">
             <div><Camera /><span><strong>Camera</strong>Private self-view and on-device presence coaching</span></div>
-            <div><Mic /><span><strong>Microphone</strong>Automatic local transcription with Whisper</span></div>
+            <div><Mic /><span><strong>Microphone</strong>Automatic English and Hindi transcription</span></div>
             <div><Headphones /><span><strong>Headphones recommended</strong>Prevents the interviewer’s voice entering your answer</span></div>
-            <div><ShieldCheck /><span><strong>Private by design</strong>No video, audio, frames, or raw landmarks are stored</span></div>
+            <div><ShieldCheck /><span><strong>Private by design</strong>Video stays on-device; audio is sent securely for transcription</span></div>
           </div>
-          {(whisper.error || error) && <div className="call-error" role="alert">{whisper.error || error}</div>}
+          {(transcription.error || error) && <div className="call-error" role="alert">{transcription.error || error}</div>}
+          {!transcriptionReady && (
+            <div className="call-error" role="alert">
+              Speech transcription is not configured on the server yet.
+            </div>
+          )}
           {mediaError && <div className="call-error" role="alert">{mediaError}</div>}
           <div className="preflight-actions">
             {mediaState !== "ready" && (
@@ -291,7 +291,7 @@ export function Room({
             )}
             <button
               className="join-call"
-              disabled={whisper.status !== "ready" || mediaState !== "ready"}
+              disabled={!transcriptionReady || transcription.status !== "ready" || mediaState !== "ready"}
               onClick={() => {
                 callStartedAt.current = Date.now();
                 setPhase("joining");
@@ -299,11 +299,13 @@ export function Room({
               }}
             >
               <Volume2 size={20} />
-              {mediaState !== "ready"
+              {!transcriptionReady
+                ? "Speech service unavailable"
+                : mediaState !== "ready"
                 ? "Complete device check first"
-                : whisper.status === "ready"
+                : transcription.status === "ready"
                   ? "Join interview"
-                  : "Preparing voice engine…"}
+                  : "Speech service unavailable"}
             </button>
             <button
               className="text-button"
@@ -373,9 +375,9 @@ export function Room({
         />
       </main>
 
-      {(error || whisper.error || voice.error) && (
+      {(error || transcription.error || voice.error) && (
         <div className="call-error" role="alert">
-          {error || whisper.error || voice.error}
+          {error || transcription.error || voice.error}
           <button onClick={repeatQuestion}>Retry this question</button>
         </div>
       )}
@@ -391,7 +393,7 @@ export function Room({
           <Mic /><span>{phase === "listening" ? "Mic live" : "Mic paused"}</span>
         </div>
         {phase === "listening" && (
-          <button className="done-speaking" onClick={whisper.stop}>
+          <button className="done-speaking" onClick={transcription.stop}>
             Done speaking
           </button>
         )}
