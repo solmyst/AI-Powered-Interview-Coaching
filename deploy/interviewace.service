@@ -9,7 +9,8 @@ User=interviewace
 Group=interviewace
 WorkingDirectory=/opt/interviewace
 EnvironmentFile=/etc/interviewace.env
-ExecStart=/usr/bin/npm start
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+ExecStart=/usr/bin/env npm start
 Restart=always
 RestartSec=5
 NoNewPrivileges=true
