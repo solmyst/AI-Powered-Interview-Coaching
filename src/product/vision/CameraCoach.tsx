@@ -14,12 +14,14 @@ export function CameraCoach({
   onSummary,
   autoStart = false,
   callMode = false,
+  mediaStream = null,
 }: {
   paused: boolean;
   turn: number;
   onSummary: (summary: VisualSummary) => void;
   autoStart?: boolean;
   callMode?: boolean;
+  mediaStream?: MediaStream | null;
 }) {
   const video = useRef<HTMLVideoElement>(null),
     canvas = useRef<HTMLCanvasElement>(null);
@@ -31,6 +33,7 @@ export function CameraCoach({
     samples = useRef(emptyVisual()),
     lastTime = useRef(0),
     lastFrame = useRef(-1);
+  const ownsStream = useRef(false);
   const pauseRef = useRef(paused),
     callback = useRef(onSummary);
   pauseRef.current = paused;
@@ -48,9 +51,10 @@ export function CameraCoach({
     cancelAnimationFrame(animation.current);
     stream.current?.getTracks().forEach((t) => {
       t.onended = null;
-      t.stop();
+      if (ownsStream.current) t.stop();
     });
     stream.current = null;
+    ownsStream.current = false;
     face.current?.close();
     pose.current?.close();
     face.current = null;
@@ -81,19 +85,22 @@ export function CameraCoach({
         throw new Error(
           "Camera access requires HTTPS or localhost and a supported browser.",
         );
-      acquired = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: "user",
-        },
-        audio: false,
-      });
+      acquired =
+        mediaStream ||
+        (await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: "user",
+          },
+          audio: false,
+        }));
       if (epoch !== generation.current) {
-        acquired.getTracks().forEach((t) => t.stop());
+        if (!mediaStream) acquired.getTracks().forEach((t) => t.stop());
         return;
       }
       stream.current = acquired;
+      ownsStream.current = !mediaStream;
       const v = video.current!;
       v.srcObject = acquired;
       await v.play();
@@ -224,7 +231,7 @@ export function CameraCoach({
     } catch (err) {
       loadedFace?.close();
       loadedPose?.close();
-      acquired?.getTracks().forEach((t) => t.stop());
+      if (!mediaStream) acquired?.getTracks().forEach((t) => t.stop());
       if (epoch !== generation.current) return;
       cleanup();
       setStatus("error");
@@ -238,10 +245,10 @@ export function CameraCoach({
     }
   }
   useEffect(() => {
-    if (autoStart) void enable();
+    if (autoStart && (!mediaStream || mediaStream.active)) void enable();
     // Start once when the call tile mounts; reconnect remains an explicit action.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoStart]);
+  }, [autoStart, mediaStream]);
   return (
     <section className={`panel camera-coach ${callMode ? "call-camera" : ""}`}>
       <div className="camera-heading">

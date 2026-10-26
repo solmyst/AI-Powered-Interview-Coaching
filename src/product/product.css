@@ -1559,10 +1559,12 @@ details p {
 }
 .preflight-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 24px;
 }
-.join-call {
+.join-call,
+.device-check {
   display: inline-flex;
   align-items: center;
   gap: 12px;
@@ -1573,12 +1575,19 @@ details p {
   color: #171713;
   font-weight: 600;
 }
+.device-check {
+  min-height: 56px;
+  padding: 14px 20px;
+  color: #eef3e9;
+  background: #263125;
+  border: 1px solid #4b5b48;
+}
 .call-preflight .text-button {
   color: #c9cec3;
 }
 .preflight-interviewer {
   position: relative;
-  min-height: 520px;
+  min-height: 620px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1612,6 +1621,46 @@ details p {
 .preflight-interviewer p,
 .preflight-interviewer small {
   color: #aeb5a9;
+}
+.preflight-device-preview {
+  position: relative;
+  width: min(82%, 360px);
+  aspect-ratio: 16/9;
+  margin-top: 28px;
+  overflow: hidden;
+  border: 1px solid #465044;
+  border-radius: 9px;
+  background: #0e110d;
+}
+.preflight-device-preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+.preflight-device-preview > span {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #8e968a;
+  font-size: 12px;
+}
+.preflight-device-preview > b {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border-radius: 999px;
+  color: #e5eee1;
+  background: #172017d9;
+  font-size: 10px;
+  font-weight: 500;
 }
 .availability {
   position: absolute;
@@ -1874,7 +1923,8 @@ details p {
 }
 .round-control,
 .hang-up,
-.active-mic {
+.active-mic,
+.done-speaking {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1892,6 +1942,13 @@ details p {
   padding: 0 18px;
   color: #dce6d8;
   background: #243427;
+  font-size: 12px;
+}
+.done-speaking {
+  padding: 0 18px;
+  color: #f3f0e7;
+  background: #2c3229;
+  border: 1px solid #454c41;
   font-size: 12px;
 }
 .hang-up {

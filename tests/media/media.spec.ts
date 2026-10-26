@@ -42,6 +42,9 @@ test("real MediaPipe and local Whisper pipelines using prerecorded camera/audio 
     expect(created.ok(), await created.text()).toBeTruthy();
     await page.goto("/");
     await page.getByRole("button", { name: "Open Frontend interview" }).click();
+    await page.getByRole("button", { name: "Allow camera & microphone" }).click();
+    await expect(page.getByText("Camera and microphone ready")).toBeVisible({ timeout: 30000 });
+    await expect(page.getByLabel("Camera preview")).toBeVisible();
     await expect(page.getByRole("button", { name: "Join interview" })).toBeEnabled({ timeout: 120000 });
     await page.getByRole("button", { name: "Join interview" }).click();
     await expect(page.getByText("LIVE · LOCAL ONLY")).toBeVisible({ timeout: 90000 });

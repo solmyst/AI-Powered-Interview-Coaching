@@ -9,6 +9,7 @@ export function useWhisper(append: (text: string) => void) {
     duration = useRef(0),
     monitor = useRef<AudioContext | null>(null),
     monitorFrame = useRef(0),
+    ownsStream = useRef(false),
     epoch = useRef(0),
     callback = useRef(append);
   callback.current = append;
@@ -27,8 +28,10 @@ export function useWhisper(append: (text: string) => void) {
     cancelAnimationFrame(monitorFrame.current);
     void monitor.current?.close().catch(() => {});
     monitor.current = null;
-    stream.current?.getTracks().forEach((t) => t.stop());
+    if (ownsStream.current)
+      stream.current?.getTracks().forEach((t) => t.stop());
     stream.current = null;
+    ownsStream.current = false;
   }
   function cancel() {
     epoch.current++;
@@ -86,20 +89,26 @@ export function useWhisper(append: (text: string) => void) {
     };
     w.postMessage({ type: "load" });
   }
-  async function record(options: { autoStop?: boolean } = {}) {
+  async function record(
+    options: { autoStop?: boolean; mediaStream?: MediaStream } = {},
+  ) {
     setError("");
     setStatus("requesting");
     const generation = epoch.current;
     try {
-      const acquired = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: false,
-      });
+      const acquired = options.mediaStream
+        ? new MediaStream(options.mediaStream.getAudioTracks())
+        : await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: false,
+          });
       if (generation !== epoch.current) {
-        acquired.getTracks().forEach((t) => t.stop());
+        if (!options.mediaStream)
+          acquired.getTracks().forEach((t) => t.stop());
         return;
       }
       stream.current = acquired;
+      ownsStream.current = !options.mediaStream;
       const r = new MediaRecorder(acquired);
       recorder.current = r;
       const chunks: Blob[] = [];

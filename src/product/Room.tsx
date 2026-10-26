@@ -41,7 +41,13 @@ export function Room({
   const deliveredTurn = useRef(-1);
   const reportStarted = useRef(false);
   const callStartedAt = useRef(0);
+  const sharedStream = useRef<MediaStream | null>(null);
+  const previewVideo = useRef<HTMLVideoElement>(null);
   const [joined, setJoined] = useState(false);
+  const [mediaState, setMediaState] = useState<
+    "idle" | "requesting" | "ready" | "error"
+  >("idle");
+  const [mediaError, setMediaError] = useState("");
   const [phase, setPhase] = useState<CallPhase>("preflight");
   const [elapsed, setElapsed] = useState(0);
   const [lastAnswer, setLastAnswer] = useState("");
@@ -103,6 +109,55 @@ export function Room({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(
+    () => () => {
+      sharedStream.current?.getTracks().forEach((track) => track.stop());
+      sharedStream.current = null;
+    },
+    [],
+  );
+
+  async function requestMedia() {
+    setMediaState("requesting");
+    setMediaError("");
+    try {
+      if (!navigator.mediaDevices?.getUserMedia)
+        throw new Error(
+          "Camera and microphone access requires HTTPS or localhost.",
+        );
+      sharedStream.current?.getTracks().forEach((track) => track.stop());
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: "user",
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      sharedStream.current = stream;
+      if (previewVideo.current) {
+        previewVideo.current.srcObject = stream;
+        await previewVideo.current.play();
+      }
+      setMediaState("ready");
+    } catch (reason) {
+      setMediaState("error");
+      setMediaError(
+        reason instanceof DOMException && reason.name === "NotAllowedError"
+          ? "Camera or microphone permission was denied. Allow both in browser settings, then retry."
+          : reason instanceof DOMException && reason.name === "NotFoundError"
+            ? "A working camera and microphone were not both found. Connect them and retry."
+            : reason instanceof Error
+              ? reason.message
+              : "Camera and microphone could not be started.",
+      );
+    }
+  }
+
   useEffect(() => {
     if (!joined) return;
     const timer = window.setInterval(
@@ -127,7 +182,10 @@ export function Room({
     setError("");
     voice.speak(question, () => {
       setPhase("listening");
-      void whisper.record({ autoStop: true });
+      void whisper.record({
+        autoStop: true,
+        mediaStream: sharedStream.current || undefined,
+      });
     });
     // retry intentionally replays the current turn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -215,10 +273,25 @@ export function Room({
             <div><ShieldCheck /><span><strong>Private by design</strong>No video, audio, frames, or raw landmarks are stored</span></div>
           </div>
           {(whisper.error || error) && <div className="call-error" role="alert">{whisper.error || error}</div>}
+          {mediaError && <div className="call-error" role="alert">{mediaError}</div>}
           <div className="preflight-actions">
+            {mediaState !== "ready" && (
+              <button
+                className="device-check"
+                disabled={mediaState === "requesting"}
+                onClick={() => void requestMedia()}
+              >
+                <Camera size={20} />
+                {mediaState === "requesting"
+                  ? "Waiting for permission…"
+                  : mediaState === "error"
+                    ? "Retry camera & microphone"
+                    : "Allow camera & microphone"}
+              </button>
+            )}
             <button
               className="join-call"
-              disabled={whisper.status !== "ready"}
+              disabled={whisper.status !== "ready" || mediaState !== "ready"}
               onClick={() => {
                 callStartedAt.current = Date.now();
                 setPhase("joining");
@@ -226,9 +299,19 @@ export function Room({
               }}
             >
               <Volume2 size={20} />
-              {whisper.status === "ready" ? "Join interview" : "Preparing voice engine…"}
+              {mediaState !== "ready"
+                ? "Complete device check first"
+                : whisper.status === "ready"
+                  ? "Join interview"
+                  : "Preparing voice engine…"}
             </button>
-            <button className="text-button" onClick={back}>Return to dashboard</button>
+            <button
+              className="text-button"
+              onClick={() => {
+                sharedStream.current?.getTracks().forEach((track) => track.stop());
+                back();
+              }}
+            >Return to dashboard</button>
           </div>
         </div>
         <div className="preflight-interviewer" aria-label="AI interviewer preview">
@@ -237,6 +320,13 @@ export function Room({
           <h2>Maya</h2>
           <p>AI interview coach</p>
           <small>{session.setup.role} · {session.setup.track} round</small>
+          <div className={`preflight-device-preview ${mediaState}`}>
+            <video ref={previewVideo} autoPlay muted playsInline aria-label="Camera preview" />
+            {mediaState !== "ready" && (
+              <span><Camera size={24} /> Your camera preview will appear here</span>
+            )}
+            {mediaState === "ready" && <b><Check size={14} /> Camera and microphone ready</b>}
+          </div>
         </div>
       </div>
     );
@@ -276,6 +366,7 @@ export function Room({
         <CameraCoach
           autoStart
           callMode
+          mediaStream={sharedStream.current}
           paused={phase !== "listening"}
           turn={session.turns.length}
           onSummary={(summary) => { visual.current = summary; }}
@@ -299,6 +390,11 @@ export function Room({
         <div className="active-mic" aria-label="Microphone is automatic">
           <Mic /><span>{phase === "listening" ? "Mic live" : "Mic paused"}</span>
         </div>
+        {phase === "listening" && (
+          <button className="done-speaking" onClick={whisper.stop}>
+            Done speaking
+          </button>
+        )}
         <button className="hang-up" onClick={() => void endInterview()} aria-label="End interview">
           <PhoneOff />
         </button>

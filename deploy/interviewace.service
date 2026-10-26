@@ -1,0 +1,22 @@
+[Unit]
+Description=InterviewAce web application
+After=network-online.target ollama.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=interviewace
+Group=interviewace
+WorkingDirectory=/opt/interviewace
+EnvironmentFile=/etc/interviewace.env
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/interviewace
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,7 @@
 # Deployment
 
+For the concrete Azure GPU/CPU VM procedure, systemd unit and Nginx configuration, see [docs/AZURE-VM.md](docs/AZURE-VM.md) and `deploy/`.
+
 ## Topology
 
 Run one Node API process with persistent SQLite disk behind an HTTPS reverse proxy. The API also serves the built React files, so browser requests stay on one origin. Run Ollama on the same trusted host/network, or configure NVIDIA. Do not expose Ollama to the public internet. Static GitHub Pages cannot host this application's authenticated API.
@@ -39,7 +41,7 @@ The only process-local state is concurrency/rate-limit state. Interview data, lo
 3. Start a three-question session, reload/resume, submit all answers and generate the report.
 4. Save a bookmark, open the library, export data, delete the test session/account.
 5. Test the daily cap; deletion must not refund usage. Stop the AI provider and verify recoverable errors.
-6. Test dictation permission denied/unavailable, text input, spoken questions and stop playback in supported browsers. Do not claim full voice support without a real microphone-to-transcript-to-answer run on each supported browser.
+6. Confirm camera and microphone permissions are requested in preflight, the camera preview appears before Join, the same devices remain active in the call, questions play automatically, a spoken answer advances after silence, and the Done speaking fallback works in a noisy room.
 7. Run a small concurrent load test and observe timeouts, memory and provider cost.
 
 ## Public launch gates

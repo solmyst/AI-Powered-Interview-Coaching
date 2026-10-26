@@ -210,6 +210,12 @@ test("report and voice-first interview preflight layouts (test fixtures)", async
     "Your interviewer is ready",
   );
   await expect(page.getByText("There is nothing to type.")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Allow camera & microphone" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Complete device check first" }),
+  ).toBeDisabled();
   await expect(page.locator("textarea")).toHaveCount(0);
   for (const width of [320, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
