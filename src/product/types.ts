@@ -1,3 +1,14 @@
+import type { VisualSummary } from "./vision/metrics";
+export type Delivery = {
+  visual?: VisualSummary;
+  speech?: {
+    source: "browser-dictation" | "whisper" | "mixed";
+    captureMs: number;
+    words: number;
+    fillers: number;
+  };
+  selfConfidence?: number;
+};
 export type User = { id: string; name: string; email: string };
 export type Usage = { used: number; limit: number; reset: string };
 export type Health = {
@@ -50,6 +61,7 @@ export type Turn = {
   question: Question;
   answer: string;
   evaluation: Evaluation;
+  delivery?: Delivery;
 };
 export type Report = {
   summary: string;

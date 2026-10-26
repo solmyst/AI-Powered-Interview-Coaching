@@ -59,8 +59,9 @@ export function createApp({
     helmet({
       contentSecurityPolicy: {
         directives: {
-          "script-src": ["'self'"],
+          "script-src": ["'self'", "'wasm-unsafe-eval'"],
           "connect-src": ["'self'"],
+          "worker-src": ["'self'", "blob:"],
           "style-src": [
             "'self'",
             "'unsafe-inline'",
@@ -384,6 +385,7 @@ export function createApp({
         question: session.currentQuestion,
         answer: input.answer,
         evaluation: last ? generated.value : generated.value.evaluation,
+        ...(input.delivery ? { delivery: input.delivery } : {}),
       });
       session.currentQuestion = last ? null : generated.value.nextQuestion;
       session.state = last ? "report_pending" : "active";
@@ -516,17 +518,15 @@ export function createApp({
           type: error.constructor.name,
         }),
       );
-    res
-      .status(status)
-      .json({
-        error:
-          error instanceof z.ZodError
-            ? "Invalid input. Check the fields and length limits."
-            : status === 500
-              ? "An unexpected server error occurred. Please retry."
-              : error.message,
-        requestId: req.requestId,
-      });
+    res.status(status).json({
+      error:
+        error instanceof z.ZodError
+          ? "Invalid input. Check the fields and length limits."
+          : status === 500
+            ? "An unexpected server error occurred. Please retry."
+            : error.message,
+      requestId: req.requestId,
+    });
   });
   return { app, db };
 }

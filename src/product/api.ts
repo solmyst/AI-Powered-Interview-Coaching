@@ -7,11 +7,9 @@ export async function api<T>(
     headers: { "Content-Type": "application/json", ...options.headers },
     signal: options.signal || AbortSignal.timeout(250000),
   });
-  const data = await response
-    .json()
-    .catch(() => ({
-      error: "The server could not respond. Check the connection and retry.",
-    }));
+  const data = await response.json().catch(() => ({
+    error: "The server could not respond. Check the connection and retry.",
+  }));
   if (!response.ok)
     throw new Error(data.error || "Request failed. Please retry.");
   return data as T;

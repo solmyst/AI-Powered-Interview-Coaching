@@ -1502,3 +1502,138 @@ details p {
     transition: none !important;
   }
 }
+.camera-coach h2 {
+  font-family: inherit;
+  font-size: 17px;
+  letter-spacing: 0;
+  margin: 0;
+}
+.camera-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.camera-heading span {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+.camera-preview {
+  position: relative;
+  background: #20291f;
+  aspect-ratio: 4/3;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.camera-preview video,
+.camera-preview canvas {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: scaleX(-1);
+}
+.camera-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 15px;
+  color: #dce7d5;
+  background: #20291fdd;
+}
+.camera-placeholder p {
+  color: #dce7d5;
+  font-size: 12px;
+}
+.camera-actions {
+  margin: 14px 0;
+}
+.camera-actions button {
+  width: 100%;
+  font-size: 12px;
+}
+.camera-actions .checkbox {
+  font-size: 11px;
+  margin: 12px 0;
+}
+.camera-state {
+  font-size: 12px !important;
+}
+.camera-signals {
+  margin: 12px 0;
+}
+.camera-signals > div {
+  border-top: 1px solid var(--line);
+  padding: 10px 0;
+}
+.camera-signals dt {
+  font-size: 11px;
+  color: var(--muted);
+}
+.camera-signals dd {
+  margin: 2px 0 0;
+  font-size: 12px;
+}
+.camera-coach > small {
+  font-size: 10px;
+}
+.delivery-report .eyebrow {
+  font-size: 10px;
+}
+.delivery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  margin: 24px 0;
+}
+.delivery-grid span {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+.delivery-grid strong {
+  display: block;
+  font-size: 25px;
+  font-weight: 500;
+  margin: 6px 0;
+}
+.whisper-controls {
+  padding: 14px;
+  background: #edf0e8;
+  border-radius: 6px;
+  margin: 12px 0;
+}
+.whisper-controls button {
+  font-size: 12px;
+}
+.room-grid {
+  grid-template-columns: minmax(0, 1fr) 340px;
+}
+@media (max-width: 1050px) {
+  .room-grid {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+}
+@media (max-width: 767px) {
+  .room-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .room-aside {
+    order: -1;
+  }
+  .room-aside > .panel:not(.camera-coach) {
+    display: block;
+  }
+  .delivery-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .camera-preview {
+    max-height: 300px;
+  }
+}

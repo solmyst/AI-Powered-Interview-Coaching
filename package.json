@@ -15,9 +15,15 @@
     "test": "node --test tests/*.test.js",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "test:e2e": "playwright test",
-    "test:live": "node tests/live-smoke.js"
+    "test:live": "node tests/live-smoke.js",
+    "setup:vision": "node scripts/setup-vision.js",
+    "setup:speech": "node scripts/setup-speech.js",
+    "setup:media": "npm run setup:vision && npm run setup:speech",
+    "test:media": "playwright test --config playwright.media.config.ts"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.3.1",
+    "@mediapipe/tasks-vision": "^0.10.34",
     "better-sqlite3": "^13.0.3",
     "cookie-parser": "^1.4.7",
     "dotenv": "^18.0.9",

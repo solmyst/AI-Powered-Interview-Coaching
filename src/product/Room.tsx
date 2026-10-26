@@ -1,3 +1,6 @@
+import { CameraCoach } from "./vision/CameraCoach";
+import { emptyVisual } from "./vision/metrics";
+import { useWhisper } from "./speech/useWhisper";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -20,17 +23,41 @@ export function Room({
   back: () => void;
 }) {
   const [answer, setAnswer] = useState("");
+  const visual = useRef(emptyVisual());
+  const [selfConfidence, setSelfConfidence] = useState(0);
+  const [autoSpeak, setAutoSpeak] = useState(false);
+  const [speechEngine, setSpeechEngine] = useState<"browser" | "whisper">(
+    "browser",
+  );
+  const spoken = useRef({ words: 0, fillers: 0 });
+  function appendSpeech(text: string) {
+    spoken.current.words += text.trim().split(/\s+/).filter(Boolean).length;
+    spoken.current.fillers += (
+      text.match(/\b(um|uh|erm|hmm)\b/gi) || []
+    ).length;
+    setAnswer((previous) => (previous + " " + text).trim().slice(0, 8000));
+  }
+  const whisper = useWhisper(appendSpeech);
+  const speechBusy = [
+    "loading",
+    "requesting",
+    "recording",
+    "transcribing",
+  ].includes(whisper.status);
+
   const [busy, setBusy] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [error, setError] = useState("");
   const [consent, setConsent] = useState(false);
   const questionRef = useRef<HTMLHeadingElement>(null);
-  const voice = useVoice((text) =>
-    setAnswer((previous) => (previous + " " + text).trim().slice(0, 8000)),
-  );
+  const voice = useVoice(appendSpeech);
   useEffect(() => {
     questionRef.current?.focus();
-  }, [session.turns.length]);
+    if (autoSpeak && session.currentQuestion)
+      voice.speak(session.currentQuestion.question);
+    // Playback is deliberately triggered only for a new question or user opt-in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.turns.length, autoSpeak]);
   async function report() {
     setReporting(true);
     voice.stop();
@@ -63,7 +90,7 @@ export function Room({
         </div>
         <button
           className="secondary"
-          disabled={busy}
+          disabled={busy || speechBusy}
           onClick={() => {
             voice.stop();
             back();
@@ -109,7 +136,7 @@ export function Room({
             {session.currentQuestion && (
               <button
                 className="question-audio"
-                disabled={busy}
+                disabled={busy || speechBusy || voice.listening}
                 onClick={() =>
                   voice.speaking
                     ? voice.stop()
@@ -137,10 +164,36 @@ export function Room({
                       body: JSON.stringify({
                         answer,
                         expectedTurn: session.turns.length,
+                        delivery: {
+                          ...(visual.current.samples
+                            ? { visual: visual.current }
+                            : {}),
+                          ...(selfConfidence ? { selfConfidence } : {}),
+                          ...(whisper.durationMs() + voice.durationMs() > 0
+                            ? {
+                                speech: {
+                                  source:
+                                    whisper.durationMs() && voice.durationMs()
+                                      ? "mixed"
+                                      : whisper.durationMs()
+                                        ? "whisper"
+                                        : "browser-dictation",
+                                  captureMs:
+                                    whisper.durationMs() + voice.durationMs(),
+                                  words: spoken.current.words,
+                                  fillers: spoken.current.fillers,
+                                },
+                              }
+                            : {}),
+                        },
                       }),
                     },
                   );
                   setAnswer("");
+                  voice.reset();
+                  whisper.reset();
+                  spoken.current = { words: 0, fillers: 0 };
+                  setSelfConfidence(0);
                   update(next);
                 } catch (err) {
                   setError((err as Error).message);
@@ -165,11 +218,32 @@ export function Room({
                 disabled={busy}
                 onChange={(e) => setAnswer(e.target.value)}
               />
+              <label>
+                Confidence check-in (optional, your own rating)
+                <select
+                  value={selfConfidence}
+                  onChange={(e) => setSelfConfidence(Number(e.target.value))}
+                  disabled={busy}
+                >
+                  <option value={0}>Prefer not to rate</option>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <option key={n} value={n}>
+                      {n} / 5
+                    </option>
+                  ))}
+                </select>
+              </label>
               <div className="answer-controls">
                 <button
                   type="button"
                   className={`secondary ${voice.listening ? "recording" : ""}`}
-                  disabled={busy || !consent || !voice.available}
+                  disabled={
+                    busy ||
+                    !consent ||
+                    !voice.available ||
+                    speechEngine !== "browser" ||
+                    speechBusy
+                  }
                   onClick={voice.dictate}
                 >
                   {voice.listening ? <Square size={16} /> : <Mic size={16} />}{" "}
@@ -177,7 +251,12 @@ export function Room({
                 </button>
                 <button
                   className="primary"
-                  disabled={busy || answer.trim().length < 2 || voice.listening}
+                  disabled={
+                    busy ||
+                    answer.trim().length < 2 ||
+                    voice.listening ||
+                    speechBusy
+                  }
                 >
                   {reporting
                     ? "Building your report…"
@@ -232,6 +311,19 @@ export function Room({
           )}
         </section>
         <aside className="room-aside">
+          <CameraCoach
+            paused={
+              busy ||
+              voice.speaking ||
+              whisper.status === "transcribing" ||
+              session.state !== "active"
+            }
+            turn={session.turns.length}
+            onSummary={(summary) => {
+              visual.current = summary;
+            }}
+          />
+
           <section className="panel">
             <p className="eyebrow">SESSION FOCUS</p>
             <h3>{session.setup.difficulty}</h3>
@@ -250,10 +342,95 @@ export function Room({
             <label className="checkbox">
               <input
                 type="checkbox"
+                checked={autoSpeak}
+                onChange={(e) => {
+                  setAutoSpeak(e.target.checked);
+                  if (!e.target.checked) voice.stop();
+                }}
+              />
+              Speak each question automatically
+            </label>
+            <label>
+              Speech engine
+              <select
+                value={speechEngine}
+                disabled={voice.listening || speechBusy}
+                onChange={(e) => {
+                  voice.stop();
+                  setSpeechEngine(e.target.value as "browser" | "whisper");
+                }}
+              >
+                <option value="browser">Browser live dictation</option>
+                <option value="whisper">Whisper on this device</option>
+              </select>
+            </label>
+            {speechEngine === "whisper" && (
+              <div className="whisper-controls">
+                <p>
+                  Record one answer, then stop to transcribe. Whisper runs
+                  locally in a worker; audio is never uploaded. Maximum two
+                  minutes per recording.
+                </p>
+                {(whisper.status === "off" || whisper.status === "error") && (
+                  <button
+                    className="secondary"
+                    disabled={busy || !consent}
+                    onClick={whisper.load}
+                  >
+                    Load local Whisper
+                  </button>
+                )}
+                {whisper.status === "ready" && (
+                  <button
+                    className="secondary"
+                    disabled={busy || !consent}
+                    onClick={() => {
+                      voice.stop();
+                      void whisper.record();
+                    }}
+                  >
+                    Record answer with Whisper
+                  </button>
+                )}
+                {whisper.status === "recording" && (
+                  <button className="primary" onClick={whisper.stop}>
+                    Stop & transcribe
+                  </button>
+                )}
+                {["loading", "requesting", "transcribing"].includes(
+                  whisper.status,
+                ) && (
+                  <p role="status">
+                    {whisper.status === "loading"
+                      ? "Loading local speech model…"
+                      : whisper.status === "requesting"
+                        ? "Waiting for microphone permission…"
+                        : "Transcribing your answer locally…"}
+                  </p>
+                )}
+                {speechBusy && (
+                  <button className="text-button" onClick={whisper.cancel}>
+                    Cancel Whisper
+                  </button>
+                )}
+                {whisper.error && (
+                  <p className="error" role="alert">
+                    {whisper.error}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <label className="checkbox">
+              <input
+                type="checkbox"
                 checked={consent}
                 onChange={(e) => {
                   setConsent(e.target.checked);
-                  if (!e.target.checked) voice.stop();
+                  if (!e.target.checked) {
+                    voice.stop();
+                    whisper.cancel();
+                  }
                 }}
               />
               <span>Enable optional dictation</span>
@@ -273,7 +450,9 @@ export function Room({
           {session.turns.length > 0 && session.state === "active" && (
             <button
               className="text-button"
-              disabled={busy || Boolean(answer.trim())}
+              disabled={
+                busy || Boolean(answer.trim()) || speechBusy || voice.listening
+              }
               onClick={report}
             >
               Finish early & review {session.turns.length} saved answers

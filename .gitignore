@@ -28,3 +28,8 @@ dist-ssr
 data/
 test-results/
 playwright-report/
+public/vision/
+public/speech/
+tests/fixtures/*.jpg
+tests/fixtures/*.wav
+tests/fixtures/*.y4m

@@ -8,6 +8,7 @@ Use Node 24 LTS (Node >=22.13 supported), npm, and Ollama. From this directory:
 
 ```sh
 npm ci
+npm run setup:media
 cp .env.example .env
 ollama serve
 # In another terminal, if the model is not installed:
@@ -26,7 +27,9 @@ The API listens on loopback port 3001 and Vite proxies `/api` to it. SQLite is c
 - One generated question at a time, content-based evaluations, adaptive follow-ups, answer-version conflict protection, retryable errors and resume-after-reload.
 - Reports with eight equally weighted dimensions, per-answer reasoning and example answers, missing concepts, strengths, improvements, and a study plan.
 - Dashboard, history, practice-score timeline, bookmarks and revision library. Recent report weaknesses inform new interviews.
-- Optional browser dictation and spoken questions, stop/interruption controls, explicit dictation opt-in and text fallback.
+- Optional camera coaching with on-device MediaPipe face/pose landmarks, a live mirrored preview and a separate delivery report for face visibility, approximate lens direction, framing and alignment. Video, frames and landmarks are never saved.
+- Optional local Whisper transcription in a web worker, browser dictation and spoken questions, stop/interruption controls, explicit camera/microphone opt-ins and text fallback.
+- Self-reported confidence check-ins. The application deliberately does not claim to infer confidence or emotion from a face.
 - Profile edits, JSON export, individual interview deletion and full account deletion.
 - Durable daily session caps, request and sign-in rate limiting, same-origin mutation checks, schema validation, bounded AI concurrency, timeout handling, transient HTTP retries, token usage tracking and logs without answer bodies or credentials.
 
@@ -90,6 +93,8 @@ npm run build
 npm audit
 npx playwright install chromium
 npm run test:e2e
+# Optional prerecorded camera/microphone pipeline; requires setup:media and Ollama:
+npm run test:media
 # Optional real-provider acceptance run; requires the API and Ollama:
 npm run test:live
 ```
@@ -100,4 +105,4 @@ Unit/integration fixtures are test-only and never used in the application. The l
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for persistent-disk hosting, HTTPS, backups, and a production smoke check. This is a functioning pilot, **not a claim that public SaaS launch checks are complete**. It must be deployed as a Node service; static GitHub Pages is not suitable. CI validates code rather than publishing an incomplete static app.
 
-Known limits: no payments, email verification or password recovery; `.txt` resume upload only; no sandboxed code execution; no guaranteed full-duplex real-time voice; browser speech support varies; AI scores are uncalibrated coaching estimates. SQLite and in-process locks/rate limits support one API instance, not horizontal scaling. See [docs/ROADMAP.md](docs/ROADMAP.md).
+Known limits: no payments, email verification or password recovery; `.txt` resume upload only; no sandboxed code execution; no guaranteed full-duplex real-time voice; browser/hardware support varies; gaze is an approximate direction signal, not calibrated eye tracking; AI scores are uncalibrated coaching estimates. SQLite and in-process locks/rate limits support one API instance, not horizontal scaling. See [docs/ROADMAP.md](docs/ROADMAP.md).

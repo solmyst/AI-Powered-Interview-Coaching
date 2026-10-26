@@ -1,3 +1,4 @@
+import { DeliveryReport } from "./DeliveryReport";
 import { Bookmark as BookmarkIcon, Download, ArrowUpRight } from "lucide-react";
 import { download } from "./api";
 import type { Bookmark, Session } from "./types";
@@ -49,6 +50,7 @@ export function Report({
         answered questions. Evidence measures support for claims, not personal
         confidence. Code was reviewed, not executed.
       </p>
+      <DeliveryReport turns={session.turns} />
       <section className="panel">
         <h2>Your answer profile</h2>
         <div className="scores-grid">

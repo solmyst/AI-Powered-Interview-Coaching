@@ -4,11 +4,12 @@
 
 - `npm run lint`: passed for active TypeScript UI, Node server and API tests. Legacy reference code is deliberately excluded.
 - `npm run typecheck`: passed.
-- `npm test`: 8 tests passed. Coverage includes registration/login/logout, session cookie flags, anonymous access, cross-origin denial, cross-account access, session creation replay, answer conflicts, report generation/replay, bookmarks, quota persistence after deletion, provider failure recovery, concurrent mutation protection, validation, export/deletion, invalid structured output, NVIDIA adapter contract and missing-key/timeout behavior.
-- `npm run build`: passed. Production JavaScript approximately 187.5 KB (60.1 KB gzip), CSS approximately 20.4 KB (5.2 KB gzip).
+- `npm test`: 13 tests passed. The original API/provider coverage remains, with added landmark-geometry, aggregation and strict delivery-payload validation tests.
+- `npm run build`: passed, including separately loaded MediaPipe and local Whisper worker/WASM chunks.
 - `npm audit`: zero reported vulnerabilities at verification time (including development dependencies).
 - `npm run test:e2e`: 3 Chromium tests passed. Landing/dashboard layouts checked at 320/768/1024/1440 widths; setup at desktop and 320; room/report at all four widths. Registration, profile update, persistent login after reload, history/library empty states and account deletion were exercised. Axe WCAG 2 A/AA checks returned zero violations on landing, setup, room and report. This is an automated subset, not a full accessibility certification.
 - Test browser room/report fixtures are explicitly isolated in Playwright and use the recorded synthetic-candidate live result. They do not simulate a production model connection or working voice input.
+- `npm run test:media`: passed a separate 2.5-minute Chromium acceptance test using prerecorded camera/audio fixtures plus the real local Ollama provider. MediaPipe detected and tracked the face, local `whisper-tiny.en` produced the expected JFK excerpt, aggregate delivery data persisted with the answer, and the delivery report rendered. Fixtures are ignored and are not shipped as customer content.
 
 ## Real model acceptance
 
@@ -28,7 +29,7 @@ A quality check exposed an example answer that was initially advice rather than 
 ## Not verified / deferred
 
 - Live NVIDIA: no API key/model supplied. Adapter request shape, validation and errors were tested with a test double only.
-- Live microphone → transcription: not completed. Browser controls and unsupported-browser text fallback were checked; browser permission-denied handling exists but was not exercised with a real microphone. No voice feature is represented as fully verified.
+- Physical webcam and microphone hardware were not exercised. The actual browser media pipelines were verified with prerecorded devices; permission-denied and device-disconnect behavior remains implementation-tested rather than cross-device certified.
 - No paid entitlements or payments: user explicitly deferred billing.
 - No live public deployment, TLS/domain configuration, production load test or backup restore drill.
 - No verified email/recovery, PDF/DOCX parsing, code execution, score calibration or cross-browser voice certification.

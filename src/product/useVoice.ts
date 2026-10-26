@@ -17,6 +17,7 @@ type Recognition = {
     | null;
   onerror: ((event: { error: string }) => void) | null;
   onend: (() => void) | null;
+  onstart: (() => void) | null;
   start: () => void;
   stop: () => void;
   abort: () => void;
@@ -27,6 +28,8 @@ type VoiceWindow = {
 };
 export function useVoice(append: (text: string) => void) {
   const recognition = useRef<Recognition | null>(null);
+  const started = useRef(0),
+    elapsed = useRef(0);
   const appendRef = useRef(append);
   appendRef.current = append;
   const [listening, setListening] = useState(false);
@@ -71,7 +74,14 @@ export function useVoice(append: (text: string) => void) {
           : `Dictation stopped (${e.error}). Your text is safe; type or retry.`,
       );
     };
-    rec.onend = () => setListening(false);
+    rec.onstart = () => {
+      started.current = Date.now();
+    };
+    rec.onend = () => {
+      if (started.current) elapsed.current += Date.now() - started.current;
+      started.current = 0;
+      setListening(false);
+    };
     try {
       rec.start();
       setListening(true);
@@ -121,5 +131,13 @@ export function useVoice(append: (text: string) => void) {
     dictate,
     speak,
     stop,
+    durationMs: () =>
+      Math.round(
+        elapsed.current + (started.current ? Date.now() - started.current : 0),
+      ),
+    reset: () => {
+      elapsed.current = 0;
+      started.current = 0;
+    },
   };
 }
