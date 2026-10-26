@@ -1,19 +1,57 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap");
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+*,
+::before,
+::after {
+  box-sizing: border-box;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+svg {
+  display: block;
+  vertical-align: middle;
+}
+input,
+textarea,
+select {
+  max-width: 100%;
+}
+summary {
+  display: list-item;
+}
+body {
+  margin: 0;
+}
 
 :root {
   /* Terroir — solmyst signature palette */
-  --color-void: #0D0B09;        /* warm near-black, dark bg */
-  --color-carbon: #1E1C19;      /* dark surface, cards */
-  --color-ash: #4A4640;         /* body text, light mode */
-  --color-mist: #9A9188;        /* muted / secondary text */
-  --color-vellum: #EAE4D9;      /* elegant card/section bg */
-  --color-parchment: #F6F4F0;   /* crisp editorial off-white, light page bg */
-  --color-clay: #BE5F3C;        /* ★ signature accent */
-  --color-clay-pale: #E5A88A;   /* accent on dark bg */
+  --color-void: #0d0b09; /* warm near-black, dark bg */
+  --color-carbon: #1e1c19; /* dark surface, cards */
+  --color-ash: #4a4640; /* body text, light mode */
+  --color-mist: #9a9188; /* muted / secondary text */
+  --color-vellum: #eae4d9; /* elegant card/section bg */
+  --color-parchment: #f6f4f0; /* crisp editorial off-white, light page bg */
+  --color-clay: #be5f3c; /* ★ signature accent */
+  --color-clay-pale: #e5a88a; /* accent on dark bg */
 }
 
 @layer utilities {
@@ -28,7 +66,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--color-parchment);
   color: var(--color-ash);
-  font-family: 'Outfit', sans-serif;
+  font-family: "Outfit", sans-serif;
 }
 
 /* Custom Scrollbar */

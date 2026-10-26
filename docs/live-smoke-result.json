@@ -1,0 +1,214 @@
+{
+  "testedAt": "2026-10-25T16:17:47.542Z",
+  "provider": "ollama",
+  "model": "qwen2.5:7b-instruct",
+  "session": {
+    "id": "46cedffb-e66e-4050-8987-fcebe46dbcbf",
+    "created": "2026-10-25T16:15:12.045Z",
+    "state": "complete",
+    "setup": {
+      "role": "Backend",
+      "experience": "Early career",
+      "track": "Technical",
+      "difficulty": "Intermediate",
+      "industry": "Technology",
+      "company": "",
+      "resume": "",
+      "jobDescription": "",
+      "questionCount": 3
+    },
+    "currentQuestion": null,
+    "turns": [
+      {
+        "question": {
+          "question": "Can you walk me through the design decisions you made when implementing the Redis cache for the Node.js inventory API?",
+          "focus": "Technical Design and Tradeoffs",
+          "difficulty": "Intermediate"
+        },
+        "answer": "For my inventory API I used Redis cache-aside with a 60-second TTL. Reads check Redis first and query PostgreSQL on a cache miss. Writes commit to PostgreSQL before deleting the Redis key. I would use transactions for stock updates and an idempotency key for checkout. My first implementation did not handle concurrent cache refills, which could reintroduce stale inventory.",
+        "evaluation": {
+          "scores": {
+            "correctness": 85,
+            "depth": 75,
+            "clarity": 90,
+            "structure": 80,
+            "relevance": 85,
+            "reasoning": 80,
+            "evidence": 85,
+            "practicality": 75
+          },
+          "rationale": "The candidate provided a clear and relevant explanation of their design decisions, including the use of Redis for caching, transaction handling, and idempotency. However, there are some gaps in the depth of the explanation and practical considerations that need to be addressed.",
+          "strengths": [
+            "Clear and relevant explanation of the Redis caching strategy.",
+            "Incorporation of transaction handling and idempotency, which are important for reliability.",
+            "Recognition of potential concurrency issues in the initial implementation."
+          ],
+          "improvements": [
+            "Elaborate on the tradeoffs between using Redis and PostgreSQL, such as performance and consistency.",
+            "Provide more detail on how the idempotency key works and its impact on the system.",
+            "Discuss how you would monitor and ensure the cache's effectiveness and reliability."
+          ],
+          "missingConcepts": [
+            "Detailed explanation of the cache-aside pattern and its benefits.",
+            "Tradeoffs between Redis and PostgreSQL in terms of performance and consistency.",
+            "Specifics on how to handle cache invalidation and eviction policies.",
+            "Impact of Redis's in-memory nature on data persistence and availability."
+          ],
+          "modelAnswer": "The candidate explained the use of Redis cache-aside with a 60-second TTL, reads checking Redis first and querying PostgreSQL on cache misses, and writes committing to PostgreSQL before deleting the Redis key. They also mentioned using transactions for stock updates and an idempotency key for checkout. However, they could improve by discussing the tradeoffs between Redis and PostgreSQL, providing more details on idempotency handling, and explaining how to monitor and ensure the cache's effectiveness."
+        }
+      },
+      {
+        "question": {
+          "question": "How would you handle cache invalidation and eviction policies in your Redis cache for the inventory API, and what tradeoffs would you consider in choosing these policies?",
+          "focus": "Cache Management and Tradeoffs",
+          "difficulty": "Intermediate"
+        },
+        "answer": "A reader can fetch old data before a write commits, then populate the cache after invalidation. For checkout I would bypass the cache and use an atomic SQL update with a stock >= quantity condition. For browsing, a short TTL bounds the stale window. Versioned cache values or an outbox-driven invalidation event can help, but event ordering and retry handling need care.",
+        "evaluation": {
+          "scores": {
+            "correctness": 80,
+            "depth": 70,
+            "clarity": 85,
+            "structure": 80,
+            "relevance": 85,
+            "reasoning": 80,
+            "evidence": 80,
+            "practicality": 75
+          },
+          "rationale": "The candidate provided a clear explanation of how to handle cache invalidation and eviction policies, including the use of short TTLs and versioned cache values. However, there are some gaps in the depth of the explanation, particularly regarding the tradeoffs and specific mechanisms for handling cache invalidation and eviction.",
+          "strengths": [
+            "Clear explanation of using short TTLs to bound the stale window.",
+            "Recognized the need for versioned cache values or outbox-driven invalidation events.",
+            "Acknowledged the complexity of event ordering and retry handling."
+          ],
+          "improvements": [
+            "Provide more detailed tradeoffs between different cache invalidation and eviction strategies.",
+            "Explain the specific mechanisms for handling cache invalidation and eviction in more detail.",
+            "Discuss how to ensure consistency between the cache and database during cache invalidation."
+          ],
+          "missingConcepts": [
+            "Detailed explanation of different cache invalidation and eviction strategies and their tradeoffs.",
+            "Specific mechanisms for handling cache invalidation and eviction, such as invalidation queues or pub/sub systems.",
+            "Impact of cache invalidation on system performance and database load.",
+            "Handling of edge cases, such as concurrent cache invalidations and retries."
+          ],
+          "modelAnswer": "The candidate explained the use of short TTLs to bound the stale window and recognized the need for versioned cache values or outbox-driven invalidation events. However, they could improve by providing more detailed tradeoffs between different cache invalidation and eviction strategies, explaining specific mechanisms for handling cache invalidation and eviction, and discussing the impact on system performance and database load."
+        }
+      },
+      {
+        "question": {
+          "question": "Can you explain the tradeoffs between using an invalidation queue and a pub/sub system for handling cache invalidation in your Redis cache for the inventory API?",
+          "focus": "Cache Management and Tradeoffs",
+          "difficulty": "Intermediate"
+        },
+        "answer": "I would load-test concurrent checkout requests for the same SKU, assert stock never goes negative, and inject Redis downtime and delayed invalidation. PostgreSQL remains the source of truth. I would monitor stale-read rate, database latency, error rate and outbox lag. I cannot claim exact improvements without measuring a baseline. Cache stampedes can be limited with per-key request coalescing.",
+        "evaluation": {
+          "scores": {
+            "correctness": 75,
+            "depth": 65,
+            "clarity": 85,
+            "structure": 80,
+            "relevance": 80,
+            "reasoning": 75,
+            "evidence": 75,
+            "practicality": 70
+          },
+          "rationale": "The candidate provided a clear explanation of load testing and monitoring mechanisms but did not fully address the tradeoffs between using an invalidation queue and a pub/sub system. There is a lack of depth in discussing the specific mechanisms and potential impacts on the system.",
+          "strengths": [
+            "Clear explanation of load testing and monitoring mechanisms.",
+            "Acknowledged the need for monitoring to ensure cache and database consistency.",
+            "Recognized the importance of PostgreSQL as the source of truth."
+          ],
+          "improvements": [
+            "Provide a detailed comparison of the tradeoffs between using an invalidation queue and a pub/sub system.",
+            "Discuss the specific mechanisms and potential impacts of each system on the cache and database.",
+            "Explain how to handle edge cases, such as concurrent cache invalidations and retries."
+          ],
+          "missingConcepts": [
+            "Detailed comparison of invalidation queue and pub/sub system tradeoffs.",
+            "Specific mechanisms for handling cache invalidation and eviction, such as invalidation queues or pub/sub systems.",
+            "Impact of cache invalidation on system performance and database load.",
+            "Handling of edge cases, such as concurrent cache invalidations and retries."
+          ],
+          "modelAnswer": "The candidate explained the need for load testing and monitoring mechanisms but did not fully address the tradeoffs between using an invalidation queue and a pub/sub system. They could improve by providing a detailed comparison of the tradeoffs, discussing specific mechanisms and potential impacts on the system, and explaining how to handle edge cases."
+        }
+      }
+    ],
+    "report": {
+      "summary": "The candidate demonstrated a good understanding of Redis caching, transaction handling, and cache invalidation. They provided clear explanations and recognized the importance of PostgreSQL as the source of truth. However, there are gaps in the depth of the explanation, particularly regarding tradeoffs and specific mechanisms for handling cache invalidation and eviction. The candidate also needs to improve on providing more practical details and edge case handling.",
+      "strengths": [
+        "Clear and relevant explanation of the Redis caching strategy.",
+        "Incorporation of transaction handling and idempotency, which are important for reliability.",
+        "Recognition of potential concurrency issues in the initial implementation.",
+        "Clear explanation of using short TTLs to bound the stale window.",
+        "Acknowledged the need for versioned cache values or outbox-driven invalidation events."
+      ],
+      "improvements": [
+        "Provide more detailed tradeoffs between different cache invalidation and eviction strategies.",
+        "Explain the specific mechanisms for handling cache invalidation and eviction in more detail.",
+        "Discuss how to ensure consistency between the cache and database during cache invalidation.",
+        "Provide a detailed comparison of the tradeoffs between using an invalidation queue and a pub/sub system.",
+        "Discuss the specific mechanisms and potential impacts of each system on the cache and database."
+      ],
+      "studyPlan": [
+        {
+          "day": 1,
+          "topic": "Redis Cache Design and Tradeoffs",
+          "task": "Review Redis caching strategies and tradeoffs, focusing on cache-aside and cache-hit patterns.",
+          "practiceQuestion": "Explain the differences between cache-aside and cache-hit patterns and discuss the tradeoffs in a high-traffic application."
+        },
+        {
+          "day": 3,
+          "topic": "Cache Invalidation and Eviction Strategies",
+          "task": "Study various cache invalidation and eviction strategies, including invalidation queues and pub/sub systems.",
+          "practiceQuestion": "Compare and contrast invalidation queues and pub/sub systems in terms of their tradeoffs and practical implications."
+        },
+        {
+          "day": 5,
+          "topic": "Handling Concurrency and Idempotency",
+          "task": "Explore techniques for handling concurrency and idempotency in distributed systems, including transaction handling and idempotency keys.",
+          "practiceQuestion": "Design a system for handling concurrent stock updates and explain how idempotency keys can be used to ensure consistency."
+        },
+        {
+          "day": 7,
+          "topic": "Monitoring and Ensuring Cache Effectiveness",
+          "task": "Learn about monitoring tools and techniques for ensuring cache effectiveness and reliability, including metrics and alerting.",
+          "practiceQuestion": "Design a monitoring strategy for a Redis cache and explain how you would ensure the cache remains effective and reliable."
+        },
+        {
+          "day": 9,
+          "topic": "Edge Case Handling and Retry Mechanisms",
+          "task": "Study edge cases and retry mechanisms in distributed systems, focusing on cache invalidation and database consistency.",
+          "practiceQuestion": "Discuss how to handle edge cases such as concurrent cache invalidations and retries in a distributed system."
+        },
+        {
+          "day": 11,
+          "topic": "System Design and Tradeoffs",
+          "task": "Practice designing a system that integrates Redis caching with PostgreSQL, focusing on tradeoffs and practical considerations.",
+          "practiceQuestion": "Design a system that integrates Redis caching with PostgreSQL and discuss the tradeoffs and practical considerations."
+        },
+        {
+          "day": 14,
+          "topic": "Mock Interview",
+          "task": "Prepare for and conduct a mock interview focusing on the topics covered in the study plan.",
+          "practiceQuestion": "Prepare for and conduct a mock interview focusing on the topics covered in the study plan."
+        }
+      ],
+      "scores": {
+        "correctness": 80,
+        "depth": 70,
+        "clarity": 87,
+        "structure": 80,
+        "relevance": 83,
+        "reasoning": 78,
+        "evidence": 80,
+        "practicality": 73
+      },
+      "overall": 79,
+      "answered": 3
+    },
+    "previousWeaknesses": [],
+    "provider": "ollama",
+    "model": "qwen2.5:7b-instruct"
+  }
+}

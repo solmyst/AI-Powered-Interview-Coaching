@@ -23,3 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 .env
+.env.*
+!.env.example
+data/
+test-results/
+playwright-report/

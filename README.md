@@ -1,160 +1,103 @@
-# InterviewAce - AI-Powered Interview Coaching Platform
+# InterviewAce
 
-InterviewAce is a comprehensive interview preparation platform that combines computer vision simulation, speech analysis, and natural language processing to provide instant, actionable feedback on your interview performance.
+A working interview-coaching pilot built from the original Solmyst React application. It uses real Ollama responses, or a configured NVIDIA hosted text model, with a server-owned interview history and evidence-based coaching reports. Billing is deliberately deferred.
 
-It features a custom, premium design using the **Solmyst "Terroir"** design system for a sleek, editorial aesthetic.
+## Run locally
 
----
+Use Node 24 LTS (Node >=22.13 supported), npm, and Ollama. From this directory:
 
-## 🎨 Solmyst "Terroir" Design System
-
-InterviewAce is built using a custom, high-contrast, editorial design language called **Terroir**:
-- **Palette**:
-  - **Void** (`#0D0B09`): Warm near-black background for dark pages.
-  - **Carbon** (`#1E1C19`): Surface color for card elements.
-  - **Ash** (`#4A4640`): Primary body text color.
-  - **Mist** (`#9A9188`): Muted/secondary text and borders.
-  - **Vellum** (`#EAE4D9`): Elegant, soft container/section backgrounds.
-  - **Parchment** (`#F6F4F0`): Crisp off-white workspace canvas background.
-  - **Clay** (`#BE5F3C`): Warm terracotta primary accent highlight.
-  - **Clay-Pale** (`#E5A88A`): Soft terracotta accent for dark contrast.
-- **Typography**: Editorial layout powered by **Outfit** (modern sans-serif for UI elements) and **Playfair Display** (expressive serif for headings) imported dynamically from Google Fonts.
-
----
-
-## 🚀 Features & Current Status (Working)
-
-### 1. Dual AI Provider Integration
-- **OpenAI Service**: Seamlessly connects to GPT models to generate contextual follow-up questions and compile final feedback reports.
-- **Ollama Integration**: Direct fallback to locally running LLMs (such as `llama3.2` via proxy) for a completely offline/local private setup.
-- **Dynamic Follow-Ups**: Dynamically analyzes the user's spoken answers and creates context-aware follow-up questions on the fly.
-- **Configurable Settings**: A clean Settings dashboard to switch providers, specify models, and securely manage local API keys.
-
-### 2. Multi-Modal Speech & Video Analysis
-- **Dual Transcription Engine**:
-  - **Web Speech API**: Fast, client-side real-time transcript preview.
-  - **OpenAI Whisper**: High-fidelity post-processing for precise conversational analysis.
-- **Vocal Quality Metrics**: Track **Speaking Pace** (Words Per Minute), count **Filler Words** (such as *um*, *uh*, *like*, *so*), and identify **Silence/Pauses** with automated real-time warnings.
-- **Video & Gesture Indicators**: Camera feed integration measuring simulated eye contact, body posture, facial detection warnings, and confidence scoring.
-
-### 3. Interactive Analytics Dashboard
-- **Performance Key Metrics**: Aggregated metrics including average score, completed sessions, and total hours practiced.
-- **Terroir-Themed Recharts**:
-  - **Performance Trends**: Line chart showing score improvement over time.
-  - **Category Mastery**: Radar/bar chart showing strengths in categories (Technical, Behavioral, General).
-  - **Sentiment Distribution**: Pie chart illustrating user sentiment analysis during mock sessions.
-- **Historical Session Records**: Filter and view past interviews with complete transcripts, score breakdowns, lists of strengths, and areas for improvement.
-
-### 4. Firebase Authentication & Resilient Backend
-- **Secure Authentication**: Integrated Firebase Auth with support for Email/Password registration and Google OAuth sign-in.
-- **Firestore Local Cache**: Enabled offline database persistency and query caching. When internet connection is lost, user sessions are cached locally and synced to Cloud Firestore immediately once reconnected.
-
----
-
-## 🛠️ Tech Stack
-
-- **Frontend**: React 18 + TypeScript + Vite
-- **Styling**: Tailwind CSS with Terroir CSS variables
-- **State & Databases**: Firebase Auth + Cloud Firestore (with Offline Sync)
-- **Visual Analytics**: Recharts
-- **Icons**: Lucide React
-- **Animations**: Framer Motion
-
----
-
-## 📦 Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/interviewace.git
-cd interviewace
-```
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Set up Firebase:
-   - Create a new Firebase project at [Firebase Console](https://console.firebase.google.com/)
-   - Enable Authentication and Firestore Database
-   - Enable Google Sign-in provider in Authentication
-   - Copy your Firebase config details
-
-4. Create environment variables:
-```bash
+```sh
+npm ci
 cp .env.example .env
-```
-
-5. Fill in your configuration in `.env`:
-```env
-VITE_FIREBASE_API_KEY=your_api_key_here
-VITE_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_project_id.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-VITE_FIREBASE_APP_ID=your_app_id
-```
-
-6. Start the local development server:
-```bash
+ollama serve
+# In another terminal, if the model is not installed:
+ollama pull qwen2.5:7b-instruct
 npm run dev
 ```
 
----
+Open **http://localhost:5173**. Use that exact origin (not 127.0.0.1) because mutation requests validate `APP_ORIGIN`. Create an account, select a role and round, optionally add resume text, then begin. No API key is required for Ollama. The first model request can be slower while it loads.
 
-## 🏗️ Project Structure
+The API listens on loopback port 3001 and Vite proxies `/api` to it. SQLite is created under `data/`. Keep `.env` private. Do not add `NODE_ENV=development` to `.env`: it can cause development React code to be included in Vite builds. Set `NODE_ENV=production` in the deployed server's environment instead.
 
+## Implemented
+
+- Email/password accounts with scrypt password hashes, hashed opaque login tokens, HttpOnly/SameSite cookies, logout and persistent sessions.
+- Role, seniority, round, difficulty, industry and company setup; 3–8 questions; optional `.txt` resume upload or pasted context and job description.
+- One generated question at a time, content-based evaluations, adaptive follow-ups, answer-version conflict protection, retryable errors and resume-after-reload.
+- Reports with eight equally weighted dimensions, per-answer reasoning and example answers, missing concepts, strengths, improvements, and a study plan.
+- Dashboard, history, practice-score timeline, bookmarks and revision library. Recent report weaknesses inform new interviews.
+- Optional browser dictation and spoken questions, stop/interruption controls, explicit dictation opt-in and text fallback.
+- Profile edits, JSON export, individual interview deletion and full account deletion.
+- Durable daily session caps, request and sign-in rate limiting, same-origin mutation checks, schema validation, bounded AI concurrency, timeout handling, transient HTTP retries, token usage tracking and logs without answer bodies or credentials.
+
+The original cream/clay palette and editorial typography are retained, with a quiet green accent for the practice workspace. Original prototype modules live in `legacy/` for reference and are excluded from the bundle. Old browser IndexedDB records remain untouched; they are not silently converted into semantic answer scores.
+
+## Environment
+
+| Variable                | Default / purpose                                                                   |
+| ----------------------- | ----------------------------------------------------------------------------------- |
+| `PORT`                  | `3001`, API and production static server                                            |
+| `HOST`                  | `127.0.0.1`; use `0.0.0.0` only in a properly isolated deployment                   |
+| `APP_ORIGIN`            | `http://localhost:5173`; exact public HTTPS origin in production, no trailing slash |
+| `DATABASE_PATH`         | `./data/interviewace.db`; persistent local disk                                     |
+| `AI_PROVIDER`           | `ollama` or `nvidia`                                                                |
+| `OLLAMA_URL`            | `http://127.0.0.1:11434`; trusted operator-configured endpoint                      |
+| `OLLAMA_MODEL`          | `qwen2.5:7b-instruct`                                                               |
+| `AI_TIMEOUT_MS`         | `120000` per request attempt                                                        |
+| `DAILY_INTERVIEW_LIMIT` | `5` successful session starts per user per UTC day                                  |
+| `NVIDIA_API_KEY`        | Server-only key; needed only for NVIDIA                                             |
+| `NVIDIA_MODEL`          | Exact model ID available to the NVIDIA account                                      |
+| `NODE_ENV`              | Set to `production` on deployment for Secure cookies and HTTPS enforcement          |
+
+### NVIDIA
+
+Configure locally, without sharing the key in chat or committing it:
+
+```dotenv
+AI_PROVIDER=nvidia
+NVIDIA_API_KEY=your_key_here
+NVIDIA_MODEL=your_selected_catalog_model_id
 ```
-src/
-├── components/           # React components
-│   ├── interview/       # Interview-specific elements (RealTimeFeedback, VideoFeed, FeedbackReport)
-│   ├── layout/          # Page layouts (Navigation)
-│   └── pages/           # Page views (Dashboard, AnalyticsDashboard, Settings, LandingPage, InterviewPractice)
-├── config/              # Configuration files
-│   └── firebase.ts      # Firebase initialization & offline rules setup
-├── services/            # Core business logic layer
-│   ├── aiProviderService.ts      # OpenAI & Ollama coordinator
-│   ├── faceAnalysisService.ts    # Camera feed & posture analyzer
-│   ├── speechAnalysisService.ts  # Pace & filler word tracker
-│   ├── sessionStorageService.ts  # Session storage & Firestore syncer
-│   └── whisperService.ts         # Audio recording and Whisper transcription
-├── App.tsx              # Main routing & app entry point
-└── main.tsx            # App bundle mounting
+
+Restart the API. The adapter uses `https://integrate.api.nvidia.com/v1/chat/completions` with Bearer authorization. Model IDs and account availability differ; choose a chat/instruct model from the NVIDIA catalog that reliably follows JSON instructions. The server validates every response against Zod schemas. Invalid or truncated responses produce a recoverable error, never invented interview data. A configured key is not proof of live availability. NVIDIA was contract-tested with a test double; live testing requires your key and model.
+
+References: [NVIDIA LLM APIs](https://docs.api.nvidia.com/nim/reference/llm-apis), [Ollama API](https://github.com/ollama/ollama/blob/main/docs/api.md).
+
+## API and storage
+
+`server/app.js` owns identity, access control and interview transitions. `server/db.js` initializes schema version 1: users, login sessions, interviews, usage and bookmarks. `server/ai.js` is the only model-network boundary. `server/schemas.js` defines inputs and model outputs. React renders saved server results; it cannot set scores or usage counts.
+
+- `POST /api/auth/register`, `/login`, `/logout`; `GET /api/auth/session`
+- `GET/PATCH/DELETE /api/me`; `GET /api/me/export`
+- `GET/POST /api/interviews`; creation requires a UUID `Idempotency-Key`
+- `GET/DELETE /api/interviews/:id`
+- `POST /api/interviews/:id/answers` with `{answer, expectedTurn}`
+- `POST /api/interviews/:id/report` (also supports finishing early after one answer)
+- `POST /api/interviews/:id/bookmarks` with `{turn, saved}`; `GET /api/bookmarks`
+- `GET /api/health` for model configuration/availability
+
+Every mutation requires an `Origin` matching `APP_ORIGIN`. All personal-data routes require a cookie. Interview state is `active → report_pending → complete`; early reports may transition directly from active to complete. A failed generation leaves the previous saved state untouched. Creation retries reuse their UUID; answer retries use the expected turn; report requests return the existing report after completion. No external code execution occurs.
+
+Usage counts successful starts, not retries, resumes or deletion. Output and input token counters are persisted when a generation is saved. There are at most two in-flight model requests and one mutation per user per process. HTTP 429/502/503 gets one short retry; invalid JSON and transport timeouts require explicit user retry. Responses are limited to 2,200 model output tokens. To bound follow-up/report context, prior answers are excerpted to 2,500 characters and prior rationales to 500 characters; full answers remain in the database and are evaluated in full on submission. Long-answer final summaries can miss details outside those excerpts.
+
+## Validation
+
+```sh
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm audit
+npx playwright install chromium
+npm run test:e2e
+# Optional real-provider acceptance run; requires the API and Ollama:
+npm run test:live
 ```
 
----
+Unit/integration fixtures are test-only and never used in the application. The live acceptance script creates a disposable local account, runs three real model turns and a report, writes `docs/live-smoke-result.json`, and deletes its account. The file is explicitly a synthetic-candidate test artifact, not customer data or a testimonial. See `docs/VALIDATION.md` for observed results and limitations.
 
-## 🔥 Firebase Setup
+## Deployment and launch readiness
 
-### Firestore Security Rules
-Add these rules inside the Firestore Console:
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-    match /interviewSessions/{sessionId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-    }
-  }
-}
-```
+See [DEPLOYMENT.md](DEPLOYMENT.md) for persistent-disk hosting, HTTPS, backups, and a production smoke check. This is a functioning pilot, **not a claim that public SaaS launch checks are complete**. It must be deployed as a Node service; static GitHub Pages is not suitable. CI validates code rather than publishing an incomplete static app.
 
----
-
-## 🤝 Contributing
-
-1. Fork the repository.
-2. Create a feature branch: `git checkout -b feature/amazing-feature`.
-3. Commit your changes: `git commit -m 'Add amazing feature'`.
-4. Push to the branch: `git push origin feature/amazing-feature`.
-5. Open a Pull Request.
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Known limits: no payments, email verification or password recovery; `.txt` resume upload only; no sandboxed code execution; no guaranteed full-duplex real-time voice; browser speech support varies; AI scores are uncalibrated coaching estimates. SQLite and in-process locks/rate limits support one API instance, not horizontal scaling. See [docs/ROADMAP.md](docs/ROADMAP.md).

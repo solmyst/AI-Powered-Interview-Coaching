@@ -1,0 +1,38 @@
+{
+  "provider": "ollama",
+  "model": "qwen2.5:7b-instruct",
+  "testedAt": "2026-10-26T07:34:20.868Z",
+  "value": {
+    "scores": {
+      "correctness": 85,
+      "depth": 70,
+      "clarity": 90,
+      "structure": 80,
+      "relevance": 85,
+      "reasoning": 80,
+      "evidence": 75,
+      "practicality": 85
+    },
+    "rationale": "The candidate provided a good overview of keyboard accessibility and validation error announcements in React forms. However, there are some areas for improvement, such as not mentioning the use of `aria-invalid` and `aria-live` attributes, and not discussing the importance of handling form validation on both client and server sides.",
+    "strengths": [
+      "The candidate correctly mentioned the use of native HTML elements and ARIA attributes for accessibility.",
+      "They provided a clear and structured approach to handling form submission and validation errors.",
+      "The candidate demonstrated practical knowledge by testing with different keyboard navigation methods and a screen reader."
+    ],
+    "improvements": [
+      "The candidate should mention the use of `aria-invalid` to mark form fields as invalid.",
+      "Discuss the importance of server-side validation to ensure data integrity.",
+      "Explain how to handle edge cases, such as multiple errors and complex forms."
+    ],
+    "missingConcepts": [
+      "Server-side validation and its importance",
+      "Handling multiple errors and complex forms",
+      "The use of `aria-live` to announce live regions more effectively"
+    ],
+    "modelAnswer": "To make a React form keyboard-accessible and announce validation errors, I would use native labeled inputs and buttons, ensuring a logical tab order and visible focus styles. On form submission, I would focus the first invalid input and use `aria-describedby` to link the error message. For live region announcements, I would use `aria-live` with the 'polite' or 'assertive' mode, depending on the severity of the error. To handle multiple errors, I would use a single live region to announce all errors at once. I would also ensure server-side validation to prevent security vulnerabilities. For complex forms, I would consider using a library like `react-aria` or `react-a11y` to simplify accessibility implementation."
+  },
+  "usage": {
+    "input": 783,
+    "output": 468
+  }
+}
