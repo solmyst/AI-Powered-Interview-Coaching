@@ -14,6 +14,7 @@ import { resolve } from "node:path";
 import { z } from "zod";
 import { openDatabase } from "./db.js";
 import { createAI, ServiceError } from "./ai.js";
+import { createTranscriber } from "./transcription.js";
 import {
   setupSchema,
   answerSchema,
@@ -46,6 +47,7 @@ export function createApp({
   env = process.env,
   db = openDatabase(env.DATABASE_PATH || "./data/interviewace.db"),
   ai = createAI(env),
+  transcriber = createTranscriber(env),
 } = {}) {
   const app = express();
   const locks = new Set();
@@ -160,7 +162,11 @@ export function createApp({
     message: { error: "Too many sign-in attempts. Try again in 15 minutes." },
   });
   app.get("/api/health", async (_req, res) =>
-    res.json({ ...(await ai.status()), billing: false }),
+    res.json({
+      ...(await ai.status()),
+      transcription: transcriber.status(),
+      billing: false,
+    }),
   );
   app.post("/api/auth/register", authLimit, async (req, res) => {
     const input = credentials.parse(req.body);
@@ -227,6 +233,21 @@ export function createApp({
   });
   app.get("/api/me", auth, (req, res) =>
     res.json({ user: safeUser(req.user), usage: usage(req.user.id) }),
+  );
+  app.post(
+    "/api/transcribe",
+    auth,
+    express.raw({ type: "audio/wav", limit: "12mb" }),
+    async (req, res) => {
+      if (
+        !Buffer.isBuffer(req.body) ||
+        req.body.length < 44 ||
+        req.body.subarray(0, 4).toString("ascii") !== "RIFF" ||
+        req.body.subarray(8, 12).toString("ascii") !== "WAVE"
+      )
+        fail(415, "A valid WAV recording is required.");
+      res.json(await transcriber.transcribe(req.body));
+    },
   );
   app.patch("/api/me", auth, (req, res) => {
     const { name } = z

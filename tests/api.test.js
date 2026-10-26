@@ -32,6 +32,7 @@ const report = {
 let badAI = false,
   calls = 0,
   delay = 0,
+  transcribedBytes = 0,
   server,
   base,
   db;
@@ -57,6 +58,17 @@ const ai = {
     };
   },
 };
+const transcriber = {
+  status: () => ({
+    provider: "assemblyai",
+    model: "universal-3-5-pro",
+    ready: true,
+  }),
+  transcribe: async (audio) => {
+    transcribedBytes = audio.length;
+    return { text: "मैंने a cache service बनाई.", confidence: 0.96, durationMs: 2300 };
+  },
+};
 before(async () => {
   const result = createApp({
     env: {
@@ -66,6 +78,7 @@ before(async () => {
       DAILY_INTERVIEW_LIMIT: "2",
     },
     ai,
+    transcriber,
   });
   db = result.db;
   server = result.app.listen(0, "127.0.0.1");
@@ -162,6 +175,35 @@ test("authentication, session cookies, invalid credentials and CSRF", async () =
   );
   await request("/auth/logout", { method: "POST", cookie: a.cookie, body: {} });
   assert.equal((await request("/me", { cookie: a.cookie })).status, 401);
+});
+test("authenticated WAV transcription returns only the safe transcript contract", async () => {
+  const a = await account("speech@example.test");
+  const wav = Buffer.alloc(44);
+  wav.write("RIFF");
+  wav.write("WAVE", 8);
+  const unauthorized = await fetch(base + "/api/transcribe", {
+    method: "POST",
+    headers: { Origin: origin, "Content-Type": "audio/wav" },
+    body: wav,
+  });
+  assert.equal(unauthorized.status, 401);
+
+  const response = await fetch(base + "/api/transcribe", {
+    method: "POST",
+    headers: {
+      Origin: origin,
+      Cookie: a.cookie,
+      "Content-Type": "audio/wav",
+    },
+    body: wav,
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    text: "मैंने a cache service बनाई.",
+    confidence: 0.96,
+    durationMs: 2300,
+  });
+  assert.equal(transcribedBytes, 44);
 });
 test("complete interview, grounded evaluations, report, bookmarks, ownership and deletion", async () => {
   const a = await account("flow@example.test"),
