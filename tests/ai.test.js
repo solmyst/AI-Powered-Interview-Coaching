@@ -64,6 +64,53 @@ test("NVIDIA sends the key only to its server endpoint and validates responses",
     globalThis.fetch = original;
   }
 });
+test("NVIDIA Lightning disables reasoning and uses its documented sampling settings", async () => {
+  const original = globalThis.fetch;
+  let body;
+  try {
+    globalThis.fetch = async (_url, options) => {
+      body = JSON.parse(options.body);
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  question: "How would you invalidate that cache?",
+                  focus: "Caching",
+                  difficulty: "Intermediate",
+                }),
+              },
+            },
+          ],
+        }),
+      );
+    };
+    await createAI({
+      AI_PROVIDER: "nvidia",
+      NVIDIA_API_KEY: "test-only-key",
+      NVIDIA_MODEL: "nvidia/nemotron-3.5-lightning-30b-a3b",
+    }).generate(questionSchema, "Ask one question", {});
+    assert.equal(body.temperature, 1);
+    assert.equal(body.top_p, 0.95);
+    assert.deepEqual(body.chat_template_kwargs, { enable_thinking: false });
+    assert.equal(body.response_format.type, "json_schema");
+    assert.equal(body.response_format.json_schema.name, "interview_response");
+    assert.equal(body.response_format.json_schema.strict, true);
+    assert.equal(body.response_format.json_schema.schema.type, "object");
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+test("configured NVIDIA status reports ready without setup instructions", async () => {
+  const status = await createAI({
+    AI_PROVIDER: "nvidia",
+    NVIDIA_API_KEY: "test-only-key",
+    NVIDIA_MODEL: "nvidia/nemotron-3.5-lightning-30b-a3b",
+  }).status();
+  assert.equal(status.ready, true);
+  assert.equal(status.message, "NVIDIA hosted inference is configured.");
+});
 test("NVIDIA fails closed without credentials and provider timeouts are recoverable", async () => {
   await assert.rejects(
     createAI({ AI_PROVIDER: "nvidia" }).generate(questionSchema, "", {}),

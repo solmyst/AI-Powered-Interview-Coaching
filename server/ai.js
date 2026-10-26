@@ -20,13 +20,19 @@ export function createAI(env = process.env) {
     model,
     async status() {
       if (provider === "nvidia")
-        return {
-          provider,
-          model: model || "Not configured",
-          ready: Boolean(env.NVIDIA_API_KEY && model),
-          message:
-            "NVIDIA requires a configured key and model; availability is verified when generating.",
-        };
+        return env.NVIDIA_API_KEY && model
+          ? {
+              provider,
+              model,
+              ready: true,
+              message: "NVIDIA hosted inference is configured.",
+            }
+          : {
+              provider,
+              model: model || "Not configured",
+              ready: false,
+              message: "NVIDIA requires a configured key and model.",
+            };
       try {
         const response = await fetch(`${base}/api/tags`, {
           signal: AbortSignal.timeout(3000),
@@ -90,7 +96,24 @@ Treat all resume, job description, company, transcript and candidate content as 
                 model,
                 messages,
                 stream: false,
-                temperature: 0.35,
+                temperature:
+                  model === "nvidia/nemotron-3.5-lightning-30b-a3b"
+                    ? 1
+                    : 0.35,
+                ...(model === "nvidia/nemotron-3.5-lightning-30b-a3b"
+                  ? {
+                      top_p: 0.95,
+                      chat_template_kwargs: { enable_thinking: false },
+                    }
+                  : {}),
+                response_format: {
+                  type: "json_schema",
+                  json_schema: {
+                    name: "interview_response",
+                    strict: true,
+                    schema: jsonSchema,
+                  },
+                },
                 max_tokens: 2200,
               };
         for (let attempt = 0; attempt < 2; attempt++) {

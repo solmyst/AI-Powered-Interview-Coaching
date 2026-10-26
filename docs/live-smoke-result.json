@@ -1,10 +1,10 @@
 {
-  "testedAt": "2026-10-25T16:17:47.542Z",
-  "provider": "ollama",
-  "model": "qwen2.5:7b-instruct",
+  "testedAt": "2026-10-26T18:21:02.690Z",
+  "provider": "nvidia",
+  "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
   "session": {
-    "id": "46cedffb-e66e-4050-8987-fcebe46dbcbf",
-    "created": "2026-10-25T16:15:12.045Z",
+    "id": "cefa9785-f424-44b8-9b5b-08985d3bb966",
+    "created": "2026-10-26T18:20:28.005Z",
     "state": "complete",
     "setup": {
       "role": "Backend",
@@ -21,194 +21,170 @@
     "turns": [
       {
         "question": {
-          "question": "Can you walk me through the design decisions you made when implementing the Redis cache for the Node.js inventory API?",
-          "focus": "Technical Design and Tradeoffs",
+          "question": "In your Node.js inventory API with PostgreSQL, you mentioned using Redis to cache product inventory for 60 seconds. If that cache expired and two concurrent requests came in for the same product at the exact same moment, what happens to database consistency and how would you prevent stale reads or double-counting?",
+          "focus": "Cache consistency and race conditions in backend APIs",
           "difficulty": "Intermediate"
         },
         "answer": "For my inventory API I used Redis cache-aside with a 60-second TTL. Reads check Redis first and query PostgreSQL on a cache miss. Writes commit to PostgreSQL before deleting the Redis key. I would use transactions for stock updates and an idempotency key for checkout. My first implementation did not handle concurrent cache refills, which could reintroduce stale inventory.",
         "evaluation": {
           "scores": {
-            "correctness": 85,
-            "depth": 75,
-            "clarity": 90,
-            "structure": 80,
+            "correctness": 75,
+            "depth": 65,
+            "clarity": 80,
+            "structure": 70,
             "relevance": 85,
-            "reasoning": 80,
-            "evidence": 85,
+            "reasoning": 70,
+            "evidence": 60,
             "practicality": 75
           },
-          "rationale": "The candidate provided a clear and relevant explanation of their design decisions, including the use of Redis for caching, transaction handling, and idempotency. However, there are some gaps in the depth of the explanation and practical considerations that need to be addressed.",
+          "rationale": "The candidate demonstrates solid understanding of cache-aside patterns and idempotency, correctly identifying the core risk of stale reads. However, the answer lacks specific mechanism details for preventing double-counting during concurrent cache misses. The explanation of transactions is logical but would benefit from concrete isolation level discussion. Evidence of implementation is limited to general patterns rather than specific code or configuration.",
           "strengths": [
-            "Clear and relevant explanation of the Redis caching strategy.",
-            "Incorporation of transaction handling and idempotency, which are important for reliability.",
-            "Recognition of potential concurrency issues in the initial implementation."
+            "Clear description of cache-aside pattern with TTL",
+            "Recognizes the concurrent cache miss problem",
+            "Introduces idempotency keys appropriately"
           ],
           "improvements": [
-            "Elaborate on the tradeoffs between using Redis and PostgreSQL, such as performance and consistency.",
-            "Provide more detail on how the idempotency key works and its impact on the system.",
-            "Discuss how you would monitor and ensure the cache's effectiveness and reliability."
+            "Elaborate on PostgreSQL transaction isolation levels for stock updates",
+            "Explain cache stampede prevention mechanisms",
+            "Detail specific Redis SET NX or Redlock patterns for write locking"
           ],
           "missingConcepts": [
-            "Detailed explanation of the cache-aside pattern and its benefits.",
-            "Tradeoffs between Redis and PostgreSQL in terms of performance and consistency.",
-            "Specifics on how to handle cache invalidation and eviction policies.",
-            "Impact of Redis's in-memory nature on data persistence and availability."
+            "Specific concurrency control mechanisms (SELECT ... FOR UPDATE, advisory locks)",
+            "Cache stampede/stampede prevention strategies",
+            "Idempotency key generation and validation flow"
           ],
-          "modelAnswer": "The candidate explained the use of Redis cache-aside with a 60-second TTL, reads checking Redis first and querying PostgreSQL on cache misses, and writes committing to PostgreSQL before deleting the Redis key. They also mentioned using transactions for stock updates and an idempotency key for checkout. However, they could improve by discussing the tradeoffs between Redis and PostgreSQL, providing more details on idempotency handling, and explaining how to monitor and ensure the cache's effectiveness."
+          "modelAnswer": "With cache-aside and 60s TTL, when cache expires and two concurrent requests miss, both query PostgreSQL. Without row-level locking, both read current stock=100, both decrement to 99, and write back, causing double-counting (stock shows 98 but should be 99). Prevention: use SELECT ... FOR UPDATE within a transaction with REPEATABLE READ isolation to lock the row during read-modify-write. For cache refill coordination, use Redis SET NX with expiry to ensure only one request populates cache. Idempotency keys on checkout ensure each request is processed once."
         }
       },
       {
         "question": {
-          "question": "How would you handle cache invalidation and eviction policies in your Redis cache for the inventory API, and what tradeoffs would you consider in choosing these policies?",
-          "focus": "Cache Management and Tradeoffs",
+          "question": "Can you explain how you would use Redis SET NX with an expiry to coordinate cache refills and prevent stampede when multiple requests hit a cache miss simultaneously?",
+          "focus": "Cache stampede prevention and Redis SET NX coordination",
           "difficulty": "Intermediate"
         },
         "answer": "A reader can fetch old data before a write commits, then populate the cache after invalidation. For checkout I would bypass the cache and use an atomic SQL update with a stock >= quantity condition. For browsing, a short TTL bounds the stale window. Versioned cache values or an outbox-driven invalidation event can help, but event ordering and retry handling need care.",
         "evaluation": {
           "scores": {
-            "correctness": 80,
-            "depth": 70,
-            "clarity": 85,
-            "structure": 80,
-            "relevance": 85,
-            "reasoning": 80,
-            "evidence": 80,
-            "practicality": 75
+            "correctness": 70,
+            "depth": 60,
+            "clarity": 75,
+            "structure": 70,
+            "relevance": 80,
+            "reasoning": 65,
+            "evidence": 55,
+            "practicality": 70
           },
-          "rationale": "The candidate provided a clear explanation of how to handle cache invalidation and eviction policies, including the use of short TTLs and versioned cache values. However, there are some gaps in the depth of the explanation, particularly regarding the tradeoffs and specific mechanisms for handling cache invalidation and eviction.",
+          "rationale": "The candidate understands cache stampede concepts and mentions valid strategies like atomic SQL updates and versioned cache values. However, the answer does not explain the core Redis SET NX mechanism or how it coordinates concurrent cache refills to prevent multiple PostgreSQL queries. The response relies on general patterns without concrete coordination details, and the discussion of versioned caches lacks implementation specifics.",
           "strengths": [
-            "Clear explanation of using short TTLs to bound the stale window.",
-            "Recognized the need for versioned cache values or outbox-driven invalidation events.",
-            "Acknowledged the complexity of event ordering and retry handling."
+            "Acknowledges the stale read window and proposes atomic SQL as a bypass",
+            "Identifies TTL as a bounds mechanism for browsing scenarios"
           ],
           "improvements": [
-            "Provide more detailed tradeoffs between different cache invalidation and eviction strategies.",
-            "Explain the specific mechanisms for handling cache invalidation and eviction in more detail.",
-            "Discuss how to ensure consistency between the cache and database during cache invalidation."
+            "Explain how SET NX with an expiry atomically locks cache population during a miss",
+            "Detail the lock expiration and fallback query strategy to avoid deadlocks",
+            "Describe how to reconcile the cached value with the database after the lock is acquired"
           ],
           "missingConcepts": [
-            "Detailed explanation of different cache invalidation and eviction strategies and their tradeoffs.",
-            "Specific mechanisms for handling cache invalidation and eviction, such as invalidation queues or pub/sub systems.",
-            "Impact of cache invalidation on system performance and database load.",
-            "Handling of edge cases, such as concurrent cache invalidations and retries."
+            "Redis SET NX atomic lock coordination for cache population",
+            "Lock expiration and stale-probe fallback pattern",
+            "Versioned cache values or outbox invalidation sequence"
           ],
-          "modelAnswer": "The candidate explained the use of short TTLs to bound the stale window and recognized the need for versioned cache values or outbox-driven invalidation events. However, they could improve by providing more detailed tradeoffs between different cache invalidation and eviction strategies, explaining specific mechanisms for handling cache invalidation and eviction, and discussing the impact on system performance and database load."
+          "modelAnswer": "When a cache miss occurs, the client attempts SET key value NX PX 60000. If SET returns OK, this client owns the lock and populates Redis from the database. Other concurrent requests either wait for the lock to expire or perform a stale-probe read after the TTL. Once populated, subsequent reads use the fresh value. If SET returns nil, the client either retries with backoff or reads the stale cache with a short TTL, ensuring only one population query hits the database."
         }
       },
       {
         "question": {
-          "question": "Can you explain the tradeoffs between using an invalidation queue and a pub/sub system for handling cache invalidation in your Redis cache for the inventory API?",
-          "focus": "Cache Management and Tradeoffs",
+          "question": "Walk me through the exact sequence of operations when two requests simultaneously miss the cache for the same product key. Include how SET NX succeeds for one request, how the other request proceeds, and how you ensure only one database query occurs.",
+          "focus": "Redis SET NX coordination and cache stampede prevention sequence",
           "difficulty": "Intermediate"
         },
         "answer": "I would load-test concurrent checkout requests for the same SKU, assert stock never goes negative, and inject Redis downtime and delayed invalidation. PostgreSQL remains the source of truth. I would monitor stale-read rate, database latency, error rate and outbox lag. I cannot claim exact improvements without measuring a baseline. Cache stampedes can be limited with per-key request coalescing.",
         "evaluation": {
           "scores": {
-            "correctness": 75,
+            "correctness": 70,
             "depth": 65,
-            "clarity": 85,
-            "structure": 80,
+            "clarity": 75,
+            "structure": 70,
             "relevance": 80,
-            "reasoning": 75,
-            "evidence": 75,
+            "reasoning": 65,
+            "evidence": 55,
             "practicality": 70
           },
-          "rationale": "The candidate provided a clear explanation of load testing and monitoring mechanisms but did not fully address the tradeoffs between using an invalidation queue and a pub/sub system. There is a lack of depth in discussing the specific mechanisms and potential impacts on the system.",
+          "rationale": "The candidate describes protective measures and monitoring but does not walk through the exact Redis SET NX coordination sequence. The answer mentions monitoring and load-testing but lacks step-by-step detail on how SET NX succeeds for one request while the other proceeds, and how only one database query occurs. The discussion of per-key request coalescing is mentioned but not explained. Overall, the candidate acknowledges the problem and proposed safeguards but the explanation of the coordination mechanism is incomplete.",
           "strengths": [
-            "Clear explanation of load testing and monitoring mechanisms.",
-            "Acknowledged the need for monitoring to ensure cache and database consistency.",
-            "Recognized the importance of PostgreSQL as the source of truth."
+            "Identifies the need for coordination and monitoring",
+            "Mentions monitoring metrics and load-testing",
+            "Recognizes per-key request coalescing as a strategy"
           ],
           "improvements": [
-            "Provide a detailed comparison of the tradeoffs between using an invalidation queue and a pub/sub system.",
-            "Discuss the specific mechanisms and potential impacts of each system on the cache and database.",
-            "Explain how to handle edge cases, such as concurrent cache invalidations and retries."
+            "Walk through the exact SET NX success/failure sequence for concurrent cache misses",
+            "Explain how the second request blocks or waits rather than proceeding to PostgreSQL",
+            "Detail how only one database query is dispatched despite multiple concurrent misses"
           ],
           "missingConcepts": [
-            "Detailed comparison of invalidation queue and pub/sub system tradeoffs.",
-            "Specific mechanisms for handling cache invalidation and eviction, such as invalidation queues or pub/sub systems.",
-            "Impact of cache invalidation on system performance and database load.",
-            "Handling of edge cases, such as concurrent cache invalidations and retries."
+            "Exact Redis SET NX coordination sequence",
+            "How blocked/waiting requests are managed",
+            "Mechanism to ensure single database query per cache miss event"
           ],
-          "modelAnswer": "The candidate explained the need for load testing and monitoring mechanisms but did not fully address the tradeoffs between using an invalidation queue and a pub/sub system. They could improve by providing a detailed comparison of the tradeoffs, discussing specific mechanisms and potential impacts on the system, and explaining how to handle edge cases."
+          "modelAnswer": "When two requests simultaneously miss the cache for the same product key: 1) Request A calls SET key myproduct XXXX NX PX 60000 and succeeds, acquiring the lock. 2) Request B calls SET key myproduct XXXX NX; since the key already exists, SET NX returns null and Request B knows it missed the lock. 3) Request B either waits for Request A to complete and populate the cache, or falls back to a short-stale read while waiting. 4) Once Request A finishes and deletes or overwrites the key with new values, Request B re-reads the cache (now hot) and uses that data, preventing a second PostgreSQL query. This sequence ensures only the request that acquired SET NX triggers the database lookup, while others wait or use stale data bounded by the TTL."
         }
       }
     ],
     "report": {
-      "summary": "The candidate demonstrated a good understanding of Redis caching, transaction handling, and cache invalidation. They provided clear explanations and recognized the importance of PostgreSQL as the source of truth. However, there are gaps in the depth of the explanation, particularly regarding tradeoffs and specific mechanisms for handling cache invalidation and eviction. The candidate also needs to improve on providing more practical details and edge case handling.",
+      "summary": "The candidate demonstrates solid understanding of cache-aside patterns and idempotency, correctly identifying the core risk of stale reads. However, the answer lacks specific mechanism details for preventing double-counting during concurrent cache misses. The explanation of transactions is logical but would benefit from concrete isolation level discussion. Evidence of implementation is limited to general patterns rather than specific code or configuration.",
       "strengths": [
-        "Clear and relevant explanation of the Redis caching strategy.",
-        "Incorporation of transaction handling and idempotency, which are important for reliability.",
-        "Recognition of potential concurrency issues in the initial implementation.",
-        "Clear explanation of using short TTLs to bound the stale window.",
-        "Acknowledged the need for versioned cache values or outbox-driven invalidation events."
+        "Understands cache-aside pattern with Redis and PostgreSQL integration",
+        "Recognizes need for idempotency keys in checkout operations",
+        "Acknowledges concurrent cache refill risks and stale inventory potential"
       ],
       "improvements": [
-        "Provide more detailed tradeoffs between different cache invalidation and eviction strategies.",
-        "Explain the specific mechanisms for handling cache invalidation and eviction in more detail.",
-        "Discuss how to ensure consistency between the cache and database during cache invalidation.",
-        "Provide a detailed comparison of the tradeoffs between using an invalidation queue and a pub/sub system.",
-        "Discuss the specific mechanisms and potential impacts of each system on the cache and database."
+        "Explain Redis SET NX mechanism for coordinating concurrent cache refills and preventing stampede",
+        "Detail concrete database isolation level (e.g., SERIALIZABLE) for stock update consistency",
+        "Provide concrete sequence of operations when two requests miss cache simultaneously",
+        "Discuss per-key request coalescing or async guard pattern implementation",
+        "Mention specific monitoring metrics for cache consistency and stampede detection"
       ],
       "studyPlan": [
         {
           "day": 1,
-          "topic": "Redis Cache Design and Tradeoffs",
-          "task": "Review Redis caching strategies and tradeoffs, focusing on cache-aside and cache-hit patterns.",
-          "practiceQuestion": "Explain the differences between cache-aside and cache-hit patterns and discuss the tradeoffs in a high-traffic application."
+          "topic": "Redis SET NX and cache stampede prevention",
+          "task": "Study Redis SET NX command semantics and cache stampede patterns. Understand how to use SET NX with EX for per-key request coalescing.",
+          "practiceQuestion": "How would you use Redis SET NX with an expiry to coordinate cache refills and prevent stampede when multiple requests hit a cache miss simultaneously?"
         },
         {
           "day": 3,
-          "topic": "Cache Invalidation and Eviction Strategies",
-          "task": "Study various cache invalidation and eviction strategies, including invalidation queues and pub/sub systems.",
-          "practiceQuestion": "Compare and contrast invalidation queues and pub/sub systems in terms of their tradeoffs and practical implications."
+          "topic": "Database isolation levels for concurrent updates",
+          "task": "Review PostgreSQL isolation levels (READ COMMITTED vs SERIALIZABLE) and how they affect concurrent stock updates. Understand how to use SELECT ... FOR UPDATE with proper locking.",
+          "practiceQuestion": "When two concurrent requests update product stock in PostgreSQL, how does READ COMMITTED isolation level behave, and how would you use SELECT ... FOR UPDATE to prevent double-counting?"
         },
         {
           "day": 5,
-          "topic": "Handling Concurrency and Idempotency",
-          "task": "Explore techniques for handling concurrency and idempotency in distributed systems, including transaction handling and idempotency keys.",
-          "practiceQuestion": "Design a system for handling concurrent stock updates and explain how idempotency keys can be used to ensure consistency."
+          "topic": "Cache consistency and race condition patterns",
+          "task": "Study cache-aside pattern edge cases, including cache stampede, double-counting scenarios, and request coalescing patterns. Review outbox/inbox patterns for reliable invalidation.",
+          "practiceQuestion": "Walk through the exact sequence of operations when two requests simultaneously miss the cache for the same product key. Include how SET NX succeeds for one request, how the other request proceeds, and how you ensure only one database query occurs."
         },
         {
           "day": 7,
-          "topic": "Monitoring and Ensuring Cache Effectiveness",
-          "task": "Learn about monitoring tools and techniques for ensuring cache effectiveness and reliability, including metrics and alerting.",
-          "practiceQuestion": "Design a monitoring strategy for a Redis cache and explain how you would ensure the cache remains effective and reliable."
-        },
-        {
-          "day": 9,
-          "topic": "Edge Case Handling and Retry Mechanisms",
-          "task": "Study edge cases and retry mechanisms in distributed systems, focusing on cache invalidation and database consistency.",
-          "practiceQuestion": "Discuss how to handle edge cases such as concurrent cache invalidations and retries in a distributed system."
-        },
-        {
-          "day": 11,
-          "topic": "System Design and Tradeoffs",
-          "task": "Practice designing a system that integrates Redis caching with PostgreSQL, focusing on tradeoffs and practical considerations.",
-          "practiceQuestion": "Design a system that integrates Redis caching with PostgreSQL and discuss the tradeoffs and practical considerations."
-        },
-        {
-          "day": 14,
-          "topic": "Mock Interview",
-          "task": "Prepare for and conduct a mock interview focusing on the topics covered in the study plan.",
-          "practiceQuestion": "Prepare for and conduct a mock interview focusing on the topics covered in the study plan."
+          "topic": "Monitoring and load testing cache consistency",
+          "task": "Research metrics for cache consistency monitoring (stale-read rate, database latency, error rate). Understand load testing patterns for concurrent cache miss scenarios.",
+          "practiceQuestion": "What metrics would you monitor to detect cache consistency issues and stampede events in production? How would you load-test concurrent checkout requests for the same SKU to verify stock never goes negative?"
         }
       ],
       "scores": {
-        "correctness": 80,
-        "depth": 70,
-        "clarity": 87,
-        "structure": 80,
-        "relevance": 83,
-        "reasoning": 78,
-        "evidence": 80,
-        "practicality": 73
+        "correctness": 72,
+        "depth": 63,
+        "clarity": 77,
+        "structure": 70,
+        "relevance": 82,
+        "reasoning": 67,
+        "evidence": 57,
+        "practicality": 72
       },
-      "overall": 79,
+      "overall": 70,
       "answered": 3
     },
     "previousWeaknesses": [],
-    "provider": "ollama",
-    "model": "qwen2.5:7b-instruct"
+    "provider": "nvidia",
+    "model": "nvidia/nemotron-3.5-lightning-30b-a3b"
   }
 }
