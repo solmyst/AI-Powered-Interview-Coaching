@@ -15,6 +15,7 @@ import { z } from "zod";
 import { openDatabase } from "./db.js";
 import { createAI, ServiceError } from "./ai.js";
 import { createTranscriber } from "./transcription.js";
+import { createSpeech } from "./speech.js";
 import {
   setupSchema,
   answerSchema,
@@ -48,6 +49,7 @@ export function createApp({
   db = openDatabase(env.DATABASE_PATH || "./data/interviewace.db"),
   ai = createAI(env),
   transcriber = createTranscriber(env),
+  speech = createSpeech(env),
 } = {}) {
   const app = express();
   const locks = new Set();
@@ -165,6 +167,7 @@ export function createApp({
     res.json({
       ...(await ai.status()),
       transcription: transcriber.status(),
+      speech: speech.status(),
       billing: false,
     }),
   );
@@ -249,6 +252,14 @@ export function createApp({
       res.json(await transcriber.transcribe(req.body));
     },
   );
+  app.post("/api/speech", auth, async (req, res) => {
+    const { text } = z
+      .object({ text: z.string().trim().min(1).max(2000) })
+      .strict()
+      .parse(req.body);
+    const generated = await speech.synthesize(text);
+    res.type(generated.contentType).send(Buffer.from(generated.audio));
+  });
   app.patch("/api/me", auth, (req, res) => {
     const { name } = z
       .object({ name: z.string().trim().min(1).max(80) })

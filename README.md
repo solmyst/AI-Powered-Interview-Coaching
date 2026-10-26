@@ -53,6 +53,9 @@ The original cream/clay palette and editorial typography are retained, with a qu
 | `NVIDIA_MODEL`          | Exact model ID available to the NVIDIA account                                      |
 | `ASSEMBLYAI_API_KEY`    | Server-only key required for spoken-answer transcription                            |
 | `ASSEMBLYAI_MODEL`      | `universal-3-5-pro`; English/Hindi Sync transcription                               |
+| `ELEVENLABS_API_KEY`    | Server-only key for the consistent Maya interviewer voice                           |
+| `ELEVENLABS_MODEL`      | `eleven_v4_turbo`; expressive low-latency multilingual TTS                          |
+| `ELEVENLABS_VOICE_ID`   | Voice selected from the ElevenLabs account; browser TTS is the fallback             |
 | `NODE_ENV`              | Set to `production` on deployment for Secure cookies and HTTPS enforcement          |
 
 ### NVIDIA

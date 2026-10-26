@@ -45,6 +45,7 @@ test("camera renders real frames before and after joining the interview", async 
       model: "fixture",
       message: "Ready",
       transcription: { ready: true, provider: "assemblyai", model: "universal-3-5-pro" },
+      speech: { ready: false, provider: "elevenlabs", model: "eleven_v4_turbo", voiceId: "" },
     },
   }));
   await page.route("**/api/auth/session", (route) => route.fulfill({

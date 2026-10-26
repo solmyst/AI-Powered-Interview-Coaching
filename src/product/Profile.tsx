@@ -101,6 +101,12 @@ export function Profile({
         <p>
           {health?.transcription.provider} / {health?.transcription.model}
         </p>
+        <h3>Interviewer voice</h3>
+        <p>
+          {health?.speech.ready
+            ? `${health.speech.provider} / ${health.speech.model}`
+            : "Browser voice fallback (ElevenLabs is not configured)"}
+        </p>
       </section>
       <section className="panel">
         <h2>Your data, your choice.</h2>

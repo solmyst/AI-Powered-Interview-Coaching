@@ -69,6 +69,15 @@ const transcriber = {
     return { text: "मैंने a cache service बनाई.", confidence: 0.96, durationMs: 2300 };
   },
 };
+const speech = {
+  status: () => ({
+    provider: "elevenlabs",
+    model: "eleven_v4_turbo",
+    voiceId: "fixture-voice",
+    ready: true,
+  }),
+  synthesize: async () => ({ audio: new Uint8Array([1, 2, 3]), contentType: "audio/mpeg" }),
+};
 before(async () => {
   const result = createApp({
     env: {
@@ -79,6 +88,7 @@ before(async () => {
     },
     ai,
     transcriber,
+    speech,
   });
   db = result.db;
   server = result.app.listen(0, "127.0.0.1");
@@ -204,6 +214,27 @@ test("authenticated WAV transcription returns only the safe transcript contract"
     durationMs: 2300,
   });
   assert.equal(transcribedBytes, 44);
+});
+test("authenticated interviewer speech returns audio without exposing provider credentials", async () => {
+  const a = await account("tts@example.test");
+  const unauthorized = await fetch(base + "/api/speech", {
+    method: "POST",
+    headers: { Origin: origin, "Content-Type": "application/json" },
+    body: JSON.stringify({ text: "Welcome" }),
+  });
+  assert.equal(unauthorized.status, 401);
+  const response = await fetch(base + "/api/speech", {
+    method: "POST",
+    headers: {
+      Origin: origin,
+      Cookie: a.cookie,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ text: "नमस्ते. Welcome to your interview." }),
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "audio/mpeg");
+  assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [1, 2, 3]);
 });
 test("complete interview, grounded evaluations, report, bookmarks, ownership and deletion", async () => {
   const a = await account("flow@example.test"),

@@ -57,6 +57,12 @@ function App() {
             provider: "assemblyai",
             model: "universal-3-5-pro",
           },
+          speech: {
+            ready: false,
+            provider: "elevenlabs",
+            model: "eleven_v4_turbo",
+            voiceId: "",
+          },
         }),
       );
   }, []);
@@ -259,6 +265,7 @@ function App() {
                 key={session.id}
                 session={session}
                 transcriptionReady={Boolean(health?.transcription.ready)}
+                speechReady={Boolean(health?.speech.ready)}
                 update={(s) => {
                   opened(s);
                   void refresh().catch((err) => setError(err.message));

@@ -26,8 +26,15 @@ type VoiceWindow = {
   SpeechRecognition?: new () => Recognition;
   webkitSpeechRecognition?: new () => Recognition;
 };
-export function useVoice(append: (text: string) => void) {
+export function useVoice(
+  append: (text: string) => void,
+  { cloud = false }: { cloud?: boolean } = {},
+) {
   const recognition = useRef<Recognition | null>(null);
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const audioUrl = useRef("");
+  const speechRequest = useRef<AbortController | null>(null);
+  const speechGeneration = useRef(0);
   const started = useRef(0),
     elapsed = useRef(0);
   const appendRef = useRef(append);
@@ -39,6 +46,13 @@ export function useVoice(append: (text: string) => void) {
     (window as unknown as VoiceWindow).SpeechRecognition ||
     (window as unknown as VoiceWindow).webkitSpeechRecognition;
   function stop() {
+    speechGeneration.current++;
+    speechRequest.current?.abort();
+    speechRequest.current = null;
+    audio.current?.pause();
+    audio.current = null;
+    if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
+    audioUrl.current = "";
     recognition.current?.stop();
     window.speechSynthesis?.cancel();
     setSpeaking(false);
@@ -89,31 +103,77 @@ export function useVoice(append: (text: string) => void) {
       setError("Could not start the microphone. Please retry.");
     }
   }
-  function speak(text: string, onDone?: () => void) {
-    setError("");
-    recognition.current?.stop();
+  function speakWithBrowser(text: string, generation: number, onDone?: () => void) {
+    if (generation !== speechGeneration.current) return;
     if (!window.speechSynthesis) {
-      setError(
-        "Spoken questions are unavailable in this browser. Read the question on screen.",
-      );
+      setError("Spoken questions are unavailable. Read the question on screen.");
+      setSpeaking(false);
       onDone?.();
       return;
     }
     window.speechSynthesis.cancel();
-    const speech = new SpeechSynthesisUtterance(text);
-    speech.rate = 0.95;
-    speech.onend = () => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.95;
+    utterance.onend = () => {
+      if (generation !== speechGeneration.current) return;
       setSpeaking(false);
       onDone?.();
     };
-    speech.onerror = (e) => {
+    utterance.onerror = (event) => {
+      if (generation !== speechGeneration.current) return;
       setSpeaking(false);
-      if (e.error !== "canceled" && e.error !== "interrupted")
+      if (event.error !== "canceled" && event.error !== "interrupted") {
         setError("Speech playback failed. The question is available as text.");
-      if (e.error !== "canceled" && e.error !== "interrupted") onDone?.();
+        onDone?.();
+      }
     };
+    window.speechSynthesis.speak(utterance);
+  }
+  function speak(text: string, onDone?: () => void) {
+    setError("");
+    recognition.current?.stop();
+    stop();
+    const generation = speechGeneration.current;
     setSpeaking(true);
-    window.speechSynthesis.speak(speech);
+    if (!cloud) {
+      speakWithBrowser(text, generation, onDone);
+      return;
+    }
+    const controller = new AbortController();
+    speechRequest.current = controller;
+    let usedFallback = false;
+    const fallback = () => {
+      if (usedFallback) return;
+      usedFallback = true;
+      speakWithBrowser(text, generation, onDone);
+    };
+    void fetch("/api/speech", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Cloud speech unavailable");
+        return response.blob();
+      })
+      .then((blob) => {
+        if (generation !== speechGeneration.current) return;
+        audioUrl.current = URL.createObjectURL(blob);
+        const player = new Audio(audioUrl.current);
+        audio.current = player;
+        player.onended = () => {
+          if (generation !== speechGeneration.current) return;
+          setSpeaking(false);
+          onDone?.();
+        };
+        player.onerror = fallback;
+        return player.play();
+      })
+      .catch((reason) => {
+        if (generation !== speechGeneration.current || reason?.name === "AbortError") return;
+        fallback();
+      });
   }
   useEffect(
     () => () => {
@@ -125,6 +185,9 @@ export function useVoice(append: (text: string) => void) {
         rec.abort();
       }
       window.speechSynthesis?.cancel();
+      speechRequest.current?.abort();
+      audio.current?.pause();
+      if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
     },
     [],
   );

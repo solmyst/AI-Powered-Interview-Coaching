@@ -151,6 +151,27 @@ test("report and voice-first interview preflight layouts (test fixtures)", async
       },
     }),
   );
+  await page.route("**/api/health", (route) =>
+    route.fulfill({
+      json: {
+        ready: true,
+        provider: "fixture",
+        model: "fixture",
+        message: "Ready",
+        transcription: {
+          ready: true,
+          provider: "assemblyai",
+          model: "universal-3-5-pro",
+        },
+        speech: {
+          ready: false,
+          provider: "elevenlabs",
+          model: "eleven_v4_turbo",
+          voiceId: "",
+        },
+      },
+    }),
+  );
   await page.route("**/api/bookmarks", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/interviews", (route) =>
     route.fulfill({

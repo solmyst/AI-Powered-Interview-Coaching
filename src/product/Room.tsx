@@ -44,11 +44,13 @@ function waitForVideoFrame(video: HTMLVideoElement) {
 export function Room({
   session,
   transcriptionReady,
+  speechReady,
   update,
   back,
 }: {
   session: Session;
   transcriptionReady: boolean;
+  speechReady: boolean;
   update: (value: Session) => void;
   back: () => void;
 }) {
@@ -117,7 +119,7 @@ export function Room({
   }
 
   const transcription = useTranscription(receiveTranscript);
-  const voice = useVoice(() => {});
+  const voice = useVoice(() => {}, { cloud: speechReady });
   const question = session.currentQuestion?.question || "";
 
   useEffect(

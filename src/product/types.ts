@@ -21,6 +21,12 @@ export type Health = {
     provider: string;
     model: string;
   };
+  speech: {
+    ready: boolean;
+    provider: string;
+    model: string;
+    voiceId: string;
+  };
 };
 export const roles = [
   "Software engineering",
