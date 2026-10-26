@@ -21,5 +21,6 @@ export default defineConfig({
     command: "npm run dev",
     url: "http://localhost:5173",
     reuseExistingServer: true,
+    env: { DATABASE_PATH: "./data/media-e2e.db" },
   },
 });

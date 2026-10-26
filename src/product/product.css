@@ -1664,6 +1664,7 @@ details p {
   background: #0e110d;
 }
 .preflight-device-preview video {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -2128,6 +2129,9 @@ details p {
   height: 100%;
   object-fit: contain;
   transform: scaleX(-1);
+}
+.camera-preview video {
+  display: block;
 }
 .camera-placeholder {
   position: absolute;

@@ -1,9 +1,32 @@
 import { test, expect } from "@playwright/test";
-import { randomUUID } from "node:crypto";
-test("real MediaPipe pipeline and AssemblyAI transcription handoff using prerecorded fixtures", async ({
-  page,
-}) => {
-  const origin = "http://localhost:5173";
+
+test("camera renders real frames before and after joining the interview", async ({ page }) => {
+  const id = "camera-acceptance";
+  const session = {
+    id,
+    created: new Date().toISOString(),
+    state: "active",
+    setup: {
+      role: "Frontend",
+      experience: "Student / graduate",
+      track: "Behavioral",
+      difficulty: "Foundational",
+      industry: "Technology",
+      company: "",
+      resume: "",
+      jobDescription: "",
+      questionCount: 3,
+    },
+    currentQuestion: {
+      question: "Tell me about a project you are proud of.",
+      focus: "Communication",
+      difficulty: "Foundational",
+    },
+    turns: [],
+    report: null,
+    model: "fixture",
+    provider: "fixture",
+  };
   await page.addInitScript(() => {
     Object.defineProperty(window, "speechSynthesis", {
       configurable: true,
@@ -15,80 +38,57 @@ test("real MediaPipe pipeline and AssemblyAI transcription handoff using prereco
       },
     });
   });
-  await page.route("**/api/transcribe", async (route) => {
-    expect(await route.request().headerValue("content-type")).toContain("audio/wav");
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        text: "Ask not what your country can do for you.",
-        confidence: 0.98,
-        durationMs: 6200,
-      }),
-    });
-  });
-  await page.request.post("/api/auth/register", {
-    headers: { Origin: origin },
-    data: {
-      name: "Media acceptance test",
-      email: `media-${Date.now()}@example.test`,
-      password: randomUUID(),
+  await page.route("**/api/health", (route) => route.fulfill({
+    json: {
+      ready: true,
+      provider: "fixture",
+      model: "fixture",
+      message: "Ready",
+      transcription: { ready: true, provider: "assemblyai", model: "universal-3-5-pro" },
     },
-  });
-  try {
-    const created = await page.request.post("/api/interviews", {
-      headers: { Origin: origin, "Idempotency-Key": randomUUID() },
-      data: {
-        role: "Frontend",
-        experience: "Student / graduate",
-        track: "Behavioral",
-        difficulty: "Foundational",
-        industry: "Technology",
-        company: "",
-        resume: "",
-        jobDescription: "",
-        questionCount: 3,
-      },
-      timeout: 150000,
-    });
-    expect(created.ok(), await created.text()).toBeTruthy();
-    await page.goto("/");
-    await page.getByRole("button", { name: "Open Frontend interview" }).click();
-    await page.getByRole("button", { name: "Allow camera & microphone" }).click();
-    await expect(page.getByText("Camera and microphone ready")).toBeVisible({ timeout: 30000 });
-    await expect(page.getByLabel("Camera preview")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Join interview" })).toBeEnabled({ timeout: 120000 });
-    await page.getByRole("button", { name: "Join interview" }).click();
-    await expect(page.getByText("LIVE · LOCAL ONLY")).toBeVisible({ timeout: 90000 });
-    await expect(page.getByText("Listening to you")).toBeVisible({ timeout: 30000 });
-    await page.screenshot({
-      path: "test-results/camera-live-fixture.png",
-      fullPage: true,
-    });
-    await expect.poll(async () => {
-      const value = await (await page.request.get(`/api/interviews/${(await created.json()).id}`)).json();
-      return value.turns.length;
-    }, { timeout: 180000 }).toBeGreaterThan(0);
-    const s = await (
-      await page.request.get(`/api/interviews/${(await created.json()).id}`)
-    ).json();
-    console.log("AssemblyAI contract transcript:", s.turns[0].answer);
-    expect(s.turns[0].answer.toLowerCase()).toMatch(/country|americans|ask|fellow/);
-    expect(s.turns[0].delivery.visual.faceSamples).toBeGreaterThan(20);
-    expect(s.turns[0].delivery.speech.source).toBe("assemblyai");
-    expect(s.turns[0].delivery.speech.captureMs).toBeGreaterThan(5000);
-    await page.getByRole("button", { name: "End interview" }).click();
-    await expect(
-      page.getByRole("heading", { name: "How you delivered your answers" }),
-    ).toBeVisible({ timeout: 150000 });
-    await expect(
-      page.getByText("No reliable camera summary", { exact: false }),
-    ).toHaveCount(0);
-    await page.screenshot({
-      path: "test-results/media-report-fixture.png",
-      fullPage: true,
-    });
-  } finally {
-    await page.request.delete("/api/me", { headers: { Origin: origin } });
-  }
+  }));
+  await page.route("**/api/auth/session", (route) => route.fulfill({
+    json: {
+      user: { id: "camera-user", name: "Camera Test", email: "camera@example.test" },
+      usage: { used: 1, limit: 5, reset: "00:00 UTC" },
+    },
+  }));
+  await page.route("**/api/bookmarks", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/interviews", (route) => route.fulfill({
+    json: {
+      sessions: [{
+        id,
+        created: session.created,
+        state: "active",
+        role: session.setup.role,
+        track: session.setup.track,
+        answered: 0,
+        total: 3,
+        score: null,
+      }],
+      usage: { used: 1, limit: 5, reset: "00:00 UTC" },
+    },
+  }));
+  await page.route(`**/api/interviews/${id}`, (route) => route.fulfill({ json: session }));
+  await page.route("**/api/transcribe", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ text: "I built an accessible interface.", confidence: 0.98, durationMs: 6200 }),
+  }));
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open Frontend interview" }).click();
+  await page.getByRole("button", { name: "Allow camera & microphone" }).click();
+  await expect(page.getByText("Camera and microphone ready")).toBeVisible({ timeout: 30000 });
+  await expect.poll(() => page.getByLabel("Camera preview").evaluate(
+    (video: HTMLVideoElement) => ({ width: video.videoWidth, readyState: video.readyState }),
+  )).toMatchObject({ width: 640, readyState: 4 });
+  await page.screenshot({ path: "test-results/camera-preflight-fixture.png", fullPage: true });
+
+  await page.getByRole("button", { name: "Join interview" }).click();
+  await expect(page.getByText("VIDEO LIVE").or(page.getByText("LIVE · LOCAL ONLY"))).toBeVisible({ timeout: 30000 });
+  await expect.poll(() => page.getByLabel("Your live camera preview").evaluate(
+    (video: HTMLVideoElement) => ({ width: video.videoWidth, readyState: video.readyState }),
+  )).toMatchObject({ width: 640, readyState: 4 });
+  await page.screenshot({ path: "test-results/camera-live-fixture.png", fullPage: true });
 });

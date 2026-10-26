@@ -27,6 +27,20 @@ type CallPhase =
   | "thinking"
   | "complete";
 
+function waitForVideoFrame(video: HTMLVideoElement) {
+  return new Promise<void>((resolve, reject) => {
+    const deadline = performance.now() + 8000;
+    const check = () => {
+      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0)
+        return resolve();
+      if (performance.now() >= deadline)
+        return reject(new Error("The camera connected but did not provide a picture."));
+      requestAnimationFrame(check);
+    };
+    check();
+  });
+}
+
 export function Room({
   session,
   transcriptionReady,
@@ -50,6 +64,7 @@ export function Room({
     "idle" | "requesting" | "ready" | "error"
   >("idle");
   const [mediaError, setMediaError] = useState("");
+  const [cameraLabel, setCameraLabel] = useState("");
   const [phase, setPhase] = useState<CallPhase>("preflight");
   const [elapsed, setElapsed] = useState(0);
   const [lastAnswer, setLastAnswer] = useState("");
@@ -138,10 +153,24 @@ export function Room({
       if (previewVideo.current) {
         previewVideo.current.srcObject = stream;
         await previewVideo.current.play();
+        await waitForVideoFrame(previewVideo.current);
       }
+      const cameraTrack = stream.getVideoTracks()[0];
+      setCameraLabel(cameraTrack?.label || "Camera connected");
+      cameraTrack?.addEventListener(
+        "ended",
+        () => {
+          setMediaState("error");
+          setMediaError("The camera disconnected. Reconnect it and retry the device check.");
+        },
+        { once: true },
+      );
       setMediaState("ready");
     } catch (reason) {
       setMediaState("error");
+      sharedStream.current?.getTracks().forEach((track) => track.stop());
+      sharedStream.current = null;
+      if (previewVideo.current) previewVideo.current.srcObject = null;
       setMediaError(
         reason instanceof DOMException && reason.name === "NotAllowedError"
           ? "Camera or microphone permission was denied. Allow both in browser settings, then retry."
@@ -327,7 +356,9 @@ export function Room({
             {mediaState !== "ready" && (
               <span><Camera size={24} /> Your camera preview will appear here</span>
             )}
-            {mediaState === "ready" && <b><Check size={14} /> Camera and microphone ready</b>}
+            {mediaState === "ready" && (
+              <b title={cameraLabel}><Check size={14} /> Camera and microphone ready</b>
+            )}
           </div>
         </div>
       </div>

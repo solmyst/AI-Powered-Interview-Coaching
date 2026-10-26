@@ -42,6 +42,7 @@ export function CameraCoach({
     "off",
   );
   const [error, setError] = useState("");
+  const [videoReady, setVideoReady] = useState(false);
   const [live, setLive] = useState<FrameSignals | null>(null);
   const [overlay, setOverlay] = useState(true);
   const overlayRef = useRef(overlay);
@@ -64,6 +65,20 @@ export function CameraCoach({
     c?.getContext("2d")?.clearRect(0, 0, c.width, c.height);
     lastTime.current = 0;
     lastFrame.current = -1;
+    setVideoReady(false);
+  }
+  function stopAnalysis() {
+    cancelAnimationFrame(animation.current);
+    face.current?.close();
+    pose.current?.close();
+    face.current = null;
+    pose.current = null;
+    canvas.current?.getContext("2d")?.clearRect(
+      0,
+      0,
+      canvas.current.width,
+      canvas.current.height,
+    );
   }
   useEffect(() => () => cleanup(), []);
   useEffect(() => {
@@ -104,6 +119,22 @@ export function CameraCoach({
       const v = video.current!;
       v.srcObject = acquired;
       await v.play();
+      if (!v.videoWidth || !v.videoHeight)
+        await new Promise<void>((resolve, reject) => {
+          const timeout = window.setTimeout(
+            () => reject(new Error("The camera did not provide a video frame.")),
+            8000,
+          );
+          v.addEventListener(
+            "loadeddata",
+            () => {
+              window.clearTimeout(timeout);
+              resolve();
+            },
+            { once: true },
+          );
+        });
+      setVideoReady(true);
       const { FaceLandmarker, PoseLandmarker, FilesetResolver } =
         await import("@mediapipe/tasks-vision");
       const vision = await FilesetResolver.forVisionTasks("/vision/wasm");
@@ -215,10 +246,10 @@ export function CameraCoach({
               }
             }
           } catch {
-            cleanup();
+            stopAnalysis();
             setStatus("error");
             setError(
-              "Camera analysis stopped. Try again or continue with text and voice.",
+              "Your camera is still live, but presence coaching stopped. Retry the camera to restore coaching.",
             );
             return;
           }
@@ -231,16 +262,22 @@ export function CameraCoach({
     } catch (err) {
       loadedFace?.close();
       loadedPose?.close();
-      if (!mediaStream) acquired?.getTracks().forEach((t) => t.stop());
       if (epoch !== generation.current) return;
-      cleanup();
+      if (!video.current?.videoWidth) {
+        if (!mediaStream) acquired?.getTracks().forEach((t) => t.stop());
+        cleanup();
+      } else {
+        setVideoReady(true);
+      }
       setStatus("error");
       setError(
         err instanceof DOMException && err.name === "NotAllowedError"
           ? "Camera permission was denied. Allow it in browser settings, or continue without video."
           : err instanceof DOMException && err.name === "NotFoundError"
             ? "No camera was found. Connect a webcam and retry."
-            : `Could not initialize camera analysis. Check that vision assets are installed, then retry. ${err instanceof Error ? err.message : ""}`,
+            : video.current?.videoWidth
+              ? "Your camera is live, but presence coaching could not start. You can continue the interview with video."
+              : `Could not start the camera. ${err instanceof Error ? err.message : ""}`,
       );
     }
   }
@@ -256,6 +293,8 @@ export function CameraCoach({
         <span>
           {status === "active"
             ? "LIVE · LOCAL ONLY"
+            : videoReady
+              ? "VIDEO LIVE"
             : status === "loading"
               ? "STARTING…"
               : "CAMERA OFF"}
@@ -270,7 +309,7 @@ export function CameraCoach({
           aria-label="Your live camera preview"
         />
         <canvas ref={canvas} aria-hidden="true" />
-        {status !== "active" && (
+        {!videoReady && (
           <div className="camera-placeholder">
             <CameraOff size={30} />
             <p>
@@ -285,21 +324,21 @@ export function CameraCoach({
         <button
           className="secondary"
           onClick={() => {
-            if (status === "active" || status === "loading") {
+            if (videoReady || status === "loading") {
               cleanup();
               setLive(null);
               setStatus("off");
             } else void enable();
           }}
         >
-          {status === "active" || status === "loading" ? (
+          {videoReady || status === "loading" ? (
             <CameraOff size={16} />
           ) : (
             <Camera size={16} />
           )}{" "}
-          {status === "loading"
+          {status === "loading" && !videoReady
             ? "Cancel camera startup"
-            : status === "active"
+            : videoReady
               ? "Turn camera off"
               : "Enable camera coaching"}
         </button>
