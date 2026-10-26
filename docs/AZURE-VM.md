@@ -94,6 +94,11 @@ For hosted NVIDIA instead, replace the provider section:
 AI_PROVIDER=nvidia
 NVIDIA_API_KEY=configure_on_the_vm_only
 NVIDIA_MODEL=the_exact_catalog_model_id
+ASSEMBLYAI_API_KEY=configure_on_the_vm_only
+ASSEMBLYAI_MODEL=universal-3-5-pro
+ELEVENLABS_API_KEY=configure_on_the_vm_only
+ELEVENLABS_MODEL=eleven_v4_turbo
+ELEVENLABS_VOICE_ID=OZ0L6eISlOejga3XjDFt
 ```
 
 Install and start the service:
