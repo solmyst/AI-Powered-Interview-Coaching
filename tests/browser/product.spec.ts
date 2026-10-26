@@ -49,7 +49,13 @@ test("account onboarding, dashboard, setup, history, library and profile", async
     .click();
   await page.getByLabel("Your name").fill("Browser Test");
   await page.getByLabel("Email address").fill(`e2e-${Date.now()}@example.test`);
-  await page.getByLabel("Password").fill("automated-test-password");
+  await page.getByLabel("Password", { exact: true }).fill("automated-test-password");
+  const password = page.getByLabel("Password", { exact: true });
+  await expect(password).toHaveAttribute("type", "password");
+  await page.getByRole("button", { name: "Show password" }).click();
+  await expect(password).toHaveAttribute("type", "text");
+  await page.getByRole("button", { name: "Hide password" }).click();
+  await expect(password).toHaveAttribute("type", "password");
   await page
     .getByRole("button", { name: "Create account", exact: true })
     .click();

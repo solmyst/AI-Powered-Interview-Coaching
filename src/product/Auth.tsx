@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRight, LockKeyhole } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, LockKeyhole } from "lucide-react";
 import { api } from "./api";
 import type { User, Usage } from "./types";
 export function Auth({
@@ -12,6 +12,7 @@ export function Auth({
   const [register, setRegister] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   return (
     <div className="auth-layout wrap">
       <section>
@@ -85,18 +86,30 @@ export function Auth({
             maxLength={254}
           />
         </label>
-        <label>
-          Password
-          <input
-            name="password"
-            type="password"
-            autoComplete={register ? "new-password" : "current-password"}
-            required
-            minLength={10}
-            maxLength={128}
-          />
+        <div className="password-group">
+          <label htmlFor="account-password">Password</label>
+          <span className="password-field">
+            <input
+              id="account-password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete={register ? "new-password" : "current-password"}
+              required
+              minLength={10}
+              maxLength={128}
+            />
+            <button
+              type="button"
+              className="password-toggle"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
+              onClick={() => setShowPassword((visible) => !visible)}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </span>
           <small>At least 10 characters.</small>
-        </label>
+        </div>
         {error && (
           <p className="error" role="alert">
             {error}
@@ -112,6 +125,7 @@ export function Auth({
           disabled={busy}
           onClick={() => {
             setRegister(!register);
+            setShowPassword(false);
             setError("");
           }}
         >

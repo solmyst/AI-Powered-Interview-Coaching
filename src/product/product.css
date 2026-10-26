@@ -624,6 +624,37 @@ hr {
 .auth-panel h2 {
   margin: 12px 0;
 }
+.password-field {
+  position: relative;
+  display: block;
+}
+.password-group {
+  margin-bottom: 20px;
+}
+.password-group label {
+  margin-bottom: 0;
+}
+.password-field input {
+  padding-right: 48px;
+}
+.password-toggle {
+  position: absolute;
+  right: 5px;
+  top: 13px;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+}
+.password-toggle:hover,
+.password-toggle:focus-visible {
+  background: #eceee5;
+  color: var(--ink);
+}
 .auth-panel .primary {
   width: 100%;
   margin: 6px 0;
