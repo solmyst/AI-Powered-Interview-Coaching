@@ -73,7 +73,7 @@ export function useWhisper(append: (text: string) => void) {
         if (e.data.text) callback.current(e.data.text);
         else
           setError(
-            "No speech was transcribed. Please try again or type your answer.",
+            "No speech was transcribed. Please try your answer again.",
           );
       } else {
         setStatus("error");

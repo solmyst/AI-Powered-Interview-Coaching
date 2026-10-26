@@ -212,7 +212,7 @@ export function Setup({
               <li>Adaptive follow-up questions</li>
               <li>Answer-by-answer feedback</li>
               <li>A personal study plan</li>
-              <li>Text first, optional voice</li>
+              <li>Voice-first video interview</li>
             </ul>
             <div className="provider-status">
               <span className={`dot ${health?.ready ? "" : "offline"}`} />

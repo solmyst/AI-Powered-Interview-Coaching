@@ -53,7 +53,7 @@ export function useVoice(append: (text: string) => void) {
     }
     if (!engine) {
       setError(
-        "Dictation is unavailable in this browser. You can type your answer instead.",
+        "Speech recognition is unavailable in this browser. Please use a supported browser and retry.",
       );
       return;
     }
@@ -70,8 +70,8 @@ export function useVoice(append: (text: string) => void) {
       setListening(false);
       setError(
         e.error === "not-allowed"
-          ? "Microphone permission was denied. Enable it in browser settings, or continue by typing."
-          : `Dictation stopped (${e.error}). Your text is safe; type or retry.`,
+          ? "Microphone permission was denied. Enable it in browser settings and retry."
+          : `Speech recognition stopped (${e.error}). Please retry.`,
       );
     };
     rec.onstart = () => {
@@ -86,7 +86,7 @@ export function useVoice(append: (text: string) => void) {
       rec.start();
       setListening(true);
     } catch {
-      setError("Could not start the microphone. Please type or retry.");
+      setError("Could not start the microphone. Please retry.");
     }
   }
   function speak(text: string, onDone?: () => void) {

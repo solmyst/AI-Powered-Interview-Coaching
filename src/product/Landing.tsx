@@ -121,7 +121,7 @@ export function Landing({ start }: { start: () => void }) {
               AudioLines,
               "02",
               "Think out loud",
-              "Answer in text or use optional voice controls. Expect follow-ups that challenge your reasoning, not random trivia.",
+              "Answer naturally in a voice-first video call. Expect follow-ups that challenge your reasoning, not random trivia.",
             ],
             [
               ShieldCheck,
