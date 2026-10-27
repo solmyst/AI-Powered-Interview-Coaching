@@ -18,16 +18,43 @@ test("camera renders real frames before and after joining the interview", async 
       questionCount: 3,
     },
     currentQuestion: {
-      question: "Tell me about a project you are proud of.",
+      question: "Can you describe a specific academic project or coursework where you had to debug a challenging issue? What was the problem, which alternatives did you consider, and how did you approach solving it?",
       focus: "Communication",
       difficulty: "Foundational",
     },
-    turns: [],
+    turns: [{
+      question: { question: "Tell me about yourself.", focus: "Communication", difficulty: "Foundational" },
+      answer: "I am a frontend engineering student.",
+      evaluation: {
+        scores: {}, rationale: "Fixture", strengths: [], improvements: [], missingConcepts: [], modelAnswer: "Fixture",
+      },
+    }],
     report: null,
     model: "fixture",
     provider: "fixture",
   };
   await page.addInitScript(() => {
+    (window as unknown as { __fullscreenRequests: number }).__fullscreenRequests = 0;
+    let activeFullscreen: Element | null = null;
+    Object.defineProperty(Document.prototype, "fullscreenElement", {
+      configurable: true,
+      get: () => activeFullscreen,
+    });
+    Object.defineProperty(Element.prototype, "requestFullscreen", {
+      configurable: true,
+      value: async () => {
+        (window as unknown as { __fullscreenRequests: number }).__fullscreenRequests++;
+        activeFullscreen = document.documentElement;
+        document.dispatchEvent(new Event("fullscreenchange"));
+      },
+    });
+    Object.defineProperty(Document.prototype, "exitFullscreen", {
+      configurable: true,
+      value: async () => {
+        activeFullscreen = null;
+        document.dispatchEvent(new Event("fullscreenchange"));
+      },
+    });
     Object.defineProperty(window, "speechSynthesis", {
       configurable: true,
       value: {
@@ -71,6 +98,10 @@ test("camera renders real frames before and after joining the interview", async 
     },
   }));
   await page.route(`**/api/interviews/${id}`, (route) => route.fulfill({ json: session }));
+  await page.route(`**/api/interviews/${id}/report`, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    await route.fulfill({ json: { ...session, state: "complete", currentQuestion: null, report: { summary: "Fixture" } } });
+  });
   await page.route("**/api/transcribe", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
@@ -87,9 +118,17 @@ test("camera renders real frames before and after joining the interview", async 
   await page.screenshot({ path: "test-results/camera-preflight-fixture.png", fullPage: true });
 
   await page.getByRole("button", { name: "Join interview" }).click();
+  await expect.poll(() => page.evaluate(
+    () => (window as unknown as { __fullscreenRequests: number }).__fullscreenRequests,
+  )).toBeGreaterThan(0);
+  await expect(page.getByRole("button", { name: /full screen/ })).toBeVisible();
+  await expect(page.locator(".question-caption")).toHaveClass(/question-very-long/);
   await expect(page.getByText("VIDEO LIVE").or(page.getByText("LIVE · LOCAL ONLY"))).toBeVisible({ timeout: 30000 });
   await expect.poll(() => page.getByLabel("Your live camera preview").evaluate(
     (video: HTMLVideoElement) => ({ width: video.videoWidth, readyState: video.readyState }),
   )).toMatchObject({ width: 640, readyState: 4 });
   await page.screenshot({ path: "test-results/camera-live-fixture.png", fullPage: true });
+  await page.getByRole("button", { name: "End interview" }).click();
+  await expect(page.getByRole("heading", { name: "Interview complete" })).toBeVisible();
+  await expect(page.getByText("preparing your briefing", { exact: false })).toBeVisible();
 });

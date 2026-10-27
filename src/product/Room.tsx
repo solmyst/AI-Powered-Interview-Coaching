@@ -4,7 +4,9 @@ import {
   Camera,
   Check,
   Headphones,
+  Maximize,
   Mic,
+  Minimize,
   PhoneOff,
   RotateCcw,
   ShieldCheck,
@@ -72,6 +74,8 @@ export function Room({
   const [lastAnswer, setLastAnswer] = useState("");
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [briefingError, setBriefingError] = useState("");
 
   async function submitSpokenAnswer(text: string) {
     const answer = text.trim().slice(0, 8000);
@@ -126,9 +130,26 @@ export function Room({
     () => () => {
       sharedStream.current?.getTracks().forEach((track) => track.stop());
       sharedStream.current = null;
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     },
     [],
   );
+
+  useEffect(() => {
+    const sync = () => setFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", sync);
+    sync();
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch {
+      setError("Full screen was blocked by the browser. You can continue normally.");
+    }
+  }
 
   async function requestMedia() {
     setMediaState("requesting");
@@ -227,6 +248,7 @@ export function Room({
     if (session.state !== "report_pending" || reportStarted.current) return;
     reportStarted.current = true;
     setPhase("complete");
+    setBriefingError("");
     voice.stop();
     transcription.cancel();
     void api<Session>(`/interviews/${session.id}/report`, {
@@ -234,7 +256,10 @@ export function Room({
       body: "{}",
     })
       .then(update)
-      .catch((reason) => setError((reason as Error).message));
+      .catch((reason) => {
+        setBriefingError((reason as Error).message);
+        reportStarted.current = false;
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.state]);
 
@@ -253,6 +278,7 @@ export function Room({
       return;
     }
     setPhase("complete");
+    setBriefingError("");
     setError("");
     try {
       update(
@@ -262,7 +288,7 @@ export function Room({
         }),
       );
     } catch (reason) {
-      setError((reason as Error).message);
+      setBriefingError((reason as Error).message);
     }
   }
 
@@ -326,6 +352,7 @@ export function Room({
               onClick={() => {
                 callStartedAt.current = Date.now();
                 setPhase("joining");
+                void document.documentElement.requestFullscreen?.().catch(() => {});
                 setJoined(true);
               }}
             >
@@ -387,15 +414,20 @@ export function Room({
           <div className="interviewer-identity">
             <strong>Maya</strong><span>AI interview coach</span>
           </div>
-          <div className="question-caption" aria-live="polite">
+          <div
+            className={`question-caption ${question.length > 170 ? "question-very-long" : question.length > 105 ? "question-long" : ""}`}
+            aria-live="polite"
+          >
             <span>{phase === "thinking" ? "MAYA IS PREPARING YOUR FOLLOW-UP" : "MAYA ASKS"}</span>
             <h1>{phase === "thinking" ? "Thank you. Give me a moment to consider that." : question}</h1>
           </div>
-          {phase === "listening" && (
-            <div className="listening-prompt"><span className="audio-wave"><i/><i/><i/><i/><i/></span> Answer naturally. I’ll continue when you finish.</div>
-          )}
-          {phase === "transcribing" && <div className="listening-prompt"><Sparkles size={18}/> Understanding your response…</div>}
-          {lastAnswer && phase === "thinking" && <p className="answer-received"><Check size={16}/> Answer received</p>}
+          <div className="turn-state-slot" aria-live="polite">
+            {phase === "listening" && (
+              <div className="listening-prompt"><span className="audio-wave"><i/><i/><i/><i/><i/></span> Answer naturally. I’ll continue when you finish.</div>
+            )}
+            {phase === "transcribing" && <div className="listening-prompt"><Sparkles size={18}/> Understanding your response…</div>}
+            {lastAnswer && phase === "thinking" && <p className="answer-received"><Check size={16}/> Answer received</p>}
+          </div>
         </section>
 
         <CameraCoach
@@ -418,6 +450,11 @@ export function Room({
       <footer className="call-controls" aria-label="Interview controls">
         <button
           className="round-control"
+          onClick={() => void toggleFullscreen()}
+          aria-label={fullscreen ? "Exit full screen" : "Enter full screen"}
+        >{fullscreen ? <Minimize /> : <Maximize />}</button>
+        <button
+          className="round-control"
           disabled={phase === "thinking" || phase === "complete"}
           onClick={repeatQuestion}
           aria-label="Repeat question"
@@ -434,6 +471,30 @@ export function Room({
           <PhoneOff />
         </button>
       </footer>
+      {phase === "complete" && (
+        <div className="briefing-overlay" role="status" aria-live="polite">
+          <div className="briefing-card">
+            <span className="briefing-mark"><Check size={28} /></span>
+            <p className="eyebrow">SESSION SAVED</p>
+            <h2>Interview complete</h2>
+            {briefingError ? (
+              <>
+                <p>We couldn’t prepare your briefing yet. Your answers are safe.</p>
+                <p className="briefing-error">{briefingError}</p>
+                <button className="primary" onClick={() => void endInterview()}>
+                  Try preparing briefing again
+                </button>
+              </>
+            ) : (
+              <>
+                <p>Maya is preparing your briefing, answer feedback, and next-step study plan.</p>
+                <div className="briefing-progress"><i /><i /><i /></div>
+                <small>This usually takes a few seconds. Please keep this window open.</small>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
