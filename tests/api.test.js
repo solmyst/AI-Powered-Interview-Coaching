@@ -144,6 +144,20 @@ const create = (cookie, id = crypto.randomUUID()) =>
     body: setup,
     headers: { "Idempotency-Key": id },
   });
+test("production trusts exactly one reverse proxy hop", () => {
+  const production = createApp({
+    env: {
+      NODE_ENV: "production",
+      DATABASE_PATH: ":memory:",
+      APP_ORIGIN: "https://interview.example.test",
+    },
+    ai,
+    transcriber,
+    speech,
+  });
+  assert.equal(production.app.get("trust proxy"), 1);
+  production.db.close();
+});
 test("authentication, session cookies, invalid credentials and CSRF", async () => {
   assert.equal((await request("/interviews")).status, 401);
   const a = await account("auth@example.test");

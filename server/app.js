@@ -59,6 +59,9 @@ export function createApp({
   if (secure && !origin.startsWith("https://"))
     throw new Error("Production APP_ORIGIN must use HTTPS");
   app.disable("x-powered-by");
+  // Production is exposed through one local Nginx hop. This lets rate limits use
+  // the real client address without trusting arbitrary forwarded chains.
+  app.set("trust proxy", secure ? 1 : false);
   app.use(
     helmet({
       contentSecurityPolicy: {
