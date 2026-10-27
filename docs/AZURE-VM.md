@@ -98,7 +98,7 @@ ASSEMBLYAI_API_KEY=configure_on_the_vm_only
 ASSEMBLYAI_MODEL=universal-3-5-pro
 ELEVENLABS_API_KEY=configure_on_the_vm_only
 ELEVENLABS_MODEL=eleven_v4_turbo
-ELEVENLABS_VOICE_ID=OZ0L6eISlOejga3XjDFt
+ELEVENLABS_VOICE_ID=EXAVITQu4vr4xnSDxMaL
 ```
 
 Install and start the service:
