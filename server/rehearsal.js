@@ -9,7 +9,7 @@ const observation = z.object({
 });
 export const rehearsalPlanSchema = z.object({
   focus: text,
-  coaching: text,
+  coaching: z.string().trim().min(1).max(600),
   checkpoints: z.array(z.object({ criterion: text, baseline: observation })).length(3),
   transferQuestion: text,
 });
@@ -66,7 +66,7 @@ export function registerRehearsal(app, { auth, locked, owned, save, recordUsage,
       const stage = lab.attempts.length === 0 ? "retry" : "transfer";
       const question = stage === "retry" ? session.turns[index].question.question : lab.plan.transferQuestion;
       const generated = await ai.generate(rehearsalResultSchema,
-        "Evaluate this spoken practice answer against the provided THREE checkpoints, in EXACTLY the same order. Return checks with an EXACT contiguous quote from the submitted answer for every demonstrated/partial observation. Use null if no evidence. Evaluate substance, not verbosity or accent. Be willing to report no improvement. Do not award points for repeating coaching language without explaining it. Explain what changed concretely; transfer tests application in a new scenario, not a comparable numeric score. Give one practical nextStep. Use the language of the answer. Never invent experience or claim code execution.",
+        "Evaluate this spoken practice answer against the provided THREE checkpoints, in EXACTLY the same order. Return checks with an EXACT contiguous quote from the submitted answer for every demonstrated/partial observation. Use null if no evidence. Evaluate substance, not verbosity or accent. Do not assume improvement. Do not award points for repeating coaching language without explaining it. Summarize what THIS answer demonstrates; earlier observations are compared separately in the UI. Transfer tests application in a new scenario, not a comparable numeric score. Give one practical nextStep. Use the language of the answer. Never invent experience or claim code execution.",
         { role: session.setup.role, stage, question, checkpoints: lab.plan.checkpoints.map((c) => c.criterion), answer: input.answer });
       const result = rehearsalResultSchema.parse(generated.value);
       verifyEvidence(result.checks, input.answer);

@@ -68,6 +68,13 @@ export function RehearsalLab({ session, update, speechReady, transcriptionReady 
       });
       if (alive.current) { update(next); setPendingAnswer(""); }
     } catch (reason) {
+      try {
+        const latest = await api<Session>(`/interviews/${session.id}`);
+        if ((latest.rehearsals?.[turn]?.attempts.length || 0) > attempt) {
+          if (alive.current) { update(latest); setPendingAnswer(""); }
+          return;
+        }
+      } catch { /* Keep the transcript available for another save attempt. */ }
       if (alive.current) setError((reason as Error).message);
     } finally {
       submitting.current = false;
