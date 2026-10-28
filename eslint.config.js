@@ -7,7 +7,7 @@ import tseslint from "typescript-eslint";
 export default tseslint.config(
   { ignores: ["dist", "legacy", "test-results", "playwright-report"] },
   {
-    files: ["server/**/*.js", "tests/*.js"],
+    files: ["server/**/*.js", "scripts/**/*.js", "tests/*.js"],
     languageOptions: { ecmaVersion: "latest", globals: globals.node },
     rules: {
       ...js.configs.recommended.rules,

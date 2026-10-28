@@ -7,20 +7,22 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:5173",
     headless: true,
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
     permissions: ["camera", "microphone"],
     launchOptions: {
       args: [
         "--use-fake-ui-for-media-stream",
         "--use-fake-device-for-media-stream",
         `--use-file-for-fake-video-capture=${resolve("tests/fixtures/camera.y4m")}`,
-        `--use-file-for-fake-audio-capture=${resolve("tests/fixtures/jfk-padded.wav")}`,
+        `--use-file-for-fake-audio-capture=${resolve("tests/fixtures/microphone.wav")}`,
       ],
     },
   },
   webServer: {
     command: "npm run dev",
     url: "http://localhost:5173",
-    reuseExistingServer: true,
+    reuseExistingServer: !process.env.CI,
     env: { DATABASE_PATH: "./data/media-e2e.db" },
   },
 });

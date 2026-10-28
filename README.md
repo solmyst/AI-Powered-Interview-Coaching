@@ -99,13 +99,17 @@ npm run build
 npm audit
 npx playwright install chromium
 npm run test:e2e
-# Optional prerecorded camera/microphone pipeline; requires setup:media and Ollama:
+# Synthetic camera/microphone pipeline; no provider credentials required:
+npm run setup:vision
+npm run setup:test-media
 npm run test:media
-# Optional real-provider acceptance run; requires the API and Ollama:
+# Optional real-provider acceptance run; requires the API and configured provider:
 npm run test:live
 ```
 
 Unit/integration fixtures are test-only and never used in the application. The live acceptance script creates a disposable local account, runs three real model turns and a report, writes `docs/live-smoke-result.json`, and deletes its account. The file is explicitly a synthetic-candidate test artifact, not customer data or a testimonial. See `docs/VALIDATION.md` for observed results and limitations.
+
+GitHub Actions runs lint, types, unit/API tests, vision asset setup, the production build, dependency audit, and both browser suites on pushes and pull requests. Synthetic media fixtures are generated on each runner; media tests stub provider responses and do not prove live transcription quality. Browser diagnostics are retained for seven days. See [DEPLOYMENT.md](DEPLOYMENT.md) for the separate Azure release process.
 
 ## Deployment and launch readiness
 

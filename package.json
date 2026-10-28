@@ -18,6 +18,7 @@
     "test:live": "node tests/live-smoke.js",
     "setup:vision": "node scripts/setup-vision.js",
     "setup:media": "npm run setup:vision",
+    "setup:test-media": "node scripts/setup-test-media.js",
     "test:media": "playwright test --config playwright.media.config.ts"
   },
   "dependencies": {

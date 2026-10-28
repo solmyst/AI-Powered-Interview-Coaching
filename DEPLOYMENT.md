@@ -6,6 +6,12 @@ For the concrete Azure GPU/CPU VM procedure, systemd unit and Nginx configuratio
 
 Run one Node API process with persistent SQLite disk behind an HTTPS reverse proxy. The API also serves the built React files, so browser requests stay on one origin. Run Ollama on the same trusted host/network, or configure NVIDIA. Do not expose Ollama to the public internet. Static GitHub Pages cannot host this application's authenticated API.
 
+## CI and release status
+
+`.github/workflows/deploy.yml` validates the application; its filename is retained from the former Pages workflow. It does not deploy to Azure. Every push and pull request runs lint, type checking, unit/API tests, the production build with local vision assets, dependency audit, and both Chromium browser suites. Browser failures and screenshots are uploaded as short-lived diagnostics. Tests use synthetic media and mocked provider responses, without production credentials.
+
+Azure releases currently use the manual systemd/Nginx procedure in [docs/AZURE-VM.md](docs/AZURE-VM.md). A green Actions run or a push to `main` does not change the VM. Production provider credentials stay in `/etc/interviewace.env`, with persistent data in `/var/lib/interviewace`. Before each release, retain the previous application directory, build the new revision separately, switch directories during a brief service stop, and check both loopback and public HTTPS health; restore the previous directory if verification fails. Do not configure static Pages publishing for this full-stack application.
+
 ## Build and start
 
 ```sh
@@ -46,4 +52,4 @@ The only process-local state is concurrency/rate-limit state. Interview data, lo
 
 ## Public launch gates
 
-Before collecting real student data at scale: verified-email/recovery flows, account-abuse controls, privacy/retention policy, encrypted backups, restore drills, provider data-processing review, load tests and observability alerts. Benchmark the selected model with expert-graded answers across each advertised track, and remove unsupported tracks if evaluation quality is inadequate. No live deployment or domain change was performed in this task.
+Before collecting real student data at scale: verified-email/recovery flows, account-abuse controls, privacy/retention policy, encrypted backups, restore drills, provider data-processing review, load tests and observability alerts. Benchmark the selected model with expert-graded answers across each advertised track, and remove unsupported tracks if evaluation quality is inadequate.

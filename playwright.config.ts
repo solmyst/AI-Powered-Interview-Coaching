@@ -3,7 +3,12 @@ export default defineConfig({
   testDir: "./tests/browser",
   timeout: 30000,
   workers: 1,
-  use: { baseURL: "http://localhost:5173", headless: true },
+  use: {
+    baseURL: "http://localhost:5173",
+    headless: true,
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
+  },
   webServer: {
     command: "npm run dev",
     url: "http://localhost:5173",
