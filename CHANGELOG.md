@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added the spoken Answer Lab: personalized checkpoints, an answer retry, a changed-scenario challenge, and a persisted side-by-side evidence review without changing original interview scores.
+- Verified coaching quotations against answer transcripts on the server, with one bounded repair attempt for invalid evidence and no partial save on failure.
+- Added pause/resume, question clarification, standalone spoken repeat/pause/clarify commands, and recovery when a saved-answer response is interrupted.
+- Strengthened assessment guidance to accept correct equivalent solutions rather than require specific keywords or techniques.
 - Replaced the browser Whisper model with server-owned AssemblyAI Universal-3.5 Pro Sync transcription for faster English/Hindi interview turns and a much smaller initial download.
 - Added server-owned ElevenLabs multilingual interviewer speech with automatic browser-TTS fallback, an accessible password visibility control, and camera rendering that stays live when presence coaching is still loading or fails.
 

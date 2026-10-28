@@ -60,7 +60,8 @@ export function registerRehearsal(app, { auth, locked, owned, save, recordUsage,
       if (session.rehearsals[index]) return res.json(session);
       const generated = await generateVerified(ai, rehearsalPlanSchema,
         "Build a focused Answer Lab for this specific answer. Pick ONE important weakness, give a short actionable coaching cue without supplying a script, and define exactly THREE observable checkpoints that apply to both a retry and a new scenario. Evaluate the original answer against each checkpoint. evidence must be an EXACT contiguous quote from the original answer, or null when evidence is absent. demonstrated/partial REQUIRE a quote. not_yet means not observed, not proof of inability. Create one NEW transferQuestion testing the same skill with a changed constraint; do not repeat the original question. Do not infer confidence or personality. Use the language of the candidate's answer, keeping technical terms natural.",
-        { role: session.setup.role, track: session.setup.track, difficulty: session.setup.difficulty, ...turn },
+        { role: session.setup.role, track: session.setup.track, difficulty: session.setup.difficulty,
+          checkpointPolicy: "Describe observable outcomes, not mandatory technologies, buzzwords or one prescribed solution. Each checkpoint must be usable in the new scenario too. Accept equivalent correct approaches.", ...turn },
         turn.answer, (plan) => plan.checkpoints.map((c) => c.baseline));
       const plan = rehearsalPlanSchema.parse(generated.value);
       verifyEvidence(plan.checkpoints.map((c) => c.baseline), turn.answer);

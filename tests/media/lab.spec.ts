@@ -42,6 +42,8 @@ test("Answer Lab captures spoken retry and transfer, restores progress and stays
       summary: "You explained a concrete fallback and its load trade-off.", nextStep: "Test a delayed invalidation event.",
       checks: plan.checkpoints.map(() => ({ status: "demonstrated", evidence: "source of truth", reason: "Explicitly explains the trade-off." })),
     } });
+    // Simulate a dropped save response: GET reconciliation must recover it.
+    if (lab.attempts.length === 1) return route.fulfill({ status: 503, json: { error: "Response interrupted after save" } });
     return route.fulfill({ json: session });
   });
   await page.goto("/");

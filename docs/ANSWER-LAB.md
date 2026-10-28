@@ -12,6 +12,7 @@ The experience is: completed interview → select one answer → three observabl
 - Each original answer has one persisted coaching plan and at most two practice attempts: retry, then transfer.
 - Checkpoints stay fixed across the three answers. Their statuses are AI coaching observations, not calibrated hiring scores.
 - Server checks every non-null quote is an exact substring of the relevant transcript. Positive observations require a quote. This verifies provenance, not the correctness of the interpretation.
+- A failed evidence check triggers one bounded generation repair with explicit original-script instructions. Invalid evidence after that still fails without saving. English/Hindi transliteration or translation is never silently accepted as a quote.
 - Plan/attempt requests require interview ownership, CSRF origin checks and existing user request locking. Plans are idempotent. Attempt count prevents duplicate advancement.
 - Provider failure does not save a partial result. Pending spoken responses can be retried; the client reconciles responses that were saved before a connection failure.
 - Rehearsal is private and included in normal account export/deletion because it is stored in the owned session document. No schema migration is required; older reports without rehearsals work.
@@ -25,6 +26,8 @@ The call also supports pause/resume, repeat and plain-language clarification. Ex
 `npm test` covers ownership, request limits, duplicates, provider failures, unchanged scores and evidence guards. `npm run test:media` covers microphone capture, spoken retry/transfer, persistence on reload, pause/resume/clarification, camera frames, fullscreen and completion. The Answer Lab view is checked at 320/768/1440 px and with axe WCAG 2 A/AA rules.
 
 `node tests/rehearsal-live.js` is an opt-in configured-provider acceptance test. It runs the real application against an isolated in-memory database, including a Hindi/English retry; it does not use production users or records. It proves the integration and evidence contract, not learning efficacy or broad assessment accuracy.
+
+`LAB_QUOTE_DIAGNOSTIC=1` seeds a synthetic completed interview in that isolated database for focused quote debugging and prints only synthetic evaluation observations. Add `LAB_FULL_ACCEPTANCE=1` to retain diagnostics while generating the entire interview live. These flags belong to the test script, not production configuration.
 
 ## Practical limits and follow-up work
 

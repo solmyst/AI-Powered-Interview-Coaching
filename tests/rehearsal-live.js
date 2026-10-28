@@ -3,9 +3,20 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { createApp } from "../server/app.js";
+import { createAI } from "../server/ai.js";
+import { readFileSync } from "node:fs";
 
 const origin = "http://localhost:5173";
-const { app, db } = createApp({ env: { ...process.env, NODE_ENV: "test", DATABASE_PATH: ":memory:", APP_ORIGIN: origin } });
+const seedFixture = Boolean(process.env.LAB_QUOTE_DIAGNOSTIC && !process.env.LAB_FULL_ACCEPTANCE);
+const provider = createAI();
+const { app, db } = createApp({ env: { ...process.env, NODE_ENV: "test", DATABASE_PATH: ":memory:", APP_ORIGIN: origin }, ai: {
+  ...provider,
+  generate: async (...args) => {
+    const result = await provider.generate(...args);
+    if (process.env.LAB_QUOTE_DIAGNOSTIC && args[0].shape.checks) console.log("SYNTHETIC_QUOTE_DIAGNOSTIC:", JSON.stringify(result.value.checks));
+    return result;
+  },
+} });
 const server = app.listen(0, "127.0.0.1");
 await new Promise((resolve) => server.once("listening", resolve));
 const base = `http://127.0.0.1:${server.address().port}/api`;
@@ -20,17 +31,26 @@ async function call(path, body, headers = {}) {
   return value;
 }
 try {
-  await call("/auth/register", { name: "Isolated Lab Acceptance", email: `lab-${randomUUID()}@example.test`, password: randomUUID() });
-  let session = await call("/interviews", { role: "Backend", experience: "Early career", track: "Technical", difficulty: "Intermediate", industry: "Technology", company: "", resume: "Built a PostgreSQL inventory API with Redis caching.", jobDescription: "Build reliable backend APIs and explain consistency trade-offs.", questionCount: 3 }, { "Idempotency-Key": randomUUID() });
+  const account = await call("/auth/register", { name: "Isolated Lab Acceptance", email: `lab-${randomUUID()}@example.test`, password: randomUUID() });
+  let session;
+  if (seedFixture) {
+    session = JSON.parse(readFileSync("docs/live-smoke-result.json", "utf8")).session;
+    session.id = randomUUID();
+    db.prepare("INSERT INTO interviews VALUES (?,?,?,?,?)").run(session.id, account.user.id, session.created, session.state, JSON.stringify(session));
+  } else {
+    session = await call("/interviews", { role: "Backend", experience: "Early career", track: "Technical", difficulty: "Intermediate", industry: "Technology", company: "", resume: "Built a PostgreSQL inventory API with Redis caching.", jobDescription: "Build reliable backend APIs and explain consistency trade-offs.", questionCount: 3 }, { "Idempotency-Key": randomUUID() });
+  }
   const id = session.id;
-  await call(`/interviews/${id}/clarify`, { expectedTurn: 0 });
+  if (!seedFixture) await call(`/interviews/${id}/clarify`, { expectedTurn: 0 });
   const answers = [
     "I used Redis with a 60 second TTL. Reads check the cache first. If the cache misses, I read PostgreSQL and fill Redis. I deleted the cache after writes. I did not test concurrent readers or measure error rates.",
     "A reader may refill the cache with an older value after the writer invalidates it. I would use versioned cache values and bypass Redis for checkout. Stock decrement needs an atomic SQL update with a stock greater than or equal to quantity condition.",
     "I would test concurrent checkout, Redis downtime and delayed invalidation. PostgreSQL remains the source of truth. I would measure stale-read rate, database load and outbox lag. I cannot claim an improvement without measuring it.",
   ];
-  for (let i = 0; i < answers.length; i++) session = await call(`/interviews/${id}/answers`, { answer: answers[i], expectedTurn: i });
-  session = await call(`/interviews/${id}/report`, {});
+  if (!seedFixture) {
+    for (let i = 0; i < answers.length; i++) session = await call(`/interviews/${id}/answers`, { answer: answers[i], expectedTurn: i });
+    session = await call(`/interviews/${id}/report`, {});
+  }
   const originalScore = session.report.overall;
   session = await call(`/interviews/${id}/rehearsal/0`, {});
   assert.equal(session.rehearsals[0].plan.checkpoints.length, 3);

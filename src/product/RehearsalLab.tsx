@@ -129,7 +129,7 @@ export function RehearsalLab({ session, update, speechReady, transcriptionReady 
           {capturing && <><p role="status"><Mic size={17} /> Listening. Finish naturally or select Done speaking.</p><button className="primary" onClick={transcription.stop}>Done speaking</button></>}
           {(voice.speaking || capturing) && <button className="secondary" onClick={cancelRecording}>Pause practice</button>}
           {(busy || transcription.status === "transcribing") && <p role="status">{busy ? "Checking your answer against the same checkpoints…" : "Understanding your answer…"}</p>}
-          {!waiting && pendingAnswer && <button className="secondary" onClick={() => void submit(pendingAnswer)}><RotateCcw size={16} />Retry feedback for saved response</button>}
+          {!waiting && pendingAnswer && <><button className="secondary" onClick={() => void submit(pendingAnswer)}><RotateCcw size={16} />Retry feedback for saved response</button><button className="secondary" onClick={practice}>Record again</button></>}
         </div>
         {!transcriptionReady && <p className="notice">Voice practice is temporarily unavailable. Your coaching checklist is ready below.</p>}
       </div>}
