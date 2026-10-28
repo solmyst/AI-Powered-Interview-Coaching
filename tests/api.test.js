@@ -155,6 +155,12 @@ test("Answer Lab persists retry and transfer, enforces ownership, deduplicates a
   const created = await create(a.cookie);
   const id = created.body.id;
   const path = `/interviews/${id}/rehearsal/0`;
+  const clarifyPath = `/interviews/${id}/clarify`;
+  assert.equal((await request(clarifyPath, { method: "POST", cookie: b.cookie, body: { expectedTurn: 0 } })).status, 404);
+  for (let i = 0; i < 2; i++) assert.equal((await request(clarifyPath, { method: "POST", cookie: a.cookie, body: { expectedTurn: 0 } })).status, 200);
+  assert.equal((await request(clarifyPath, { method: "POST", cookie: a.cookie, body: { expectedTurn: 0 } })).status, 429);
+  assert.equal((await request(`/interviews/${id}`, { cookie: a.cookie })).body.turns.length, 0);
+  assert.equal((await request(clarifyPath, { method: "POST", cookie: a.cookie, body: { expectedTurn: 1 } })).status, 409);
   assert.equal((await request(path, { method: "POST", cookie: a.cookie, body: {} })).status, 409);
   for (let i = 0; i < 3; i++) await request(`/interviews/${id}/answers`, {
     method: "POST", cookie: a.cookie, body: { answer: "Use a TTL to expire stale entries.", expectedTurn: i },

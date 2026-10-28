@@ -98,6 +98,7 @@ test("camera renders real frames before and after joining the interview", async 
     },
   }));
   await page.route(`**/api/interviews/${id}`, (route) => route.fulfill({ json: session }));
+  await page.route(`**/api/interviews/${id}/clarify`, (route) => route.fulfill({ json: { question: "Tell me about a bug in your project and how you fixed it." } }));
   await page.route(`**/api/interviews/${id}/report`, async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 1200));
     await route.fulfill({ json: { ...session, state: "complete", currentQuestion: null, report: { summary: "Fixture" } } });
@@ -128,6 +129,14 @@ test("camera renders real frames before and after joining the interview", async 
     (video: HTMLVideoElement) => ({ width: video.videoWidth, readyState: video.readyState }),
   )).toMatchObject({ width: 640, readyState: 4 });
   await page.screenshot({ path: "test-results/camera-live-fixture.png", fullPage: true });
+  await page.getByRole("button", { name: "Pause interview", exact: true }).click();
+  await expect(page.getByText("Paused · take your time", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Resume interview", exact: true }).click();
+  await expect(page.getByText("Listening to you", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Clarify question", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Tell me about a bug in your project and how you fixed it." })).toBeVisible();
+  await expect(page.getByText("Question 2 of 3", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "End interview" })).toBeEnabled();
   await page.getByRole("button", { name: "End interview" }).click();
   await expect(page.getByRole("heading", { name: "Interview complete" })).toBeVisible();
   await expect(page.getByRole("dialog")).toBeVisible();

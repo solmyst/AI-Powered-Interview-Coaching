@@ -7,6 +7,9 @@ import {
   Maximize,
   Mic,
   Minimize,
+  MessageCircle,
+  Pause,
+  Play,
   PhoneOff,
   RotateCcw,
   ShieldCheck,
@@ -27,6 +30,7 @@ type CallPhase =
   | "listening"
   | "transcribing"
   | "thinking"
+  | "paused"
   | "complete";
 
 function waitForVideoFrame(video: HTMLVideoElement) {
@@ -61,6 +65,7 @@ export function Room({
   const deliveredTurn = useRef(-1);
   const reportStarted = useRef(false);
   const callEnded = useRef(false);
+  const paused = useRef(false);
   const callStartedAt = useRef(0);
   const sharedStream = useRef<MediaStream | null>(null);
   const previewVideo = useRef<HTMLVideoElement>(null);
@@ -73,10 +78,13 @@ export function Room({
   const [phase, setPhase] = useState<CallPhase>("preflight");
   const [elapsed, setElapsed] = useState(0);
   const [lastAnswer, setLastAnswer] = useState("");
+  const [answerPending, setAnswerPending] = useState(false);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
   const [briefingError, setBriefingError] = useState("");
+  const [clarifiedQuestion, setClarifiedQuestion] = useState("");
+  const [clarifying, setClarifying] = useState(false);
 
   async function submitSpokenAnswer(text: string) {
     if (callEnded.current) return;
@@ -87,6 +95,7 @@ export function Room({
       return;
     }
     setLastAnswer(answer);
+    setAnswerPending(true);
     setPhase("thinking");
     setError("");
     try {
@@ -109,14 +118,41 @@ export function Room({
       visual.current = emptyVisual();
       spoken.current = { words: 0, fillers: 0 };
       transcription.reset();
+      setAnswerPending(false);
       update(next);
     } catch (reason) {
+      // A response can be lost after the server saves a turn. Reconcile before
+      // offering a retry so one spoken answer cannot advance two questions.
+      try {
+        const latest = await api<Session>(`/interviews/${session.id}`);
+        if (latest.turns.length > session.turns.length) {
+          setAnswerPending(false);
+          visual.current = emptyVisual();
+          spoken.current = { words: 0, fillers: 0 };
+          transcription.reset();
+          update(latest);
+          return;
+        }
+      } catch { /* Preserve the response locally until the connection returns. */ }
       setError((reason as Error).message);
-      setPhase("listening");
+      pauseInterview();
     }
   }
 
   function receiveTranscript(text: string) {
+    const command = text.trim().toLowerCase().replace(/[?.!।]/g, "").trim();
+    if (/^(please )?(repeat( the)? question|repeat that|could you repeat( the question| that)?|can you repeat( the question| that)?)( please)?$/.test(command)) {
+      repeatQuestion();
+      return;
+    }
+    if (/^(please )?(pause( the)? interview|give me a moment|pause)( please)?$/.test(command)) {
+      pauseInterview();
+      return;
+    }
+    if (/^(please )?(clarify( the)? question|could you clarify( the question| that)?|can you rephrase( the question| that)?)( please)?$/.test(command)) {
+      void clarifyQuestion();
+      return;
+    }
     spoken.current.words += text.trim().split(/\s+/).filter(Boolean).length;
     spoken.current.fillers += (
       text.match(/\b(um|uh|erm|hmm)\b/gi) || []
@@ -228,10 +264,11 @@ export function Room({
       return;
     deliveredTurn.current = session.turns.length;
     setPhase("interviewer");
+    setClarifiedQuestion("");
     setLastAnswer("");
     setError("");
     voice.speak(question, () => {
-      if (callEnded.current) return;
+      if (callEnded.current || paused.current) return;
       setPhase("listening");
       void transcription.record({
         autoStop: true,
@@ -269,10 +306,45 @@ export function Room({
   }, [session.state]);
 
   function repeatQuestion() {
+    paused.current = false;
     voice.stop();
     transcription.cancel();
     deliveredTurn.current = -1;
     setRetry((value) => value + 1);
+  }
+
+  function pauseInterview() {
+    paused.current = true;
+    voice.stop();
+    transcription.cancel();
+    setPhase("paused");
+  }
+
+  function resumeInterview() {
+    paused.current = false;
+    setPhase("listening");
+    void transcription.record({ autoStop: true, mediaStream: sharedStream.current || undefined });
+  }
+
+  async function clarifyQuestion() {
+    voice.stop();
+    transcription.cancel();
+    setClarifying(true);
+    setPhase("interviewer");
+    setError("");
+    try {
+      const result = await api<{ question: string }>(`/interviews/${session.id}/clarify`, {
+        method: "POST", body: JSON.stringify({ expectedTurn: session.turns.length }),
+      });
+      if (callEnded.current) return;
+      setClarifiedQuestion(result.question);
+      voice.speak(result.question, () => { if (!callEnded.current && !paused.current) resumeInterview(); });
+    } catch (reason) {
+      setError((reason as Error).message);
+      if (!callEnded.current) pauseInterview();
+    } finally {
+      setClarifying(false);
+    }
   }
 
   async function endInterview() {
@@ -302,7 +374,7 @@ export function Room({
     }
   }
 
-  const status =
+  const status = clarifying ? "Clarifying your question" : phase === "paused" ? "Paused · take your time" :
     phase === "interviewer"
       ? "Interviewer speaking"
       : phase === "listening"
@@ -429,7 +501,7 @@ export function Room({
             aria-live="polite"
           >
             <span>{phase === "thinking" ? "MAYA IS PREPARING YOUR FOLLOW-UP" : "MAYA ASKS"}</span>
-            <h1>{question}</h1>
+            <h1>{clarifiedQuestion || question}</h1>
           </div>
           <div className="turn-state-slot" aria-live="polite">
             {phase === "listening" && (
@@ -437,6 +509,7 @@ export function Room({
             )}
             {phase === "transcribing" && <div className="listening-prompt"><Sparkles size={18}/> Understanding your response…</div>}
             {lastAnswer && phase === "thinking" && <p className="answer-received"><Check size={16}/> Answer received</p>}
+            {phase === "paused" && <p className="listening-prompt">Microphone paused. Resume when you’re ready.</p>}
           </div>
         </section>
 
@@ -453,7 +526,7 @@ export function Room({
       {(error || transcription.error || voice.error) && (
         <div className="call-error" role="alert">
           {error || transcription.error || voice.error}
-          <button onClick={repeatQuestion}>Retry this question</button>
+          <button onClick={() => answerPending ? void submitSpokenAnswer(lastAnswer) : repeatQuestion()}>{answerPending ? "Retry saving my answer" : "Retry this question"}</button>
         </div>
       )}
 
@@ -465,10 +538,12 @@ export function Room({
         >{fullscreen ? <Minimize /> : <Maximize />}</button>
         <button
           className="round-control"
-          disabled={phase === "thinking" || phase === "complete"}
+          disabled={phase === "thinking" || phase === "transcribing" || phase === "complete" || clarifying || answerPending}
           onClick={repeatQuestion}
           aria-label="Repeat question"
         ><RotateCcw /></button>
+        <button className="round-control" disabled={phase === "thinking" || phase === "transcribing" || phase === "complete" || clarifying || answerPending} onClick={() => phase === "paused" ? resumeInterview() : pauseInterview()} aria-label={phase === "paused" ? "Resume interview" : "Pause interview"}>{phase === "paused" ? <Play /> : <Pause />}</button>
+        <button className="round-control" disabled={phase === "thinking" || phase === "transcribing" || phase === "complete" || clarifying || answerPending} onClick={() => void clarifyQuestion()} aria-label="Clarify question"><MessageCircle /></button>
         <div className="active-mic" aria-label="Microphone is automatic">
           <Mic /><span>{phase === "listening" ? "Mic live" : "Mic paused"}</span>
         </div>
@@ -477,7 +552,7 @@ export function Room({
             Done speaking
           </button>
         )}
-        <button className="hang-up" disabled={phase === "thinking" || phase === "transcribing" || phase === "complete"} onClick={() => void endInterview()} aria-label="End interview" title={phase === "thinking" || phase === "transcribing" ? "Saving your answer before ending the interview" : "End interview and prepare briefing"}>
+        <button className="hang-up" disabled={phase === "thinking" || phase === "transcribing" || phase === "complete" || clarifying || answerPending} onClick={() => void endInterview()} aria-label="End interview" title={phase === "thinking" || phase === "transcribing" ? "Saving your answer before ending the interview" : "End interview and prepare briefing"}>
           <PhoneOff />
         </button>
       </footer>

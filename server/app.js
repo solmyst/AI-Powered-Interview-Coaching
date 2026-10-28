@@ -396,6 +396,24 @@ export function createApp({
     }),
   );
   app.get("/api/interviews/:id", auth, (req, res) => res.json(owned(req)));
+  app.post("/api/interviews/:id/clarify", auth, async (req, res) =>
+    locked(req.user.id, async () => {
+      const { expectedTurn } = z.object({ expectedTurn: z.number().int().min(0).max(7) }).strict().parse(req.body);
+      const session = owned(req);
+      if (session.state !== "active" || expectedTurn !== session.turns.length)
+        fail(409, "The question changed. Please retry on the current question.");
+      session.clarifications ||= {};
+      const used = session.clarifications[expectedTurn] || 0;
+      if (used >= 2) fail(429, "This question has been clarified twice. Take your time and answer what you understand.");
+      const generated = await ai.generate(questionSchema,
+        "Rephrase the current question in plain language, preserving its technical meaning, difficulty, and constraints. Explain ambiguous wording only. Do not give hints, solutions, an example answer, or a new question. Ask ONE question. Use the same language as the current question.",
+        { role: session.setup.role, currentQuestion: session.currentQuestion });
+      const clarified = questionSchema.parse(generated.value);
+      session.clarifications[expectedTurn] = used + 1;
+      save(session.id, session);
+      recordUsage(req.user.id, generated.usage);
+      res.json({ question: clarified.question });
+    }));
   app.post("/api/interviews/:id/answers", auth, async (req, res) =>
     locked(req.user.id, async () => {
       const input = answerSchema.parse(req.body);

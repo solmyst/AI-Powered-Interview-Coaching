@@ -2240,6 +2240,8 @@ details p {
     padding: 10px;
     font-size: 11px;
   }
+  .call-controls .round-control, .call-controls .hang-up { width: 40px; height: 40px; }
+  .call-controls .active-mic span { display: none; }
   .turn-state-slot {
     min-height: 48px;
     font-size: 12px;
