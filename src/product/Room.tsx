@@ -60,6 +60,7 @@ export function Room({
   const spoken = useRef({ words: 0, fillers: 0 });
   const deliveredTurn = useRef(-1);
   const reportStarted = useRef(false);
+  const callEnded = useRef(false);
   const callStartedAt = useRef(0);
   const sharedStream = useRef<MediaStream | null>(null);
   const previewVideo = useRef<HTMLVideoElement>(null);
@@ -78,6 +79,7 @@ export function Room({
   const [briefingError, setBriefingError] = useState("");
 
   async function submitSpokenAnswer(text: string) {
+    if (callEnded.current) return;
     const answer = text.trim().slice(0, 8000);
     if (answer.length < 2) {
       setError("I couldn’t hear a complete answer. Try that response again.");
@@ -229,6 +231,7 @@ export function Room({
     setLastAnswer("");
     setError("");
     voice.speak(question, () => {
+      if (callEnded.current) return;
       setPhase("listening");
       void transcription.record({
         autoStop: true,
@@ -247,10 +250,12 @@ export function Room({
   useEffect(() => {
     if (session.state !== "report_pending" || reportStarted.current) return;
     reportStarted.current = true;
+    callEnded.current = true;
     setPhase("complete");
     setBriefingError("");
     voice.stop();
     transcription.cancel();
+    sharedStream.current?.getTracks().forEach((track) => track.stop());
     void api<Session>(`/interviews/${session.id}/report`, {
       method: "POST",
       body: "{}",
@@ -271,8 +276,12 @@ export function Room({
   }
 
   async function endInterview() {
+    if (reportStarted.current || phase === "thinking" || phase === "transcribing") return;
+    reportStarted.current = true;
+    callEnded.current = true;
     voice.stop();
     transcription.cancel();
+    sharedStream.current?.getTracks().forEach((track) => track.stop());
     if (!session.turns.length) {
       back();
       return;
@@ -288,6 +297,7 @@ export function Room({
         }),
       );
     } catch (reason) {
+      reportStarted.current = false;
       setBriefingError((reason as Error).message);
     }
   }
@@ -419,7 +429,7 @@ export function Room({
             aria-live="polite"
           >
             <span>{phase === "thinking" ? "MAYA IS PREPARING YOUR FOLLOW-UP" : "MAYA ASKS"}</span>
-            <h1>{phase === "thinking" ? "Thank you. Give me a moment to consider that." : question}</h1>
+            <h1>{question}</h1>
           </div>
           <div className="turn-state-slot" aria-live="polite">
             {phase === "listening" && (
@@ -467,16 +477,16 @@ export function Room({
             Done speaking
           </button>
         )}
-        <button className="hang-up" onClick={() => void endInterview()} aria-label="End interview">
+        <button className="hang-up" disabled={phase === "thinking" || phase === "transcribing" || phase === "complete"} onClick={() => void endInterview()} aria-label="End interview" title={phase === "thinking" || phase === "transcribing" ? "Saving your answer before ending the interview" : "End interview and prepare briefing"}>
           <PhoneOff />
         </button>
       </footer>
       {phase === "complete" && (
-        <div className="briefing-overlay" role="status" aria-live="polite">
+        <div className="briefing-overlay" role="dialog" aria-modal="true" aria-labelledby="briefing-title">
           <div className="briefing-card">
             <span className="briefing-mark"><Check size={28} /></span>
             <p className="eyebrow">SESSION SAVED</p>
-            <h2>Interview complete</h2>
+            <h2 id="briefing-title" tabIndex={-1} ref={(element) => element?.focus()}>Interview complete</h2>
             {briefingError ? (
               <>
                 <p>We couldn’t prepare your briefing yet. Your answers are safe.</p>
@@ -484,6 +494,7 @@ export function Room({
                 <button className="primary" onClick={() => void endInterview()}>
                   Try preparing briefing again
                 </button>
+                <button className="text-button" onClick={back}>Return to dashboard</button>
               </>
             ) : (
               <>

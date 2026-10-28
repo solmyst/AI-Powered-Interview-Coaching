@@ -1715,6 +1715,7 @@ details p {
   background: #7eb187;
 }
 .interview-call-shell {
+  position: relative;
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
@@ -2078,6 +2079,19 @@ details p {
   color: #f0b7a9 !important;
   font-size: 12px;
 }
+.briefing-card .text-button { display: block; margin: 16px auto 0; color: #c7cec2; }
+.briefing-card h2:focus { outline: none; }
+.interview-call-shell > .call-error {
+  position: absolute;
+  z-index: 10;
+  left: 16px;
+  right: 16px;
+  bottom: 100px;
+  max-height: 25vh;
+  overflow: auto;
+  margin: 0;
+}
+.hang-up:disabled { opacity: 0.5; cursor: wait; }
 @keyframes briefingPulse {
   50% { transform: translateY(-5px); opacity: 0.45; }
 }
@@ -2101,7 +2115,7 @@ details p {
   }
   .call-stage {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(430px, 1fr) 220px;
+    grid-template-rows: minmax(0, 1fr);
   }
   .call-camera {
     width: 300px;
@@ -2124,7 +2138,8 @@ details p {
     grid-template-columns: 1fr;
   }
   .preflight-interviewer {
-    display: none;
+    min-height: 300px;
+    padding: 24px;
   }
   .preflight-actions {
     align-items: stretch;
@@ -2149,7 +2164,7 @@ details p {
     grid-template-rows: 1fr;
   }
   .interviewer-tile {
-    padding: 24px 16px 120px;
+    padding: 16px 12px 130px;
   }
   .interviewer-presence {
     width: 105px;
@@ -2164,7 +2179,27 @@ details p {
     margin-bottom: 24px;
   }
   .question-caption h1 {
-    font-size: 27px;
+    font-size: clamp(19px, 5vw, 27px);
+    letter-spacing: -0.6px;
+  }
+  .question-caption {
+    width: 100%;
+    min-height: 130px;
+    max-height: 26dvh;
+    flex-shrink: 0;
+  }
+  .call-controls {
+    gap: 8px;
+    padding: 12px 8px;
+    flex-wrap: wrap;
+  }
+  .call-controls .active-mic {
+    padding: 10px;
+    font-size: 11px;
+  }
+  .turn-state-slot {
+    min-height: 48px;
+    font-size: 12px;
   }
   .call-camera {
     width: 128px;
@@ -2183,6 +2218,7 @@ details p {
   .call-status i {
     animation: none !important;
   }
+  .briefing-progress i { animation: none !important; }
 }
 @media (prefers-reduced-motion: reduce) {
   * {

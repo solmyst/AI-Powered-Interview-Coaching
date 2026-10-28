@@ -130,5 +130,9 @@ test("camera renders real frames before and after joining the interview", async 
   await page.screenshot({ path: "test-results/camera-live-fixture.png", fullPage: true });
   await page.getByRole("button", { name: "End interview" }).click();
   await expect(page.getByRole("heading", { name: "Interview complete" })).toBeVisible();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect.poll(() => page.getByLabel("Your live camera preview").evaluate(
+    (video: HTMLVideoElement) => (video.srcObject as MediaStream)?.getTracks().every((track) => track.readyState === "ended"),
+  )).toBe(true);
   await expect(page.getByText("preparing your briefing", { exact: false })).toBeVisible();
 });
