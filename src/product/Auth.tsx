@@ -5,11 +5,13 @@ import type { User, Usage } from "./types";
 export function Auth({
   done,
   back,
+  initialRegister = true,
 }: {
   done: (user: User, usage: Usage) => void;
   back: () => void;
+  initialRegister?: boolean;
 }) {
-  const [register, setRegister] = useState(true);
+  const [register, setRegister] = useState(initialRegister);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -73,13 +75,14 @@ export function Auth({
         {register && (
           <label>
             Your name
-            <input name="name" autoComplete="name" required maxLength={80} />
+            <input name="name" disabled={busy} autoComplete="name" required maxLength={80} />
           </label>
         )}
         <label>
           Email address
           <input
             name="email"
+            disabled={busy}
             type="email"
             autoComplete="email"
             required
@@ -92,6 +95,7 @@ export function Auth({
             <input
               id="account-password"
               name="password"
+              disabled={busy}
               type={showPassword ? "text" : "password"}
               autoComplete={register ? "new-password" : "current-password"}
               required
@@ -133,7 +137,7 @@ export function Auth({
             ? "Already have an account? Sign in"
             : "New here? Create an account"}
         </button>
-        <button type="button" className="text-button" onClick={back}>
+        <button type="button" disabled={busy} className="text-button" onClick={back}>
           Back to home
         </button>
         <small>

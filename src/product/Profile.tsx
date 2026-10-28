@@ -64,6 +64,7 @@ export function Profile({
           Name
           <input
             required
+            disabled={busy}
             maxLength={80}
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -143,6 +144,7 @@ export function Profile({
         <label>
           Type DELETE to confirm
           <input
+            disabled={busy}
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             autoComplete="off"

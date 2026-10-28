@@ -34,6 +34,7 @@ export function RehearsalLab({ session, update, speechReady, transcriptionReady 
   const transcription = useTranscription((answer) => void submit(answer));
   const lab = session.rehearsals?.[turn];
   const attempt = lab?.attempts.length || 0;
+  const currentStep = lab ? Math.min(attempt + 1, 2) : 0;
   const capturing = transcription.status === "recording" || transcription.status === "requesting";
   const waiting = busy || voice.speaking || capturing || transcription.status === "transcribing";
   const question = attempt === 1 ? lab?.plan.transferQuestion : session.turns[turn]?.question.question;
@@ -106,7 +107,7 @@ export function RehearsalLab({ session, update, speechReady, transcriptionReady 
       <span className="lab-private">Private practice · original scores stay unchanged</span>
     </div>
     <ol className="lab-steps" aria-label="Answer Lab progress">
-      {["Find your focus", "Retry aloud", "Apply it elsewhere"].map((label, i) => <li key={label} aria-current={lab && attempt === i ? "step" : undefined} className={lab && attempt >= i ? "active" : ""}><span>{i + 1}</span>{label}</li>)}
+      {["Find your focus", "Retry aloud", "Apply it elsewhere"].map((label, i) => <li key={label} aria-current={attempt < 2 && currentStep === i ? "step" : undefined} className={currentStep >= i ? "active" : ""}><span>{i + 1}</span>{label}</li>)}
     </ol>
     <label className="lab-select">Choose an answer to work on
       <select value={turn} disabled={waiting} onChange={(e) => { cancelRecording(); setTurn(Number(e.target.value)); setError(""); setPendingAnswer(""); }}>
@@ -125,7 +126,7 @@ export function RehearsalLab({ session, update, speechReady, transcriptionReady 
         <p>{attempt === 0 ? "Use the three checkpoints below. Speak from your own experience; don’t invent achievements." : "Apply the same checkpoints to this new scenario. This tests application, not memorization."}</p>
         <div className="lab-actions">
           {!waiting && !pendingAnswer && <button className="primary" disabled={!transcriptionReady} onClick={practice}><Mic size={17} />{attempt ? "Try a new scenario" : "Retry aloud"}</button>}
-          {voice.speaking && <p role="status"><Volume2 size={17} /> Maya is speaking. Your microphone starts automatically.</p>}
+          {voice.speaking && <p role="status"><Volume2 size={17} /> {voice.preparing ? "Preparing Maya’s voice…" : "Maya is speaking. Your microphone starts automatically."}</p>}
           {capturing && <><p role="status"><Mic size={17} /> Listening. Finish naturally or select Done speaking.</p><button className="primary" onClick={transcription.stop}>Done speaking</button></>}
           {(voice.speaking || capturing) && <button className="secondary" onClick={cancelRecording}>Pause practice</button>}
           {(busy || transcription.status === "transcribing") && <p role="status">{busy ? "Checking your answer against the same checkpoints…" : "Understanding your answer…"}</p>}

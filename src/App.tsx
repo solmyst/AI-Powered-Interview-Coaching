@@ -29,6 +29,7 @@ import "./product/product.css";
 function App() {
   const [page, setPage] = useState<Page>("home");
   const [auth, setAuth] = useState(false);
+  const [authExpired, setAuthExpired] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [usage, setUsage] = useState<Usage>({
     used: 0,
@@ -76,6 +77,20 @@ function App() {
     setBookmarks(saved);
   }, []);
   useEffect(() => {
+    const expired = () => {
+      setUser(null);
+      setSession(null);
+      setSessions([]);
+      setBookmarks([]);
+      setPage("home");
+      setAuth(true);
+      setAuthExpired(true);
+      setError("Your session has expired. Sign in again to reopen your saved interviews.");
+    };
+    window.addEventListener("interviewace:session-expired", expired);
+    return () => window.removeEventListener("interviewace:session-expired", expired);
+  }, []);
+  useEffect(() => {
     refreshHealth();
     void api<{ user: User | null; usage: Usage | null }>("/auth/session")
       .then((result) => {
@@ -85,10 +100,12 @@ function App() {
           setPage("dashboard");
         }
       })
-      .catch(() => {})
+      .catch((reason) => setError((reason as Error).message))
       .finally(() => setLoading(false));
     // Remove old client-stored API configuration from previous prototype installations.
-    localStorage.removeItem("interview_ace_ai_config");
+    try { localStorage.removeItem("interview_ace_ai_config"); } catch {
+      // Privacy settings may disable localStorage; account access uses cookies.
+    }
   }, [refreshHealth]);
   useEffect(() => {
     if (user) void refresh().catch((err) => setError(err.message));
@@ -135,7 +152,7 @@ function App() {
   }
   const start = () => {
     if (user) navigate("setup");
-    else setAuth(true);
+    else { setAuthExpired(false); setAuth(true); }
   };
   if (loading)
     return (
@@ -177,6 +194,7 @@ function App() {
                   <button
                     key={p}
                     className={page === p ? "active" : ""}
+                    aria-current={page === p ? "page" : undefined}
                     onClick={() => navigate(p)}
                   >
                     <Icon size={16} />
@@ -212,7 +230,7 @@ function App() {
         {error && (
           <div className="wrap error" role="alert">
             {error}
-            <button
+            {user && <button
               className="text-button"
               onClick={() => {
                 setError("");
@@ -220,12 +238,14 @@ function App() {
               }}
             >
               Retry
-            </button>
+            </button>}
+            {!user && !authExpired && <button className="text-button" onClick={() => window.location.reload()}>Reload connection</button>}
           </div>
         )}
         {!user ? (
           auth ? (
             <Auth
+              initialRegister={!authExpired}
               back={() => setAuth(false)}
               done={(u, used) => {
                 setUser(u);

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Fixed clipped questions on short/landscape screens, self-view overlap on mobile, missing mobile question progress, and control-bar movement between speaking/listening states.
+- Added accessible briefing focus management and report-failure recovery; recording errors now pause the call, disconnected devices can reconnect, and stalled cloud speech falls back after 12 seconds.
+- Added actionable session-expiry/network errors, safe startup with blocked storage, submission-locked forms and corrected Answer Lab progress states.
 - Added the spoken Answer Lab: personalized checkpoints, an answer retry, a changed-scenario challenge, and a persisted side-by-side evidence review without changing original interview scores.
 - Verified coaching quotations against answer transcripts on the server, with one bounded repair attempt for invalid evidence and no partial save on failure.
 - Added pause/resume, question clarification, standalone spoken repeat/pause/clarify commands, and recovery when a saved-answer response is interrupted.

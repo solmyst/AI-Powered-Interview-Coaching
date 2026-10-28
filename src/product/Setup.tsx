@@ -36,13 +36,13 @@ export function Setup({
   const [error, setError] = useState("");
   const id = useRef(crypto.randomUUID());
   const update = (key: keyof SetupType, value: string | number) => {
-    setForm({ ...form, [key]: value });
+    setForm((current) => ({ ...current, [key]: value }));
     id.current = crypto.randomUUID();
   };
   const select = (label: string, key: keyof SetupType, options: string[]) => (
     <label>
       {label}
-      <select value={form[key]} onChange={(e) => update(key, e.target.value)}>
+      <select disabled={busy} value={form[key]} onChange={(e) => update(key, e.target.value)}>
         {options.map((s) => (
           <option key={s}>{s}</option>
         ))}
@@ -103,6 +103,7 @@ export function Setup({
                 Industry
                 <input
                   required
+                  disabled={busy}
                   maxLength={80}
                   value={form.industry}
                   onChange={(e) => update("industry", e.target.value)}
@@ -112,6 +113,7 @@ export function Setup({
                 Target company <small>optional</small>
                 <input
                   maxLength={100}
+                  disabled={busy}
                   placeholder="e.g. a fintech startup"
                   value={form.company}
                   onChange={(e) => update("company", e.target.value)}
@@ -137,6 +139,7 @@ export function Setup({
               Upload a text resume (.txt, up to 40 KB)
               <input
                 type="file"
+                disabled={busy}
                 accept=".txt,text/plain"
                 onChange={async (e) => {
                   const f = e.target.files?.[0];
@@ -150,7 +153,11 @@ export function Setup({
                     );
                     return;
                   }
-                  const text = await f.text();
+                  let text: string;
+                  try { text = await f.text(); } catch {
+                    setError("This file could not be read. Try another .txt file or paste your project highlights.");
+                    return;
+                  }
                   if (text.length > 10000) {
                     setError("Resume text must be under 10,000 characters.");
                     return;
@@ -164,6 +171,7 @@ export function Setup({
               Resume or project highlights
               <textarea
                 rows={5}
+                disabled={busy}
                 maxLength={10000}
                 placeholder="Your skills, projects, responsibilities, and impact…"
                 value={form.resume}
@@ -174,6 +182,7 @@ export function Setup({
               Job description
               <textarea
                 rows={4}
+                disabled={busy}
                 maxLength={6000}
                 placeholder="Paste the role requirements…"
                 value={form.jobDescription}
@@ -196,6 +205,7 @@ export function Setup({
             <label>
               Number of questions
               <select
+                disabled={busy}
                 value={form.questionCount}
                 onChange={(e) =>
                   update("questionCount", Number(e.target.value))
@@ -231,7 +241,7 @@ export function Setup({
               </button>
             )}
             <p className="muted">
-              {usage.limit - usage.used} of {usage.limit} daily sessions
+              {Math.max(0, usage.limit - usage.used)} of {usage.limit} daily sessions
               remaining
             </p>
             {error && (
@@ -248,7 +258,7 @@ export function Setup({
             </button>
             <small aria-live="polite">
               {busy
-                ? "Your model is thinking. Local generation may take up to two minutes."
+                ? "Maya is preparing a question for your role. This may take a little time. Your settings are saved for this request."
                 : "The call checks camera and microphone before joining. Spoken audio is sent to AssemblyAI for English/Hindi transcription; transcripts are shared with the configured AI provider."}
             </small>
           </div>
