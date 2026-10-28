@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Expanded CI to run camera/microphone regression tests using generated synthetic fixtures, include vision assets in builds, and retain browser diagnostics. Documented the separate manual Azure deployment process.
+- Pinned CI to Ubuntu 24.04 and reviewed Node 24 action revisions, removing deprecated action runtimes and persisted checkout credentials.
 - Fixed clipped questions on short/landscape screens, self-view overlap on mobile, missing mobile question progress, and control-bar movement between speaking/listening states.
 - Added accessible briefing focus management and report-failure recovery; recording errors now pause the call, disconnected devices can reconnect, and stalled cloud speech falls back after 12 seconds.
 - Added actionable session-expiry/network errors, safe startup with blocked storage, submission-locked forms and corrected Answer Lab progress states.
