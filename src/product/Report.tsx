@@ -1,4 +1,5 @@
 import { DeliveryReport } from "./DeliveryReport";
+import { RehearsalLab } from "./RehearsalLab";
 import { Bookmark as BookmarkIcon, Download, ArrowUpRight } from "lucide-react";
 import { download } from "./api";
 import type { Bookmark, Session } from "./types";
@@ -7,11 +8,17 @@ export function Report({
   bookmarks,
   toggle,
   start,
+  update,
+  speechReady,
+  transcriptionReady,
 }: {
   session: Session;
   bookmarks: Bookmark[];
   toggle: (id: string, turn: number, saved: boolean) => void;
   start: () => void;
+  update: (session: Session) => void;
+  speechReady: boolean;
+  transcriptionReady: boolean;
 }) {
   const report = session.report!;
   return (
@@ -50,6 +57,7 @@ export function Report({
         answered questions. Evidence measures support for claims, not personal
         confidence. Code was reviewed, not executed.
       </p>
+      <RehearsalLab key={session.id} session={session} update={update} speechReady={speechReady} transcriptionReady={transcriptionReady} />
       <DeliveryReport turns={session.turns} />
       <section className="panel">
         <h2>Your answer profile</h2>

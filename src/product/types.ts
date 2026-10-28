@@ -89,6 +89,7 @@ export type Report = {
   }[];
 };
 export type Session = {
+  rehearsals?: Record<string, Rehearsal>;
   id: string;
   created: string;
   state: "active" | "report_pending" | "complete";
@@ -98,6 +99,25 @@ export type Session = {
   report: Report | null;
   model: string;
   provider: string;
+};
+export type Observation = {
+  status: "demonstrated" | "partial" | "not_yet";
+  evidence: string | null;
+  reason: string;
+};
+export type Rehearsal = {
+  plan: {
+    focus: string;
+    coaching: string;
+    checkpoints: { criterion: string; baseline: Observation }[];
+    transferQuestion: string;
+  };
+  attempts: {
+    stage: "retry" | "transfer";
+    question: string;
+    answer: string;
+    result: { summary: string; checks: Observation[]; nextStep: string };
+  }[];
 };
 export type Summary = {
   id: string;

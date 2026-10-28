@@ -276,6 +276,9 @@ function App() {
             {page === "report" && session?.report && (
               <Report
                 session={session}
+                update={setSession}
+                speechReady={Boolean(health?.speech.ready)}
+                transcriptionReady={Boolean(health?.transcription.ready)}
                 bookmarks={bookmarks}
                 toggle={toggle}
                 start={start}
