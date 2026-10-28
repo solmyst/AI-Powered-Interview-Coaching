@@ -47,7 +47,13 @@ const ai = {
       throw Object.assign(new Error("Provider unavailable"), { status: 503 });
     const shape = schema.shape;
     return {
-      value: shape.nextQuestion
+      value: shape.checkpoints
+        ? { focus: "Consistency trade-offs", coaching: "Explain how a write invalidates stale data.",
+            checkpoints: ["Expiry", "Write handling", "Trade-offs"].map((criterion) => ({ criterion, baseline: { status: "partial", evidence: "TTL", reason: "Expiry mentioned." } })),
+            transferQuestion: "What changes when two regions write at once?" }
+        : shape.checks
+        ? { summary: "Write handling is now explicit.", checks: [0, 1, 2].map(() => ({ status: "demonstrated", evidence: "invalidate", reason: "Names write invalidation." })), nextStep: "Explain a concurrent write." }
+        : shape.nextQuestion
         ? { evaluation, nextQuestion: question }
         : shape.scores
           ? evaluation
@@ -144,6 +150,39 @@ const create = (cookie, id = crypto.randomUUID()) =>
     body: setup,
     headers: { "Idempotency-Key": id },
   });
+test("Answer Lab persists retry and transfer, enforces ownership, deduplicates and preserves interview scores", async () => {
+  const a = await account("lab@example.test"), b = await account("lab-other@example.test");
+  const created = await create(a.cookie);
+  const id = created.body.id;
+  const path = `/interviews/${id}/rehearsal/0`;
+  assert.equal((await request(path, { method: "POST", cookie: a.cookie, body: {} })).status, 409);
+  for (let i = 0; i < 3; i++) await request(`/interviews/${id}/answers`, {
+    method: "POST", cookie: a.cookie, body: { answer: "Use a TTL to expire stale entries.", expectedTurn: i },
+  });
+  await request(`/interviews/${id}/report`, { method: "POST", cookie: a.cookie, body: {} });
+  assert.equal((await request(path, { method: "POST", cookie: b.cookie, body: {} })).status, 404);
+  assert.equal((await request(path, { method: "POST", body: {} })).status, 401);
+  const plan = await request(path, { method: "POST", cookie: a.cookie, body: {} });
+  assert.equal(plan.status, 200);
+  assert.equal(plan.body.rehearsals[0].plan.checkpoints.length, 3);
+  const previousCalls = calls;
+  await request(path, { method: "POST", cookie: a.cookie, body: {} });
+  assert.equal(calls, previousCalls);
+  badAI = true;
+  const failed = await request(path + "/answers", { method: "POST", cookie: a.cookie, body: { answer: "I invalidate on write.", expectedAttempt: 0 } });
+  badAI = false;
+  assert.equal(failed.status, 503);
+  assert.equal((await request(`/interviews/${id}`, { cookie: a.cookie })).body.rehearsals[0].attempts.length, 0);
+  for (const expectedAttempt of [0, 1]) {
+    const result = await request(path + "/answers", { method: "POST", cookie: a.cookie, body: { answer: "I invalidate on write.", expectedAttempt } });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.rehearsals[0].attempts[expectedAttempt].stage, expectedAttempt ? "transfer" : "retry");
+    assert.equal(result.body.report.overall, 65);
+  }
+  assert.equal((await request(path + "/answers", { method: "POST", cookie: a.cookie, body: { answer: "duplicate", expectedAttempt: 1 } })).status, 409);
+  assert.equal((await request(`/interviews/${id}/rehearsal/7`, { method: "POST", cookie: a.cookie, body: {} })).status, 404);
+  assert.equal((await request("/me", { cookie: a.cookie })).body.usage.used, 1);
+});
 test("production trusts exactly one reverse proxy hop", () => {
   const production = createApp({
     env: {

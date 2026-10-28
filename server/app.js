@@ -16,6 +16,7 @@ import { openDatabase } from "./db.js";
 import { createAI, ServiceError } from "./ai.js";
 import { createTranscriber } from "./transcription.js";
 import { createSpeech } from "./speech.js";
+import { registerRehearsal } from "./rehearsal.js";
 import {
   setupSchema,
   answerSchema,
@@ -317,6 +318,7 @@ export function createApp({
       previousWeaknesses: session.previousWeaknesses,
     };
   }
+  registerRehearsal(app, { auth, locked, owned, save, recordUsage, ai });
   app.get("/api/interviews", auth, (req, res) => {
     const sessions = db
       .prepare(
