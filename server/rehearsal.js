@@ -33,6 +33,21 @@ export function verifyEvidence(observations, answer) {
   }
 }
 
+export async function generateVerified(ai, schema, task, context, answer, observations) {
+  let usage = { input: 0, output: 0 };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const generated = await ai.generate(schema, task + (attempt ? " IMPORTANT: Your previous response failed exact-quote validation. Copy evidence directly from the supplied answer in its ORIGINAL SCRIPT, including Hindi. Do not translate, paraphrase, combine separate passages, or add punctuation. Use a shorter exact substring if needed. If no supporting quote exists, use status not_yet and evidence null." : ""), context);
+    usage = { input: usage.input + generated.usage.input, output: usage.output + generated.usage.output };
+    const value = schema.parse(generated.value);
+    try {
+      verifyEvidence(observations(value), answer);
+      return { value, usage };
+    } catch (reason) {
+      if (attempt) throw reason;
+    }
+  }
+}
+
 export function registerRehearsal(app, { auth, locked, owned, save, recordUsage, ai }) {
   app.post("/api/interviews/:id/rehearsal/:turn", auth, async (req, res) =>
     locked(req.user.id, async () => {
@@ -43,9 +58,10 @@ export function registerRehearsal(app, { auth, locked, owned, save, recordUsage,
       if (!turn) throw new ServiceError(404, "Answer not found.");
       session.rehearsals ||= {};
       if (session.rehearsals[index]) return res.json(session);
-      const generated = await ai.generate(rehearsalPlanSchema,
+      const generated = await generateVerified(ai, rehearsalPlanSchema,
         "Build a focused Answer Lab for this specific answer. Pick ONE important weakness, give a short actionable coaching cue without supplying a script, and define exactly THREE observable checkpoints that apply to both a retry and a new scenario. Evaluate the original answer against each checkpoint. evidence must be an EXACT contiguous quote from the original answer, or null when evidence is absent. demonstrated/partial REQUIRE a quote. not_yet means not observed, not proof of inability. Create one NEW transferQuestion testing the same skill with a changed constraint; do not repeat the original question. Do not infer confidence or personality. Use the language of the candidate's answer, keeping technical terms natural.",
-        { role: session.setup.role, track: session.setup.track, difficulty: session.setup.difficulty, ...turn });
+        { role: session.setup.role, track: session.setup.track, difficulty: session.setup.difficulty, ...turn },
+        turn.answer, (plan) => plan.checkpoints.map((c) => c.baseline));
       const plan = rehearsalPlanSchema.parse(generated.value);
       verifyEvidence(plan.checkpoints.map((c) => c.baseline), turn.answer);
       session.rehearsals[index] = { plan, attempts: [], created: new Date().toISOString() };
@@ -65,9 +81,10 @@ export function registerRehearsal(app, { auth, locked, owned, save, recordUsage,
         throw new ServiceError(409, "This attempt is already saved. Reopen your report to continue.");
       const stage = lab.attempts.length === 0 ? "retry" : "transfer";
       const question = stage === "retry" ? session.turns[index].question.question : lab.plan.transferQuestion;
-      const generated = await ai.generate(rehearsalResultSchema,
+      const generated = await generateVerified(ai, rehearsalResultSchema,
         "Evaluate this spoken practice answer against the provided THREE checkpoints, in EXACTLY the same order. Return checks with an EXACT contiguous quote from the submitted answer for every demonstrated/partial observation. Use null if no evidence. Evaluate substance, not verbosity or accent. Do not assume improvement. Do not award points for repeating coaching language without explaining it. Summarize what THIS answer demonstrates; earlier observations are compared separately in the UI. Transfer tests application in a new scenario, not a comparable numeric score. Give one practical nextStep. Use the language of the answer. Never invent experience or claim code execution.",
-        { role: session.setup.role, stage, question, checkpoints: lab.plan.checkpoints.map((c) => c.criterion), answer: input.answer });
+        { role: session.setup.role, stage, question, checkpoints: lab.plan.checkpoints.map((c) => c.criterion), answer: input.answer },
+        input.answer, (result) => result.checks);
       const result = rehearsalResultSchema.parse(generated.value);
       verifyEvidence(result.checks, input.answer);
       lab.attempts.push({ stage, question, answer: input.answer, result, created: new Date().toISOString() });
