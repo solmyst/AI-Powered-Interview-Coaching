@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 test("camera renders real frames before and after joining the interview", async ({ page }) => {
   const id = "camera-acceptance";
@@ -99,9 +100,12 @@ test("camera renders real frames before and after joining the interview", async 
   }));
   await page.route(`**/api/interviews/${id}`, (route) => route.fulfill({ json: session }));
   await page.route(`**/api/interviews/${id}/clarify`, (route) => route.fulfill({ json: { question: "Tell me about a bug in your project and how you fixed it." } }));
+  let reportRequests = 0;
   await page.route(`**/api/interviews/${id}/report`, async (route) => {
+    reportRequests++;
     await new Promise((resolve) => setTimeout(resolve, 1200));
-    await route.fulfill({ json: { ...session, state: "complete", currentQuestion: null, report: { summary: "Fixture" } } });
+    if (reportRequests === 1) return route.fulfill({ status: 503, json: { error: "The briefing service is temporarily unavailable." } });
+    await route.fulfill({ json: { ...session, state: "complete", currentQuestion: null, report: { summary: "Fixture", overall: 65, answered: 1, scores: {}, strengths: [], improvements: [], studyPlan: [] } } });
   });
   await page.route("**/api/transcribe", (route) => route.fulfill({
     status: 200,
@@ -131,6 +135,27 @@ test("camera renders real frames before and after joining the interview", async 
   await page.screenshot({ path: "test-results/camera-live-fixture.png", fullPage: true });
   await page.getByRole("button", { name: "Pause interview", exact: true }).click();
   await expect(page.getByText("Paused · take your time", { exact: true })).toBeVisible();
+  expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze()).violations).toEqual([]);
+  for (const [width, height] of [[320, 480], [320, 568], [320, 740], [390, 844], [768, 650], [1024, 600], [844, 390]]) {
+    await page.setViewportSize({ width, height });
+    const layout = await page.evaluate(() => {
+      const tile = document.querySelector(".interviewer-tile")!.getBoundingClientRect();
+      const question = document.querySelector(".question-caption")!.getBoundingClientRect();
+      const controls = document.querySelector(".call-controls")!.getBoundingClientRect();
+      return { tileTop: tile.top, tileBottom: tile.bottom, questionTop: question.top, questionBottom: question.bottom, controlsBottom: controls.bottom, overflow: document.documentElement.scrollWidth > innerWidth };
+    });
+    expect(layout.overflow, `${width}x${height}: horizontal overflow`).toBe(false);
+    expect(layout.questionTop, `${width}x${height}: question clipped above tile`).toBeGreaterThanOrEqual(layout.tileTop);
+    expect(layout.questionBottom, `${width}x${height}: question clipped below tile`).toBeLessThanOrEqual(layout.tileBottom);
+    expect(layout.controlsBottom, `${width}x${height}: controls below viewport`).toBeLessThanOrEqual(height);
+    await expect(page.getByRole("button", { name: "End interview" })).toBeInViewport();
+    if (width === 390 || height === 390) await page.screenshot({ path: `test-results/call-${width}x${height}.png` });
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.getByRole("button", { name: "Turn camera off", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Enable camera coaching", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Enable camera coaching", exact: true }).click();
+  await expect.poll(() => page.getByLabel("Your live camera preview").evaluate((video: HTMLVideoElement) => video.videoWidth)).toBe(640);
   await page.getByRole("button", { name: "Resume interview", exact: true }).click();
   await expect(page.getByText("Listening to you", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Clarify question", exact: true }).click();
@@ -144,4 +169,14 @@ test("camera renders real frames before and after joining the interview", async 
     (video: HTMLVideoElement) => (video.srcObject as MediaStream)?.getTracks().every((track) => track.readyState === "ended"),
   )).toBe(true);
   await expect(page.getByText("preparing your briefing", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Try preparing briefing again" })).toBeVisible();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Try preparing briefing again" })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(page.getByRole("button", { name: "Return to dashboard", exact: true })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByRole("button", { name: "Try preparing briefing again" }).click();
+  await expect(page.getByRole("heading", { name: "Practice with a purpose." })).toBeVisible();
+  expect(reportRequests).toBe(2);
 });

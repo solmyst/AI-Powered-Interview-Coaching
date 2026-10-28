@@ -41,11 +41,13 @@ export function useVoice(
   appendRef.current = append;
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [preparing, setPreparing] = useState(false);
   const [error, setError] = useState("");
   const engine =
     (window as unknown as VoiceWindow).SpeechRecognition ||
     (window as unknown as VoiceWindow).webkitSpeechRecognition;
   function stop() {
+    setPreparing(false);
     speechGeneration.current++;
     speechRequest.current?.abort();
     speechRequest.current = null;
@@ -105,6 +107,7 @@ export function useVoice(
   }
   function speakWithBrowser(text: string, generation: number, onDone?: () => void) {
     if (generation !== speechGeneration.current) return;
+    setPreparing(false);
     if (!window.speechSynthesis) {
       setError("Spoken questions are unavailable. Read the question on screen.");
       setSpeaking(false);
@@ -113,6 +116,7 @@ export function useVoice(
     }
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = /[\u0900-\u097f]/.test(text) ? "hi-IN" : "en-IN";
     utterance.rate = 0.95;
     utterance.onend = () => {
       if (generation !== speechGeneration.current) return;
@@ -140,18 +144,20 @@ export function useVoice(
       return;
     }
     const controller = new AbortController();
+    setPreparing(true);
     speechRequest.current = controller;
     let usedFallback = false;
     const fallback = () => {
       if (usedFallback) return;
       usedFallback = true;
+      audio.current?.pause();
       speakWithBrowser(text, generation, onDone);
     };
     void fetch("/api/speech", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
-      signal: controller.signal,
+      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12000)]),
     })
       .then(async (response) => {
         if (!response.ok) throw new Error("Cloud speech unavailable");
@@ -159,6 +165,7 @@ export function useVoice(
       })
       .then((blob) => {
         if (generation !== speechGeneration.current) return;
+        setPreparing(false);
         audioUrl.current = URL.createObjectURL(blob);
         const player = new Audio(audioUrl.current);
         audio.current = player;
@@ -177,6 +184,7 @@ export function useVoice(
   }
   useEffect(
     () => () => {
+      speechGeneration.current++;
       const rec = recognition.current;
       if (rec) {
         rec.onresult = null;
@@ -194,6 +202,7 @@ export function useVoice(
   return {
     listening,
     speaking,
+    preparing,
     error,
     available: Boolean(engine),
     dictate,

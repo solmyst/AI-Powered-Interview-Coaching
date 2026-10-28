@@ -17,6 +17,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { api } from "./api";
+import { BriefingDialog } from "./BriefingDialog";
 import { useVoice } from "./useVoice";
 import { useTranscription } from "./speech/useTranscription";
 import { CameraCoach } from "./vision/CameraCoach";
@@ -218,14 +219,16 @@ export function Room({
       }
       const cameraTrack = stream.getVideoTracks()[0];
       setCameraLabel(cameraTrack?.label || "Camera connected");
-      cameraTrack?.addEventListener(
+      stream.getTracks().forEach((track) => track.addEventListener(
         "ended",
         () => {
+          if (callEnded.current) return;
           setMediaState("error");
-          setMediaError("The camera disconnected. Reconnect it and retry the device check.");
+          setMediaError("A camera or microphone disconnected. Reconnect your devices to continue.");
+          if (callStartedAt.current) pauseInterview();
         },
         { once: true },
-      );
+      ));
       setMediaState("ready");
     } catch (reason) {
       setMediaState("error");
@@ -282,7 +285,11 @@ export function Room({
   useEffect(() => {
     if (transcription.status === "transcribing") setPhase("transcribing");
     if (transcription.status === "recording") setPhase("listening");
-  }, [transcription.status]);
+    if (transcription.error && !callEnded.current) {
+      paused.current = true;
+      setPhase("paused");
+    }
+  }, [transcription.status, transcription.error]);
 
   useEffect(() => {
     if (session.state !== "report_pending" || reportStarted.current) return;
@@ -375,7 +382,7 @@ export function Room({
   }
 
   const status = clarifying ? "Clarifying your question" : phase === "paused" ? "Paused · take your time" :
-    phase === "interviewer"
+    phase === "interviewer" && voice.preparing ? "Preparing interviewer audio" : phase === "interviewer"
       ? "Interviewer speaking"
       : phase === "listening"
         ? "Listening to you"
@@ -486,7 +493,7 @@ export function Room({
         </div>
       </header>
 
-      <main className="call-stage">
+      <div className="call-stage">
         <section className="interviewer-tile" aria-label="AI interviewer">
           <div className={`interviewer-presence ${phase === "interviewer" ? "speaking" : ""}`}>
             <div className="voice-ring ring-one" />
@@ -521,12 +528,12 @@ export function Room({
           turn={session.turns.length}
           onSummary={(summary) => { visual.current = summary; }}
         />
-      </main>
+      </div>
 
-      {(error || transcription.error || voice.error) && (
+      {(mediaError || error || transcription.error || voice.error) && (
         <div className="call-error" role="alert">
-          {error || transcription.error || voice.error}
-          <button onClick={() => answerPending ? void submitSpokenAnswer(lastAnswer) : repeatQuestion()}>{answerPending ? "Retry saving my answer" : "Retry this question"}</button>
+          {mediaError || error || transcription.error || voice.error}
+          {mediaError ? <button disabled={mediaState === "requesting"} onClick={() => void requestMedia()}>{mediaState === "requesting" ? "Reconnecting…" : "Reconnect camera & microphone"}</button> : <button onClick={() => answerPending ? void submitSpokenAnswer(lastAnswer) : repeatQuestion()}>{answerPending ? "Retry saving my answer" : "Retry this question"}</button>}
         </div>
       )}
 
@@ -544,43 +551,17 @@ export function Room({
         ><RotateCcw /></button>
         <button className="round-control" disabled={phase === "thinking" || phase === "transcribing" || phase === "complete" || clarifying || answerPending} onClick={() => phase === "paused" ? resumeInterview() : pauseInterview()} aria-label={phase === "paused" ? "Resume interview" : "Pause interview"}>{phase === "paused" ? <Play /> : <Pause />}</button>
         <button className="round-control" disabled={phase === "thinking" || phase === "transcribing" || phase === "complete" || clarifying || answerPending} onClick={() => void clarifyQuestion()} aria-label="Clarify question"><MessageCircle /></button>
-        <div className="active-mic" aria-label="Microphone is automatic">
-          <Mic /><span>{phase === "listening" ? "Mic live" : "Mic paused"}</span>
+        <div className="active-mic" aria-label={transcription.status === "recording" ? "Microphone is recording" : "Microphone is paused"}>
+          <Mic /><span>{transcription.status === "recording" ? "Mic live" : "Mic paused"}</span>
         </div>
-        {phase === "listening" && (
-          <button className="done-speaking" onClick={transcription.stop}>
+          <button className="done-speaking" disabled={transcription.status !== "recording" || phase !== "listening"} onClick={transcription.stop}>
             Done speaking
           </button>
-        )}
         <button className="hang-up" disabled={phase === "thinking" || phase === "transcribing" || phase === "complete" || clarifying || answerPending} onClick={() => void endInterview()} aria-label="End interview" title={phase === "thinking" || phase === "transcribing" ? "Saving your answer before ending the interview" : "End interview and prepare briefing"}>
           <PhoneOff />
         </button>
       </footer>
-      {phase === "complete" && (
-        <div className="briefing-overlay" role="dialog" aria-modal="true" aria-labelledby="briefing-title">
-          <div className="briefing-card">
-            <span className="briefing-mark"><Check size={28} /></span>
-            <p className="eyebrow">SESSION SAVED</p>
-            <h2 id="briefing-title" tabIndex={-1} ref={(element) => element?.focus()}>Interview complete</h2>
-            {briefingError ? (
-              <>
-                <p>We couldn’t prepare your briefing yet. Your answers are safe.</p>
-                <p className="briefing-error">{briefingError}</p>
-                <button className="primary" onClick={() => void endInterview()}>
-                  Try preparing briefing again
-                </button>
-                <button className="text-button" onClick={back}>Return to dashboard</button>
-              </>
-            ) : (
-              <>
-                <p>Maya is preparing your briefing, answer feedback, and next-step study plan.</p>
-                <div className="briefing-progress"><i /><i /><i /></div>
-                <small>This usually takes a few seconds. Please keep this window open.</small>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {phase === "complete" && <BriefingDialog error={briefingError} retry={() => void endInterview()} back={back} />}
     </div>
   );
 }

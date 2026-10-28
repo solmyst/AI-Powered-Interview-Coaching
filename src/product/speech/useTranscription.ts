@@ -57,6 +57,7 @@ export function useTranscription(append: (text: string) => void) {
   }
 
   function cancel() {
+    setError("");
     epoch.current++;
     if (recorder.current) {
       recorder.current.onstop = null;
@@ -113,6 +114,8 @@ export function useTranscription(append: (text: string) => void) {
     setStatus("requesting");
     const generation = epoch.current;
     try {
+      if (typeof MediaRecorder === "undefined" || typeof AudioContext === "undefined")
+        throw new Error("Voice recording is unavailable in this browser. Try an up-to-date Chrome, Edge, or Safari browser.");
       const acquired = options.mediaStream
         ? new MediaStream(options.mediaStream.getAudioTracks())
         : await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -135,6 +138,8 @@ export function useTranscription(append: (text: string) => void) {
           void transcribe(chunks, nextRecorder.mimeType, generation);
       };
       nextRecorder.onerror = () => {
+        nextRecorder.onstop = null;
+        if (nextRecorder.state !== "inactive") nextRecorder.stop();
         release();
         setError("Microphone recording failed. Please retry.");
         setStatus("error");
@@ -178,12 +183,19 @@ export function useTranscription(append: (text: string) => void) {
         if (nextRecorder.state === "recording") nextRecorder.stop();
       }, 120000);
     } catch (reason) {
+      if (recorder.current) {
+        recorder.current.onstop = null;
+        if (recorder.current.state !== "inactive") recorder.current.stop();
+        recorder.current = null;
+      }
       release();
-      setStatus("ready");
+      setStatus("error");
       setError(
         reason instanceof DOMException && reason.name === "NotAllowedError"
           ? "Microphone permission was denied. Allow it in browser settings, then retry."
-          : "No usable microphone was found. Connect one, then retry.",
+          : reason instanceof Error && !(reason instanceof DOMException)
+            ? reason.message
+            : "No usable microphone was found. Connect one, then retry.",
       );
     }
   }

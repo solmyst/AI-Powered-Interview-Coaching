@@ -110,6 +110,7 @@ export function CameraCoach({
           },
           audio: false,
         }));
+      acquired.getVideoTracks().forEach((track) => { track.enabled = true; });
       if (epoch !== generation.current) {
         if (!mediaStream) acquired.getTracks().forEach((t) => t.stop());
         return;
@@ -325,6 +326,7 @@ export function CameraCoach({
           className="secondary"
           onClick={() => {
             if (videoReady || status === "loading") {
+              mediaStream?.getVideoTracks().forEach((track) => { track.enabled = false; });
               cleanup();
               setLive(null);
               setStatus("off");
