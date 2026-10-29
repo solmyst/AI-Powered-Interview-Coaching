@@ -96,9 +96,9 @@ NVIDIA_API_KEY=configure_on_the_vm_only
 NVIDIA_MODEL=the_exact_catalog_model_id
 ASSEMBLYAI_API_KEY=configure_on_the_vm_only
 ASSEMBLYAI_MODEL=universal-3-5-pro
-ELEVENLABS_API_KEY=configure_on_the_vm_only
-ELEVENLABS_MODEL=eleven_v4_turbo
-ELEVENLABS_VOICE_ID=hpp4J3VqNfWAUOO0d1Us
+SARVAM_API_KEY=configure_on_the_vm_only
+SARVAM_MODEL=bulbul:v3
+SARVAM_VOICE=priya
 ```
 
 Install and start the service:

@@ -165,8 +165,8 @@ test("report and voice-first interview preflight layouts (test fixtures)", async
         },
         speech: {
           ready: false,
-          provider: "elevenlabs",
-          model: "eleven_v4_turbo",
+          provider: "sarvam",
+          model: "bulbul:v3",
           voiceId: "",
         },
       },

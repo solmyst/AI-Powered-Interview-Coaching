@@ -2,49 +2,77 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createSpeech } from "../server/speech.js";
 
-test("ElevenLabs TTS keeps credentials server-side and uses the bilingual realtime model", async () => {
+test("Sarvam TTS keeps credentials server-side and decodes bilingual WAV audio", async () => {
   let captured;
   const speech = createSpeech(
     {
-      ELEVENLABS_API_KEY: "test-key",
-      ELEVENLABS_MODEL: "eleven_v4_turbo",
-      ELEVENLABS_VOICE_ID: "voice123",
+      SARVAM_API_KEY: "test-key",
+      SARVAM_MODEL: "bulbul:v3",
+      SARVAM_VOICE: "priya",
     },
     {
       fetchImpl: async (url, options) => {
         captured = { url, options };
-        return new Response(new Uint8Array([1, 2, 3]), {
-          status: 200,
-          headers: { "Content-Type": "audio/mpeg" },
-        });
+        return Response.json({ audios: [Buffer.from("RIFF1234WAVEfmt ").toString("base64")] });
       },
     },
   );
 
   const result = await speech.synthesize("नमस्ते. Tell me about your project.");
-  assert.match(captured.url, /\/v1\/text-to-speech\/voice123\/stream/);
-  assert.equal(captured.options.headers["xi-api-key"], "test-key");
+  assert.equal(captured.url, "https://api.sarvam.ai/text-to-speech");
+  assert.equal(captured.options.headers["api-subscription-key"], "test-key");
   assert.deepEqual(JSON.parse(captured.options.body), {
     text: "नमस्ते. Tell me about your project.",
-    model_id: "eleven_v4_turbo",
+    language_code: "hi-IN",
+    model: "bulbul:v3",
+    speaker: "priya",
+    speech_sample_rate: 24000,
+    output_audio_codec: "wav",
+    pace: 1,
   });
-  assert.equal(result.contentType, "audio/mpeg");
-  assert.deepEqual([...result.audio], [1, 2, 3]);
+  assert.equal(result.contentType, "audio/wav");
+  assert.equal(Buffer.from(result.audio).toString(), "RIFF1234WAVEfmt ");
+  assert.equal(JSON.stringify(speech.status()).includes("test-key"), false);
 });
 
-test("ElevenLabs TTS reports readiness only with a key and voice", () => {
+test("Sarvam TTS reports readiness only with a key", async () => {
   assert.deepEqual(createSpeech({}).status(), {
-    provider: "elevenlabs",
-    model: "eleven_v4_turbo",
-    voiceId: "",
+    provider: "sarvam",
+    model: "bulbul:v3",
+    voiceId: "priya",
     ready: false,
   });
+  await assert.rejects(createSpeech({}).synthesize("Hello"), /not configured/);
 });
 
-test("ElevenLabs TTS sanitizes provider failures", async () => {
+test("Sarvam TTS sanitizes provider failures", async () => {
   const speech = createSpeech(
-    { ELEVENLABS_API_KEY: "secret", ELEVENLABS_VOICE_ID: "voice123" },
+    { SARVAM_API_KEY: "secret" },
     { fetchImpl: async () => new Response("provider detail", { status: 429 }) },
   );
   await assert.rejects(speech.synthesize("Question"), /busy/i);
+});
+
+test("Sarvam selects English for Latin text and respects configured voice", async () => {
+  let request;
+  const speech = createSpeech({ SARVAM_API_KEY: "key", SARVAM_VOICE: "neha" }, {
+    fetchImpl: async (_url, options) => {
+      request = JSON.parse(options.body);
+      return Response.json({ audios: [Buffer.from("RIFF1234WAVEfmt ").toString("base64")] });
+    },
+  });
+  await speech.synthesize("Describe your project.");
+  assert.equal(request.language_code, "en-IN");
+  assert.equal(request.speaker, "neha");
+});
+
+test("Sarvam rejects malformed audio and hides provider error details", async () => {
+  for (const response of [new Response("secret provider detail", { status: 403 }), Response.json({ audios: [] }), Response.json({ audios: ["not audio"] }), Response.json({ audios: [Buffer.from("not wav").toString("base64")] })]) {
+    const speech = createSpeech({ SARVAM_API_KEY: "secret" }, { fetchImpl: async () => response });
+    await assert.rejects(speech.synthesize("Question"), (error) => {
+      assert.equal(error.status, 503);
+      assert.doesNotMatch(error.message, /secret|provider detail/);
+      return true;
+    });
+  }
 });

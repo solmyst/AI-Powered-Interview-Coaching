@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 
-const health = { ready: true, provider: "fixture", model: "fixture", message: "Ready", transcription: { ready: true, provider: "assemblyai", model: "fixture" }, speech: { ready: false, provider: "elevenlabs", model: "fixture" } };
+const health = { ready: true, provider: "fixture", model: "fixture", message: "Ready", transcription: { ready: true, provider: "assemblyai", model: "fixture" }, speech: { ready: false, provider: "sarvam", model: "fixture" } };
 async function workspace(page: Page) {
   await page.route("**/api/health", (route) => route.fulfill({ json: health }));
   await page.route("**/api/auth/session", (route) => route.fulfill({ json: { user: { id: "recovery", name: "Browser Test", email: "fixture@example.test" }, usage: { used: 1, limit: 5 } } }));

@@ -77,8 +77,8 @@ const transcriber = {
 };
 const speech = {
   status: () => ({
-    provider: "elevenlabs",
-    model: "eleven_v4_turbo",
+    provider: "sarvam",
+    model: "bulbul:v3",
     voiceId: "fixture-voice",
     ready: true,
   }),

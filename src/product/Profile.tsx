@@ -106,7 +106,7 @@ export function Profile({
         <p>
           {health?.speech.ready
             ? `${health.speech.provider} / ${health.speech.model}`
-            : "Browser voice fallback (ElevenLabs is not configured)"}
+            : "Browser voice fallback (Sarvam is not configured)"}
         </p>
       </section>
       <section className="panel">

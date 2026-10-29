@@ -1,4 +1,4 @@
-const DEFAULT_MODEL = "eleven_v4_turbo";
+const DEFAULT_MODEL = "bulbul:v3";
 
 export class SpeechError extends Error {
   constructor(status, message) {
@@ -8,28 +8,36 @@ export class SpeechError extends Error {
 }
 
 export function createSpeech(env = process.env, { fetchImpl = fetch } = {}) {
-  const apiKey = env.ELEVENLABS_API_KEY?.trim();
-  const model = env.ELEVENLABS_MODEL?.trim() || DEFAULT_MODEL;
-  const voiceId = env.ELEVENLABS_VOICE_ID?.trim() || "";
+  const apiKey = env.SARVAM_API_KEY?.trim();
+  const model = env.SARVAM_MODEL?.trim() || DEFAULT_MODEL;
+  const voiceId = env.SARVAM_VOICE?.trim() || "priya";
   const ready = Boolean(apiKey && /^[A-Za-z0-9_-]{4,80}$/.test(voiceId));
 
   return {
-    status: () => ({ provider: "elevenlabs", model, voiceId, ready }),
+    status: () => ({ provider: "sarvam", model, voiceId, ready }),
     async synthesize(text) {
       if (!ready)
-        throw new SpeechError(503, "ElevenLabs speech is not configured yet.");
+        throw new SpeechError(503, "Sarvam speech is not configured yet.");
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 30000);
       try {
         const response = await fetchImpl(
-          `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/stream?output_format=mp3_44100_128&enable_logging=false`,
+          "https://api.sarvam.ai/text-to-speech",
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "xi-api-key": apiKey,
+              "api-subscription-key": apiKey,
             },
-            body: JSON.stringify({ text, model_id: model }),
+            body: JSON.stringify({
+              text,
+              language_code: /[\u0900-\u097f]/u.test(text) ? "hi-IN" : "en-IN",
+              model,
+              speaker: voiceId,
+              speech_sample_rate: 24000,
+              output_audio_codec: "wav",
+              pace: 1,
+            }),
             signal: controller.signal,
           },
         );
@@ -40,10 +48,14 @@ export function createSpeech(env = process.env, { fetchImpl = fetch } = {}) {
               ? "Interviewer speech is busy. Using the browser voice instead."
               : "Interviewer speech is temporarily unavailable.",
           );
-        return {
-          audio: new Uint8Array(await response.arrayBuffer()),
-          contentType: response.headers.get("content-type") || "audio/mpeg",
-        };
+        const result = await response.json();
+        const encoded = result?.audios?.[0];
+        if (typeof encoded !== "string" || !encoded.length || encoded.length > 16000000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded))
+          throw new SpeechError(503, "Interviewer speech returned invalid audio.");
+        const audio = Buffer.from(encoded, "base64");
+        if (audio.subarray(0, 4).toString() !== "RIFF" || audio.subarray(8, 12).toString() !== "WAVE")
+          throw new SpeechError(503, "Interviewer speech returned invalid audio.");
+        return { audio, contentType: "audio/wav" };
       } catch (error) {
         if (error instanceof SpeechError) throw error;
         throw new SpeechError(503, "Interviewer speech is temporarily unavailable.");

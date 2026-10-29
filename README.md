@@ -29,7 +29,7 @@ The API listens on loopback port 3001 and Vite proxies `/api` to it. SQLite is c
 - Dashboard, history, practice-score timeline, bookmarks and revision library. Recent report weaknesses inform new interviews.
 - A voice-first interview call: one preflight and Join action, then automatic spoken questions, automatic microphone capture, silence-based turn completion, AssemblyAI English/Hindi transcription, answer submission and adaptive follow-ups. There is no typed-answer form in the interview room.
 - A private camera tile with on-device MediaPipe face/pose landmarks and a separate delivery report for face visibility, approximate lens direction, framing and alignment. Video, frames and landmarks are never saved; InterviewAce does not retain raw audio.
-- AssemblyAI Universal-3.5 Pro Sync transcription and browser speech synthesis for the interviewer. Clear Speaking, Listening and Thinking states prevent turn-taking ambiguity.
+- AssemblyAI Universal-3.5 Pro Sync transcription and Sarvam interviewer speech, with browser speech synthesis as fallback. Clear Speaking, Listening and Thinking states prevent turn-taking ambiguity.
 - Self-reported confidence check-ins. The application deliberately does not claim to infer confidence or emotion from a face.
 - Profile edits, JSON export, individual interview deletion and full account deletion.
 - Durable daily session caps, request and sign-in rate limiting, same-origin mutation checks, schema validation, bounded AI concurrency, timeout handling, transient HTTP retries, token usage tracking and logs without answer bodies or credentials.
@@ -53,9 +53,9 @@ The original cream/clay palette and editorial typography are retained, with a qu
 | `NVIDIA_MODEL`          | Exact model ID available to the NVIDIA account                                      |
 | `ASSEMBLYAI_API_KEY`    | Server-only key required for spoken-answer transcription                            |
 | `ASSEMBLYAI_MODEL`      | `universal-3-5-pro`; English/Hindi Sync transcription                               |
-| `ELEVENLABS_API_KEY`    | Server-only key for the consistent Maya interviewer voice                           |
-| `ELEVENLABS_MODEL`      | `eleven_v4_turbo`; expressive low-latency multilingual TTS                          |
-| `ELEVENLABS_VOICE_ID`   | `hpp4J3VqNfWAUOO0d1Us` (Bella); browser TTS is the automatic fallback               |
+| `SARVAM_API_KEY`        | Server-only Sarvam key for the Maya interviewer voice                               |
+| `SARVAM_MODEL`          | `bulbul:v3`; English/Hindi and code-mixed speech                                     |
+| `SARVAM_VOICE`          | `priya`; browser TTS remains the automatic fallback                                 |
 | `NODE_ENV`              | Set to `production` on deployment for Secure cookies and HTTPS enforcement          |
 
 ### NVIDIA
