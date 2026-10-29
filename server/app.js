@@ -70,6 +70,7 @@ export function createApp({
           "script-src": ["'self'", "'wasm-unsafe-eval'"],
           "connect-src": ["'self'"],
           "worker-src": ["'self'", "blob:"],
+          "media-src": ["'self'", "blob:"],
           "style-src": [
             "'self'",
             "'unsafe-inline'",

@@ -203,6 +203,10 @@ test("production trusts exactly one reverse proxy hop", () => {
   assert.equal(production.app.get("trust proxy"), 1);
   production.db.close();
 });
+test("security policy permits generated audio blob playback without broad media origins", async () => {
+  const result = await request("/health");
+  assert.match(result.headers.get("content-security-policy"), /(?:^|;)media-src 'self' blob:(?:;|$)/);
+});
 test("authentication, session cookies, invalid credentials and CSRF", async () => {
   assert.equal((await request("/interviews")).status, 401);
   const a = await account("auth@example.test");
