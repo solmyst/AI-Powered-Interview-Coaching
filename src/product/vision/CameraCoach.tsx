@@ -205,8 +205,8 @@ export function CameraCoach({
               if (ctx) {
                 ctx.clearRect(0, 0, c.width, c.height);
                 if (overlayRef.current) {
-                  ctx.strokeStyle = "#a8e2ad";
-                  ctx.fillStyle = "#a8e2ad";
+                  ctx.strokeStyle = "#00aebb";
+                  ctx.fillStyle = "#00aebb";
                   ctx.lineWidth = 2;
                   for (const pair of [
                     [33, 133],

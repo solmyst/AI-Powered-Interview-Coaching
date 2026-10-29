@@ -257,4 +257,4 @@ Azure releases are currently manual, with a separately built release, the previo
 - Load testing, backup restore drills, privacy/retention review, and learning-outcome validation are still required before a broader public launch.
 - Billing and paid entitlements are deferred.
 
-See [the product roadmap](docs/ROADMAP.md), [Answer Lab design and evidence limits](docs/ANSWER-LAB.md), and [UI QA notes](docs/UI-QA-2026-10-28.md). The original cream/clay design and quiet green interview workspace are retained; `legacy/` preserves prototype code for reference.
+See [the product roadmap](docs/ROADMAP.md), [Answer Lab design and evidence limits](docs/ANSWER-LAB.md), and [UI QA notes](docs/UI-QA-2026-10-28.md). The interface uses Ink Black (`#031211`), Warm Ivory (`#E8E4D3`), and Electric Teal (`#00AEBB`), with darker teal for readable text on light surfaces. `legacy/` preserves prototype code for reference.

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Applied the Ink Black, Warm Ivory, and Electric Teal palette across the workspace, call room, reports, Answer Lab, and favicon, with contrasting text and keyboard focus treatments.
 - Updated Sarvam TTS to Bulbul v4 Flash with the compatible English/Hindi Simran customer persona.
 - Switched interviewer TTS to server-owned Sarvam Bulbul v3 with Priya, English/Hindi language selection, validated WAV decoding, and the existing browser-voice fallback.
 - Fixed production Content Security Policy blocking generated audio blob URLs, which prevented cloud interviewer speech from playing.

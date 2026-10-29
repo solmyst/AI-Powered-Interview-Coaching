@@ -43,15 +43,13 @@ body {
 }
 
 :root {
-  /* Terroir — solmyst signature palette */
-  --color-void: #0d0b09; /* warm near-black, dark bg */
-  --color-carbon: #1e1c19; /* dark surface, cards */
-  --color-ash: #4a4640; /* body text, light mode */
-  --color-mist: #9a9188; /* muted / secondary text */
-  --color-vellum: #eae4d9; /* elegant card/section bg */
-  --color-parchment: #f6f4f0; /* crisp editorial off-white, light page bg */
-  --color-clay: #be5f3c; /* ★ signature accent */
-  --color-clay-pale: #e5a88a; /* accent on dark bg */
+  --color-void: #031211;
+  --color-carbon: #0c2423;
+  --color-ash: #031211;
+  --color-mist: #4f625f;
+  --color-vellum: #d2e5df;
+  --color-parchment: #e8e4d3;
+  --color-teal: #00aebb;
 }
 
 @layer utilities {
