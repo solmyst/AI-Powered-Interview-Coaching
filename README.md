@@ -54,8 +54,8 @@ The original cream/clay palette and editorial typography are retained, with a qu
 | `ASSEMBLYAI_API_KEY`    | Server-only key required for spoken-answer transcription                            |
 | `ASSEMBLYAI_MODEL`      | `universal-3-5-pro`; English/Hindi Sync transcription                               |
 | `SARVAM_API_KEY`        | Server-only Sarvam key for the Maya interviewer voice                               |
-| `SARVAM_MODEL`          | `bulbul:v3`; English/Hindi and code-mixed speech                                     |
-| `SARVAM_VOICE`          | `priya`; browser TTS remains the automatic fallback                                 |
+| `SARVAM_MODEL`          | `bulbul:v4-flash`; English/Hindi and code-mixed speech                               |
+| `SARVAM_VOICE`          | `simran_enhi_customer`; bilingual female persona; browser TTS remains the fallback   |
 | `NODE_ENV`              | Set to `production` on deployment for Secure cookies and HTTPS enforcement          |
 
 ### NVIDIA

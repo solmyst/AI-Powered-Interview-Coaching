@@ -1,4 +1,4 @@
-const DEFAULT_MODEL = "bulbul:v3";
+const DEFAULT_MODEL = "bulbul:v4-flash";
 
 export class SpeechError extends Error {
   constructor(status, message) {
@@ -10,7 +10,7 @@ export class SpeechError extends Error {
 export function createSpeech(env = process.env, { fetchImpl = fetch } = {}) {
   const apiKey = env.SARVAM_API_KEY?.trim();
   const model = env.SARVAM_MODEL?.trim() || DEFAULT_MODEL;
-  const voiceId = env.SARVAM_VOICE?.trim() || "priya";
+  const voiceId = env.SARVAM_VOICE?.trim() || "simran_enhi_customer";
   const ready = Boolean(apiKey && /^[A-Za-z0-9_-]{4,80}$/.test(voiceId));
 
   return {

@@ -166,7 +166,7 @@ test("report and voice-first interview preflight layouts (test fixtures)", async
         speech: {
           ready: false,
           provider: "sarvam",
-          model: "bulbul:v3",
+          model: "bulbul:v4-flash",
           voiceId: "",
         },
       },

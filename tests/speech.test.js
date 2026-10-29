@@ -7,8 +7,8 @@ test("Sarvam TTS keeps credentials server-side and decodes bilingual WAV audio",
   const speech = createSpeech(
     {
       SARVAM_API_KEY: "test-key",
-      SARVAM_MODEL: "bulbul:v3",
-      SARVAM_VOICE: "priya",
+      SARVAM_MODEL: "bulbul:v4-flash",
+      SARVAM_VOICE: "simran_enhi_customer",
     },
     {
       fetchImpl: async (url, options) => {
@@ -24,8 +24,8 @@ test("Sarvam TTS keeps credentials server-side and decodes bilingual WAV audio",
   assert.deepEqual(JSON.parse(captured.options.body), {
     text: "नमस्ते. Tell me about your project.",
     language_code: "hi-IN",
-    model: "bulbul:v3",
-    speaker: "priya",
+    model: "bulbul:v4-flash",
+    speaker: "simran_enhi_customer",
     speech_sample_rate: 24000,
     output_audio_codec: "wav",
     pace: 1,
@@ -38,8 +38,8 @@ test("Sarvam TTS keeps credentials server-side and decodes bilingual WAV audio",
 test("Sarvam TTS reports readiness only with a key", async () => {
   assert.deepEqual(createSpeech({}).status(), {
     provider: "sarvam",
-    model: "bulbul:v3",
-    voiceId: "priya",
+    model: "bulbul:v4-flash",
+    voiceId: "simran_enhi_customer",
     ready: false,
   });
   await assert.rejects(createSpeech({}).synthesize("Hello"), /not configured/);
@@ -55,7 +55,7 @@ test("Sarvam TTS sanitizes provider failures", async () => {
 
 test("Sarvam selects English for Latin text and respects configured voice", async () => {
   let request;
-  const speech = createSpeech({ SARVAM_API_KEY: "key", SARVAM_VOICE: "neha" }, {
+  const speech = createSpeech({ SARVAM_API_KEY: "key", SARVAM_VOICE: "simran_en_customer" }, {
     fetchImpl: async (_url, options) => {
       request = JSON.parse(options.body);
       return Response.json({ audios: [Buffer.from("RIFF1234WAVEfmt ").toString("base64")] });
@@ -63,7 +63,8 @@ test("Sarvam selects English for Latin text and respects configured voice", asyn
   });
   await speech.synthesize("Describe your project.");
   assert.equal(request.language_code, "en-IN");
-  assert.equal(request.speaker, "neha");
+  assert.equal(request.model, "bulbul:v4-flash");
+  assert.equal(request.speaker, "simran_en_customer");
 });
 
 test("Sarvam rejects malformed audio and hides provider error details", async () => {

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Updated Sarvam TTS to Bulbul v4 Flash with the compatible English/Hindi Simran customer persona.
 - Switched interviewer TTS to server-owned Sarvam Bulbul v3 with Priya, English/Hindi language selection, validated WAV decoding, and the existing browser-voice fallback.
 - Fixed production Content Security Policy blocking generated audio blob URLs, which prevented cloud interviewer speech from playing.
 - Expanded CI to run camera/microphone regression tests using generated synthetic fixtures, include vision assets in builds, and retain browser diagnostics. Documented the separate manual Azure deployment process.

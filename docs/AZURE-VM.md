@@ -97,8 +97,8 @@ NVIDIA_MODEL=the_exact_catalog_model_id
 ASSEMBLYAI_API_KEY=configure_on_the_vm_only
 ASSEMBLYAI_MODEL=universal-3-5-pro
 SARVAM_API_KEY=configure_on_the_vm_only
-SARVAM_MODEL=bulbul:v3
-SARVAM_VOICE=priya
+SARVAM_MODEL=bulbul:v4-flash
+SARVAM_VOICE=simran_enhi_customer
 ```
 
 Install and start the service:
