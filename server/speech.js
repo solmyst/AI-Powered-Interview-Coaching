@@ -1,11 +1,5 @@
+import { ServiceError } from "./ai.js";
 const DEFAULT_MODEL = "bulbul:v4-flash";
-
-export class SpeechError extends Error {
-  constructor(status, message) {
-    super(message);
-    this.status = status;
-  }
-}
 
 export function createSpeech(env = process.env, { fetchImpl = fetch } = {}) {
   const apiKey = env.SARVAM_API_KEY?.trim();
@@ -17,7 +11,7 @@ export function createSpeech(env = process.env, { fetchImpl = fetch } = {}) {
     status: () => ({ provider: "sarvam", model, voiceId, ready }),
     async synthesize(text) {
       if (!ready)
-        throw new SpeechError(503, "Sarvam speech is not configured yet.");
+        throw new ServiceError(503, "Sarvam speech is not configured yet.");
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 30000);
       try {
@@ -42,7 +36,7 @@ export function createSpeech(env = process.env, { fetchImpl = fetch } = {}) {
           },
         );
         if (!response.ok)
-          throw new SpeechError(
+          throw new ServiceError(
             response.status === 429 ? 429 : 503,
             response.status === 429
               ? "Interviewer speech is busy. Using the browser voice instead."
@@ -51,14 +45,14 @@ export function createSpeech(env = process.env, { fetchImpl = fetch } = {}) {
         const result = await response.json();
         const encoded = result?.audios?.[0];
         if (typeof encoded !== "string" || !encoded.length || encoded.length > 16000000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded))
-          throw new SpeechError(503, "Interviewer speech returned invalid audio.");
+          throw new ServiceError(503, "Interviewer speech returned invalid audio.");
         const audio = Buffer.from(encoded, "base64");
         if (audio.subarray(0, 4).toString() !== "RIFF" || audio.subarray(8, 12).toString() !== "WAVE")
-          throw new SpeechError(503, "Interviewer speech returned invalid audio.");
+          throw new ServiceError(503, "Interviewer speech returned invalid audio.");
         return { audio, contentType: "audio/wav" };
       } catch (error) {
-        if (error instanceof SpeechError) throw error;
-        throw new SpeechError(503, "Interviewer speech is temporarily unavailable.");
+        if (error instanceof ServiceError) throw error;
+        throw new ServiceError(503, "Interviewer speech is temporarily unavailable.");
       } finally {
         clearTimeout(timeout);
       }

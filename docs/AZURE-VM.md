@@ -86,6 +86,7 @@ OLLAMA_URL=http://127.0.0.1:11434
 OLLAMA_MODEL=qwen2.5:7b-instruct
 AI_TIMEOUT_MS=120000
 DAILY_INTERVIEW_LIMIT=5
+DAILY_SPEECH_LIMIT=300
 ```
 
 For hosted NVIDIA instead, replace the provider section:

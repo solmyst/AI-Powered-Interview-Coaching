@@ -28,26 +28,6 @@ export type Health = {
     voiceId: string;
   };
 };
-export const roles = [
-  "Software engineering",
-  "Frontend",
-  "Backend",
-  "Full-stack",
-  "Data science",
-  "AI / ML",
-  "DevOps",
-  "Cybersecurity",
-  "Product management",
-  "HR",
-];
-export const tracks = [
-  "Technical",
-  "Coding",
-  "System design",
-  "Behavioral",
-  "Product sense",
-  "Aptitude",
-];
 export type Setup = {
   role: string;
   experience: string;

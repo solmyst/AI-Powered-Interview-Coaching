@@ -479,6 +479,7 @@ export function Room({
             )}
           </div>
         </div>
+        {phase === "complete" && <BriefingDialog error={briefingError} retry={() => void endInterview()} back={back} />}
       </div>
     );
 

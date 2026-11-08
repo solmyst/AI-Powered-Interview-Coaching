@@ -63,9 +63,7 @@ export function registerRehearsal(app, { auth, locked, owned, save, recordUsage,
         { role: session.setup.role, track: session.setup.track, difficulty: session.setup.difficulty,
           checkpointPolicy: "Describe observable outcomes, not mandatory technologies, buzzwords or one prescribed solution. Each checkpoint must be usable in the new scenario too. Accept equivalent correct approaches.", ...turn },
         turn.answer, (plan) => plan.checkpoints.map((c) => c.baseline));
-      const plan = rehearsalPlanSchema.parse(generated.value);
-      verifyEvidence(plan.checkpoints.map((c) => c.baseline), turn.answer);
-      session.rehearsals[index] = { plan, attempts: [], created: new Date().toISOString() };
+      session.rehearsals[index] = { plan: generated.value, attempts: [], created: new Date().toISOString() };
       save(session.id, session);
       recordUsage(req.user.id, generated.usage);
       res.json(session);
@@ -86,9 +84,7 @@ export function registerRehearsal(app, { auth, locked, owned, save, recordUsage,
         "Evaluate this spoken practice answer against the provided THREE checkpoints, in EXACTLY the same order. Return checks with an EXACT contiguous quote from the submitted answer for every demonstrated/partial observation. Use null if no evidence. Evaluate substance, not verbosity or accent. Do not assume improvement. Do not award points for repeating coaching language without explaining it. Summarize what THIS answer demonstrates; earlier observations are compared separately in the UI. Transfer tests application in a new scenario, not a comparable numeric score. Give one practical nextStep. Use the language of the answer. Never invent experience or claim code execution.",
         { role: session.setup.role, stage, question, checkpoints: lab.plan.checkpoints.map((c) => c.criterion), answer: input.answer },
         input.answer, (result) => result.checks);
-      const result = rehearsalResultSchema.parse(generated.value);
-      verifyEvidence(result.checks, input.answer);
-      lab.attempts.push({ stage, question, answer: input.answer, result, created: new Date().toISOString() });
+      lab.attempts.push({ stage, question, answer: input.answer, result: generated.value, created: new Date().toISOString() });
       save(session.id, session);
       recordUsage(req.user.id, generated.usage);
       res.json(session);

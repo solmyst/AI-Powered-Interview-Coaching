@@ -1,12 +1,6 @@
+import { ServiceError } from "./ai.js";
 const ENDPOINT = "https://sync.assemblyai.com/transcribe";
 const DEFAULT_MODEL = "universal-3-5-pro";
-
-export class TranscriptionError extends Error {
-  constructor(status, message) {
-    super(message);
-    this.status = status;
-  }
-}
 
 export function createTranscriber(env = process.env, { fetchImpl = fetch } = {}) {
   const apiKey = env.ASSEMBLYAI_API_KEY?.trim();
@@ -16,7 +10,7 @@ export function createTranscriber(env = process.env, { fetchImpl = fetch } = {})
     status: () => ({ provider: "assemblyai", model, ready: Boolean(apiKey) }),
     async transcribe(audio) {
       if (!apiKey)
-        throw new TranscriptionError(
+        throw new ServiceError(
           503,
           "Speech transcription is not configured yet.",
         );
@@ -36,7 +30,7 @@ export function createTranscriber(env = process.env, { fetchImpl = fetch } = {})
           signal: controller.signal,
         });
         if (!response.ok)
-          throw new TranscriptionError(
+          throw new ServiceError(
             response.status === 429 ? 429 : 503,
             response.status === 429
               ? "Speech transcription is busy. Please wait a moment and retry."
@@ -53,8 +47,8 @@ export function createTranscriber(env = process.env, { fetchImpl = fetch } = {})
               : 0,
         };
       } catch (error) {
-        if (error instanceof TranscriptionError) throw error;
-        throw new TranscriptionError(
+        if (error instanceof ServiceError) throw error;
+        throw new ServiceError(
           503,
           "Speech transcription is temporarily unavailable. Retry this answer.",
         );

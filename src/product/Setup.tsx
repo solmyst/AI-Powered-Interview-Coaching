@@ -1,9 +1,8 @@
 import { useRef, useState } from "react";
 import { ArrowRight, FileText, SlidersHorizontal } from "lucide-react";
 import { api } from "./api";
+import choices from "../../shared/interview-options.json";
 import {
-  roles,
-  tracks,
   type Session,
   type Setup as SetupType,
   type Health,
@@ -42,7 +41,11 @@ export function Setup({
   const select = (label: string, key: keyof SetupType, options: string[]) => (
     <label>
       {label}
-      <select disabled={busy} value={form[key]} onChange={(e) => update(key, e.target.value)}>
+      <select
+        disabled={busy}
+        value={form[key]}
+        onChange={(e) => update(key, e.target.value)}
+      >
         {options.map((s) => (
           <option key={s}>{s}</option>
         ))}
@@ -86,19 +89,10 @@ export function Setup({
               <span>01</span>
             </div>
             <div className="form-grid">
-              {select("Target role", "role", roles)}
-              {select("Experience", "experience", [
-                "Student / graduate",
-                "Early career",
-                "Experienced",
-                "Senior / lead",
-              ])}
-              {select("Interview round", "track", tracks)}
-              {select("Difficulty", "difficulty", [
-                "Foundational",
-                "Intermediate",
-                "Advanced",
-              ])}
+              {select("Target role", "role", choices.roles)}
+              {select("Experience", "experience", choices.experience)}
+              {select("Interview round", "track", choices.tracks)}
+              {select("Difficulty", "difficulty", choices.difficulty)}
               <label>
                 Industry
                 <input
@@ -154,8 +148,12 @@ export function Setup({
                     return;
                   }
                   let text: string;
-                  try { text = await f.text(); } catch {
-                    setError("This file could not be read. Try another .txt file or paste your project highlights.");
+                  try {
+                    text = await f.text();
+                  } catch {
+                    setError(
+                      "This file could not be read. Try another .txt file or paste your project highlights.",
+                    );
                     return;
                   }
                   if (text.length > 10000) {
@@ -192,7 +190,8 @@ export function Setup({
             <small>
               For PDF or Word resumes, paste the relevant text. Context is
               stored during the interview and removed when your report is
-              generated. Questions may still reference it.
+              generated, or after 7 days if the interview is not finished.
+              Questions may still reference it.
             </small>
           </section>
         </div>
@@ -225,7 +224,9 @@ export function Setup({
               <li>Voice-first video interview</li>
             </ul>
             <div className="provider-status">
-              <span className={`dot ${health?.ready && health?.transcription.ready ? "" : "offline"}`} />
+              <span
+                className={`dot ${health?.ready && health?.transcription.ready ? "" : "offline"}`}
+              />
               {health?.ready && health?.transcription.ready
                 ? "AI and speech services configured"
                 : "Interview services unavailable"}
@@ -241,8 +242,8 @@ export function Setup({
               </button>
             )}
             <p className="muted">
-              {Math.max(0, usage.limit - usage.used)} of {usage.limit} daily sessions
-              remaining
+              {Math.max(0, usage.limit - usage.used)} of {usage.limit} daily
+              sessions remaining
             </p>
             {error && (
               <p className="error" role="alert">
@@ -251,7 +252,12 @@ export function Setup({
             )}
             <button
               className="primary"
-              disabled={busy || !health?.ready || !health?.transcription.ready || usage.used >= usage.limit}
+              disabled={
+                busy ||
+                !health?.ready ||
+                !health?.transcription.ready ||
+                usage.used >= usage.limit
+              }
             >
               {busy ? "Preparing your first question…" : "Begin interview"}
               <ArrowRight size={18} />

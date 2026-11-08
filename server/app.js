@@ -55,6 +55,7 @@ export function createApp({
   const app = express();
   const locks = new Set();
   const limit = Number(env.DAILY_INTERVIEW_LIMIT || 5);
+  const speechLimit = Number(env.DAILY_SPEECH_LIMIT || 300);
   const secure = env.NODE_ENV === "production";
   const origin = env.APP_ORIGIN || "http://localhost:5173";
   if (secure && !origin.startsWith("https://"))
@@ -132,22 +133,35 @@ export function createApp({
     limit,
     reset: "00:00 UTC",
   });
-  function auth(req, _res, next) {
+  const userFromCookie = (req) => {
     const token = req.cookies.ia_session;
-    req.user =
+    return (
       token &&
       db
         .prepare(
           "SELECT users.* FROM users JOIN auth_sessions ON users.id=auth_sessions.user_id WHERE token=? AND expires>?",
         )
-        .get(hash(token), Date.now());
+        .get(hash(token), Date.now())
+    );
+  };
+  function auth(req, _res, next) {
+    req.user = userFromCookie(req);
     if (!req.user)
       return next(new ServiceError(401, "Please sign in to continue."));
     next();
   }
+  // Reports clear resume context; abandoned interviews must not keep it forever.
+  const purgeStaleContext = () =>
+    db
+      .prepare(
+        "UPDATE interviews SET data=json_set(data,'$.setup.resume','','$.setup.jobDescription','') WHERE state!='complete' AND created < ? AND (json_extract(data,'$.setup.resume')!='' OR json_extract(data,'$.setup.jobDescription')!='')",
+      )
+      .run(new Date(Date.now() - 7 * 86400000).toISOString());
+  purgeStaleContext();
   function issueSession(res, user) {
     const token = randomBytes(32).toString("hex");
     db.prepare("DELETE FROM auth_sessions WHERE expires < ?").run(Date.now());
+    purgeStaleContext();
     db.prepare("INSERT INTO auth_sessions VALUES (?, ?, ?)").run(
       hash(token),
       user.id,
@@ -226,14 +240,7 @@ export function createApp({
     res.json({ ok: true });
   });
   app.get("/api/auth/session", (req, res) => {
-    const token = req.cookies.ia_session;
-    const user =
-      token &&
-      db
-        .prepare(
-          "SELECT users.* FROM users JOIN auth_sessions ON users.id=auth_sessions.user_id WHERE token=? AND expires>?",
-        )
-        .get(hash(token), Date.now());
+    const user = userFromCookie(req);
     res.json({
       user: user ? safeUser(user) : null,
       usage: user ? usage(user.id) : null,
@@ -242,6 +249,19 @@ export function createApp({
   app.get("/api/me", auth, (req, res) =>
     res.json({ user: safeUser(req.user), usage: usage(req.user.id) }),
   );
+  // AssemblyAI and Sarvam bill per call; count before calling so parallel requests cannot pass the cap.
+  function spendSpeech(userId) {
+    const { speech_calls } = db
+      .prepare(
+        "INSERT INTO usage(user_id,day,speech_calls) VALUES (?,?,1) ON CONFLICT(user_id,day) DO UPDATE SET speech_calls=speech_calls+1 RETURNING speech_calls",
+      )
+      .get(userId, day());
+    if (speech_calls > speechLimit)
+      fail(
+        429,
+        "You've reached today's voice limit. Type your answers or return after 00:00 UTC.",
+      );
+  }
   app.post(
     "/api/transcribe",
     auth,
@@ -254,6 +274,7 @@ export function createApp({
         req.body.subarray(8, 12).toString("ascii") !== "WAVE"
       )
         fail(415, "A valid WAV recording is required.");
+      spendSpeech(req.user.id);
       res.json(await transcriber.transcribe(req.body));
     },
   );
@@ -262,6 +283,7 @@ export function createApp({
       .object({ text: z.string().trim().min(1).max(2000) })
       .strict()
       .parse(req.body);
+    spendSpeech(req.user.id);
     const generated = await speech.synthesize(text);
     res.type(generated.contentType).send(Buffer.from(generated.audio));
   });
@@ -323,22 +345,9 @@ export function createApp({
   app.get("/api/interviews", auth, (req, res) => {
     const sessions = db
       .prepare(
-        "SELECT data FROM interviews WHERE user_id=? ORDER BY created DESC LIMIT 100",
+        "SELECT id, created, state, json_extract(data,'$.setup.role') AS role, json_extract(data,'$.setup.track') AS track, json_array_length(data,'$.turns') AS answered, json_extract(data,'$.setup.questionCount') AS total, json_extract(data,'$.report.overall') AS score FROM interviews WHERE user_id=? ORDER BY created DESC LIMIT 100",
       )
-      .all(req.user.id)
-      .map((r) => {
-        const s = JSON.parse(r.data);
-        return {
-          id: s.id,
-          created: s.created,
-          state: s.state,
-          role: s.setup.role,
-          track: s.setup.track,
-          answered: s.turns.length,
-          total: s.setup.questionCount,
-          score: s.report?.overall ?? null,
-        };
-      });
+      .all(req.user.id);
     res.json({ sessions, usage: usage(req.user.id) });
   });
   app.post("/api/interviews", auth, async (req, res) =>
@@ -399,22 +408,34 @@ export function createApp({
   app.get("/api/interviews/:id", auth, (req, res) => res.json(owned(req)));
   app.post("/api/interviews/:id/clarify", auth, async (req, res) =>
     locked(req.user.id, async () => {
-      const { expectedTurn } = z.object({ expectedTurn: z.number().int().min(0).max(7) }).strict().parse(req.body);
+      const { expectedTurn } = z
+        .object({ expectedTurn: z.number().int().min(0).max(7) })
+        .strict()
+        .parse(req.body);
       const session = owned(req);
       if (session.state !== "active" || expectedTurn !== session.turns.length)
-        fail(409, "The question changed. Please retry on the current question.");
+        fail(
+          409,
+          "The question changed. Please retry on the current question.",
+        );
       session.clarifications ||= {};
       const used = session.clarifications[expectedTurn] || 0;
-      if (used >= 2) fail(429, "This question has been clarified twice. Take your time and answer what you understand.");
-      const generated = await ai.generate(questionSchema,
+      if (used >= 2)
+        fail(
+          429,
+          "This question has been clarified twice. Take your time and answer what you understand.",
+        );
+      const generated = await ai.generate(
+        questionSchema,
         "Rephrase the current question in plain language, preserving its technical meaning, difficulty, and constraints. Explain ambiguous wording only. Do not give hints, solutions, an example answer, or a new question. Ask ONE question. Use the same language as the current question.",
-        { role: session.setup.role, currentQuestion: session.currentQuestion });
-      const clarified = questionSchema.parse(generated.value);
+        { role: session.setup.role, currentQuestion: session.currentQuestion },
+      );
       session.clarifications[expectedTurn] = used + 1;
       save(session.id, session);
       recordUsage(req.user.id, generated.usage);
-      res.json({ question: clarified.question });
-    }));
+      res.json({ question: generated.value.question });
+    }),
+  );
   app.post("/api/interviews/:id/answers", auth, async (req, res) =>
     locked(req.user.id, async () => {
       const input = answerSchema.parse(req.body);

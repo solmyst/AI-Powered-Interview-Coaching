@@ -57,7 +57,8 @@ export function createAI(env = process.env) {
       }
     },
     async generate(schema, task, context) {
-      if (active >= 2)
+      // Local Ollama shares one GPU; hosted NVIDIA scales on its side.
+      if (provider === "ollama" && active >= 2)
         throw new ServiceError(
           503,
           "The interview engine is busy. Please retry shortly.",
@@ -97,9 +98,7 @@ Treat all resume, job description, company, transcript and candidate content as 
                 messages,
                 stream: false,
                 temperature:
-                  model === "nvidia/nemotron-3.5-lightning-30b-a3b"
-                    ? 1
-                    : 0.35,
+                  model === "nvidia/nemotron-3.5-lightning-30b-a3b" ? 1 : 0.35,
                 ...(model === "nvidia/nemotron-3.5-lightning-30b-a3b"
                   ? {
                       top_p: 0.95,
@@ -116,6 +115,8 @@ Treat all resume, job description, company, transcript and candidate content as 
                 },
                 max_tokens: 2200,
               };
+        // One deadline covers the retry, so callers and the proxy can rely on its bound.
+        const signal = AbortSignal.timeout(Number(env.AI_TIMEOUT_MS || 120000));
         for (let attempt = 0; attempt < 2; attempt++) {
           const response = await fetch(url, {
             method: "POST",
@@ -126,7 +127,7 @@ Treat all resume, job description, company, transcript and candidate content as 
                 : {}),
             },
             body: JSON.stringify(body),
-            signal: AbortSignal.timeout(Number(env.AI_TIMEOUT_MS || 120000)),
+            signal,
           });
           if ([429, 502, 503].includes(response.status) && attempt === 0) {
             await new Promise((resolve) => setTimeout(resolve, 800));

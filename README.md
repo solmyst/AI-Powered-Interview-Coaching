@@ -50,7 +50,7 @@ The Azure pilot is configured with:
 
 English and Hindi speech paths are supported. Sarvam receives `hi-IN` when text contains Devanagari, otherwise `en-IN`; this is script detection, not a general language classifier. Browser speech synthesis is the fallback when cloud TTS is unavailable.
 
-The Azure VM hosts the application and database. NVIDIA, AssemblyAI, and Sarvam are hosted APIs; their models do not run locally on that VM. Browser Whisper and ElevenLabs are not used by the active application. Historical prototype modules remain in `legacy/` and are excluded from the active bundle.
+The Azure VM hosts the application and database. NVIDIA, AssemblyAI, and Sarvam are hosted APIs; their models do not run locally on that VM. Browser Whisper and ElevenLabs are not used by the active application.
 
 ## Run locally
 
@@ -130,8 +130,9 @@ Vite proxies `/api` to the Node server on loopback port 3001. SQLite is created 
 | `OLLAMA_MODEL`          | `qwen2.5:7b-instruct`                                                             |
 | `NVIDIA_API_KEY`        | Server-only NVIDIA credential                                                     |
 | `NVIDIA_MODEL`          | Exact model ID enabled for the NVIDIA account                                     |
-| `AI_TIMEOUT_MS`         | `120000` per text-generation request attempt                                      |
+| `AI_TIMEOUT_MS`         | `120000` per text-generation request, including its one retry                   |
 | `DAILY_INTERVIEW_LIMIT` | `5` successful starts per user per UTC day                                        |
+| `DAILY_SPEECH_LIMIT`    | `300` paid transcription and interviewer-voice calls per user per UTC day         |
 | `ASSEMBLYAI_API_KEY`    | Server-only transcription credential                                              |
 | `ASSEMBLYAI_MODEL`      | `universal-3-5-pro`                                                               |
 | `SARVAM_API_KEY`        | Server-only TTS credential                                                        |
@@ -257,4 +258,4 @@ Azure releases are currently manual, with a separately built release, the previo
 - Load testing, backup restore drills, privacy/retention review, and learning-outcome validation are still required before a broader public launch.
 - Billing and paid entitlements are deferred.
 
-See [the product roadmap](docs/ROADMAP.md), [Answer Lab design and evidence limits](docs/ANSWER-LAB.md), and [UI QA notes](docs/UI-QA-2026-10-28.md). The interface uses Ink Black (`#031211`), Warm Ivory (`#E8E4D3`), and Electric Teal (`#00AEBB`), with darker teal for readable text on light surfaces. `legacy/` preserves prototype code for reference.
+See [the product roadmap](docs/ROADMAP.md), [Answer Lab design and evidence limits](docs/ANSWER-LAB.md), and [UI QA notes](docs/UI-QA-2026-10-28.md). The interface uses Ink Black (`#031211`), Warm Ivory (`#E8E4D3`), and Electric Teal (`#00AEBB`), with darker teal for readable text on light surfaces.

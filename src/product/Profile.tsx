@@ -114,7 +114,8 @@ export function Profile({
         <p>
           Interview transcripts and reports are stored in this installation’s
           database. Active sessions also retain resume and job-description text;
-          that context is removed when the report is generated. Questions and
+          that context is removed when the report is generated, or after 7
+          days for unfinished interviews. Questions and
           answers may still include personal details.
         </p>
         <p>

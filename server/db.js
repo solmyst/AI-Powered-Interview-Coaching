@@ -15,7 +15,14 @@ export function openDatabase(path) {
     CREATE INDEX IF NOT EXISTS interviews_owner ON interviews(user_id, created);
     CREATE TABLE IF NOT EXISTS usage (user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, day TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0, input_tokens INTEGER NOT NULL DEFAULT 0, output_tokens INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(user_id, day));
     CREATE TABLE IF NOT EXISTS bookmarks (user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, interview_id TEXT NOT NULL REFERENCES interviews(id) ON DELETE CASCADE, turn INTEGER NOT NULL, PRIMARY KEY(user_id, interview_id, turn));
-    PRAGMA user_version = 1;
   `);
+  // Version 2 counts paid speech-to-text and text-to-speech calls per day.
+  if (db.pragma("user_version", { simple: true }) < 2)
+    db.transaction(() => {
+      db.exec(
+        "ALTER TABLE usage ADD COLUMN speech_calls INTEGER NOT NULL DEFAULT 0",
+      );
+      db.pragma("user_version = 2");
+    })();
   return db;
 }

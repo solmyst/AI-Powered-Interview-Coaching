@@ -31,5 +31,6 @@ export function download(name: string, data: unknown) {
   link.href = url;
   link.download = name;
   link.click();
-  URL.revokeObjectURL(url);
+  // Revoking synchronously can cancel the download in Firefox and Safari.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }

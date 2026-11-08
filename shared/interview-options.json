@@ -1,0 +1,29 @@
+{
+  "roles": [
+    "Software engineering",
+    "Frontend",
+    "Backend",
+    "Full-stack",
+    "Data science",
+    "AI / ML",
+    "DevOps",
+    "Cybersecurity",
+    "Product management",
+    "HR"
+  ],
+  "tracks": [
+    "Technical",
+    "Coding",
+    "System design",
+    "Behavioral",
+    "Product sense",
+    "Aptitude"
+  ],
+  "experience": [
+    "Student / graduate",
+    "Early career",
+    "Experienced",
+    "Senior / lead"
+  ],
+  "difficulty": ["Foundational", "Intermediate", "Advanced"]
+}

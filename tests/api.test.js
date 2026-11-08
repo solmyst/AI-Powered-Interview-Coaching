@@ -91,6 +91,7 @@ before(async () => {
       DATABASE_PATH: ":memory:",
       APP_ORIGIN: origin,
       DAILY_INTERVIEW_LIMIT: "2",
+      DAILY_SPEECH_LIMIT: "3",
     },
     ai,
     transcriber,
@@ -461,4 +462,54 @@ test("validation, export and account deletion", async () => {
       .get("delete@example.test").n,
     0,
   );
+});
+test("history summaries come from SQL and stale unfinished interviews drop resume context", async () => {
+  const a = await account("stale@example.test");
+  const stale = (await create(a.cookie)).body.id,
+    fresh = (await create(a.cookie)).body.id;
+  const list = await request("/interviews", { cookie: a.cookie });
+  assert.deepEqual(
+    list.body.sessions.find((s) => s.id === fresh),
+    { id: fresh, created: list.body.sessions.find((s) => s.id === fresh).created, state: "active", role: "Backend", track: "Technical", answered: 0, total: 3, score: null },
+  );
+  db.prepare("UPDATE interviews SET created=? WHERE id=?").run(
+    new Date(Date.now() - 8 * 86400000).toISOString(),
+    stale,
+  );
+  await request("/auth/login", {
+    method: "POST",
+    body: { email: "stale@example.test", password: "long-test-password" },
+  });
+  const setupOf = async (id) =>
+    (await request(`/interviews/${id}`, { cookie: a.cookie })).body.setup;
+  assert.equal((await setupOf(stale)).resume, "");
+  assert.equal((await setupOf(stale)).role, "Backend");
+  assert.equal((await setupOf(fresh)).resume, "Built a cache");
+});
+test("paid speech calls stop at the daily cap and invalid input is not charged", async () => {
+  const a = await account("speech-cap@example.test");
+  const speak = (text) =>
+    fetch(base + "/api/speech", {
+      method: "POST",
+      headers: { Origin: origin, Cookie: a.cookie, "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+  assert.equal((await speak("")).status, 400);
+  const wav = Buffer.alloc(44);
+  wav.write("RIFF");
+  wav.write("WAVE", 8);
+  const transcribe = (body) =>
+    fetch(base + "/api/transcribe", {
+      method: "POST",
+      headers: { Origin: origin, Cookie: a.cookie, "Content-Type": "audio/wav" },
+      body,
+    });
+  assert.equal((await transcribe(Buffer.alloc(44))).status, 415);
+  assert.equal((await transcribe(wav)).status, 200);
+  assert.equal((await speak("One")).status, 200);
+  assert.equal((await speak("Two")).status, 200);
+  const blocked = await speak("Three");
+  assert.equal(blocked.status, 429);
+  assert.match((await blocked.json()).error, /voice limit/);
+  assert.equal((await transcribe(wav)).status, 429);
 });

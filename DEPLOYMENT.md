@@ -36,7 +36,7 @@ Configure health probes against `/api/health`. For Ollama, `ready` checks the in
 
 ## Storage and recovery
 
-Schema version 1 is initialized automatically on first startup. Future schema changes must have explicit numbered migrations and backup/restore validation before release. WAL is enabled. Do not copy only the main `.db` file while a live writer is active. Use SQLite's online backup API or stop the service before backing up the full database. Retain backups for a documented period and verify restore on a separate installation. Account deletion cascades through active application tables; historical backups require their own retention/deletion policy.
+Schema version 2 is applied automatically on startup; version 2 adds the `usage.speech_calls` column to existing databases. Future schema changes must have explicit numbered migrations and backup/restore validation before release. WAL is enabled. Do not copy only the main `.db` file while a live writer is active. Use SQLite's online backup API or stop the service before backing up the full database. Retain backups for a documented period and verify restore on a separate installation. Account deletion cascades through active application tables; historical backups require their own retention/deletion policy.
 
 The only process-local state is concurrency/rate-limit state. Interview data, login sessions, bookmarks and daily usage survive restarts. Restarting during model generation abandons that call; the candidate can reload and retry from the last committed answer. A successfully generated but unsaved provider response may consume provider compute without a recorded token counter.
 

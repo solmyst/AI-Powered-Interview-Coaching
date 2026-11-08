@@ -1,35 +1,20 @@
 import { z } from "zod";
-export const roles = [
-  "Software engineering",
-  "Frontend",
-  "Backend",
-  "Full-stack",
-  "Data science",
-  "AI / ML",
-  "DevOps",
-  "Cybersecurity",
-  "Product management",
-  "HR",
-];
-export const tracks = [
-  "Technical",
-  "Coding",
-  "System design",
-  "Behavioral",
-  "Product sense",
-  "Aptitude",
-];
+import { readFileSync } from "node:fs";
+// readFileSync instead of a JSON import keeps Node 22 support without warnings.
+const options = JSON.parse(
+  readFileSync(
+    new URL("../shared/interview-options.json", import.meta.url),
+    "utf8",
+  ),
+);
+// The setup form reads the same file, so client and server options cannot drift.
+export const { roles, tracks, experience, difficulty } = options;
 export const setupSchema = z
   .object({
     role: z.enum(roles),
-    experience: z.enum([
-      "Student / graduate",
-      "Early career",
-      "Experienced",
-      "Senior / lead",
-    ]),
+    experience: z.enum(experience),
     track: z.enum(tracks),
-    difficulty: z.enum(["Foundational", "Intermediate", "Advanced"]),
+    difficulty: z.enum(difficulty),
     industry: z.string().trim().min(1).max(80),
     company: z.string().trim().max(100).default(""),
     resume: z.string().max(10000).default(""),
@@ -60,7 +45,7 @@ export const evaluationSchema = z.object({
 export const questionSchema = z.object({
   question: z.string().trim().min(1).max(1200),
   focus: z.string().min(1).max(150),
-  difficulty: z.enum(["Foundational", "Intermediate", "Advanced"]),
+  difficulty: z.enum(difficulty),
 });
 export const turnSchema = z.object({
   evaluation: evaluationSchema,

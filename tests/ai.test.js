@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { z } from "zod";
 import { createAI } from "../server/ai.js";
 import { questionSchema } from "../server/schemas.js";
 test("provider rejects invalid structured output rather than fabricating a question", async () => {
@@ -127,5 +128,34 @@ test("NVIDIA fails closed without credentials and provider timeouts are recovera
     );
   } finally {
     globalThis.fetch = original;
+  }
+});
+test("only local Ollama limits concurrent generations", async () => {
+  const realFetch = globalThis.fetch;
+  const release = [];
+  globalThis.fetch = () =>
+    new Promise((resolve) =>
+      release.push(() =>
+        resolve(new Response(JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }] }))),
+      ),
+    );
+  try {
+    const schema = z.object({ ok: z.boolean() });
+    for (const [env, busy] of [
+      [{ AI_PROVIDER: "ollama" }, true],
+      [{ AI_PROVIDER: "nvidia", NVIDIA_API_KEY: "k", NVIDIA_MODEL: "m" }, false],
+    ]) {
+      const ai = createAI(env);
+      const pending = [ai.generate(schema, "t", {}), ai.generate(schema, "t", {})];
+      const third = ai.generate(schema, "t", {});
+      if (busy) await assert.rejects(third, /busy/);
+      else pending.push(third);
+      await new Promise((r) => setTimeout(r, 0));
+      release.splice(0).forEach((done) => done());
+      const results = await Promise.allSettled(pending);
+      if (!busy) assert.deepEqual(results.map((r) => r.status), ["fulfilled", "fulfilled", "fulfilled"]);
+    }
+  } finally {
+    globalThis.fetch = realFetch;
   }
 });
