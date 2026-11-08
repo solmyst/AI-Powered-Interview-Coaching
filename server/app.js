@@ -56,6 +56,13 @@ export function createApp({
   const locks = new Set();
   const limit = Number(env.DAILY_INTERVIEW_LIMIT || 5);
   const speechLimit = Number(env.DAILY_SPEECH_LIMIT || 300);
+  // Owner/testing accounts skip daily trial caps. Everyone else is a trial user.
+  const unlimited = new Set(
+    (env.UNLIMITED_EMAILS || "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
   const secure = env.NODE_ENV === "production";
   const origin = env.APP_ORIGIN || "http://localhost:5173";
   if (secure && !origin.startsWith("https://"))
@@ -125,12 +132,12 @@ export function createApp({
     name: user.name,
     email: user.email,
   });
-  const usage = (id) => ({
+  const usage = (user) => ({
     used:
       db
         .prepare("SELECT count FROM usage WHERE user_id=? AND day=?")
-        .get(id, day())?.count || 0,
-    limit,
+        .get(user.id, day())?.count || 0,
+    limit: unlimited.has(user.email) ? null : limit,
     reset: "00:00 UTC",
   });
   const userFromCookie = (req) => {
@@ -210,7 +217,7 @@ export function createApp({
       throw error;
     }
     issueSession(res, user);
-    res.status(201).json({ user, usage: usage(user.id) });
+    res.status(201).json({ user, usage: usage(user) });
   });
   app.post("/api/auth/login", authLimit, async (req, res) => {
     const input = credentials.parse(req.body);
@@ -224,7 +231,7 @@ export function createApp({
     if (!timingSafeEqual(result, Buffer.from(stored, "hex")) || !user)
       fail(401, "Email or password is incorrect.");
     issueSession(res, user);
-    res.json({ user: safeUser(user), usage: usage(user.id) });
+    res.json({ user: safeUser(user), usage: usage(user) });
   });
   app.post("/api/auth/logout", (req, res) => {
     if (req.cookies.ia_session)
@@ -243,20 +250,20 @@ export function createApp({
     const user = userFromCookie(req);
     res.json({
       user: user ? safeUser(user) : null,
-      usage: user ? usage(user.id) : null,
+      usage: user ? usage(user) : null,
     });
   });
   app.get("/api/me", auth, (req, res) =>
-    res.json({ user: safeUser(req.user), usage: usage(req.user.id) }),
+    res.json({ user: safeUser(req.user), usage: usage(req.user) }),
   );
   // AssemblyAI and Sarvam bill per call; count before calling so parallel requests cannot pass the cap.
-  function spendSpeech(userId) {
+  function spendSpeech(user) {
     const { speech_calls } = db
       .prepare(
         "INSERT INTO usage(user_id,day,speech_calls) VALUES (?,?,1) ON CONFLICT(user_id,day) DO UPDATE SET speech_calls=speech_calls+1 RETURNING speech_calls",
       )
-      .get(userId, day());
-    if (speech_calls > speechLimit)
+      .get(user.id, day());
+    if (speech_calls > speechLimit && !unlimited.has(user.email))
       fail(
         429,
         "You've reached today's voice limit. Type your answers or return after 00:00 UTC.",
@@ -274,7 +281,7 @@ export function createApp({
         req.body.subarray(8, 12).toString("ascii") !== "WAVE"
       )
         fail(415, "A valid WAV recording is required.");
-      spendSpeech(req.user.id);
+      spendSpeech(req.user);
       res.json(await transcriber.transcribe(req.body));
     },
   );
@@ -283,7 +290,7 @@ export function createApp({
       .object({ text: z.string().trim().min(1).max(2000) })
       .strict()
       .parse(req.body);
-    spendSpeech(req.user.id);
+    spendSpeech(req.user);
     const generated = await speech.synthesize(text);
     res.type(generated.contentType).send(Buffer.from(generated.audio));
   });
@@ -348,7 +355,7 @@ export function createApp({
         "SELECT id, created, state, json_extract(data,'$.setup.role') AS role, json_extract(data,'$.setup.track') AS track, json_array_length(data,'$.turns') AS answered, json_extract(data,'$.setup.questionCount') AS total, json_extract(data,'$.report.overall') AS score FROM interviews WHERE user_id=? ORDER BY created DESC LIMIT 100",
       )
       .all(req.user.id);
-    res.json({ sessions, usage: usage(req.user.id) });
+    res.json({ sessions, usage: usage(req.user) });
   });
   app.post("/api/interviews", auth, async (req, res) =>
     locked(req.user.id, async () => {
@@ -358,7 +365,8 @@ export function createApp({
         .prepare("SELECT data FROM interviews WHERE id=? AND user_id=?")
         .get(id, req.user.id);
       if (existing) return res.json(JSON.parse(existing.data));
-      if (usage(req.user.id).used >= limit)
+      const today = usage(req.user);
+      if (today.limit !== null && today.used >= today.limit)
         fail(
           429,
           `You've used today's ${limit} interviews. Continue an existing session or return after 00:00 UTC.`,

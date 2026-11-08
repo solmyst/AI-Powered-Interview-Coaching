@@ -81,9 +81,11 @@ export function Profile({
       <section className="panel">
         <h2>Practice access</h2>
         <p>
-          Free pilot access · {usage.used} of {usage.limit} interviews started
-          today. Continuing saved interviews does not use another session.
-          Deleting an interview does not restore usage.
+          {usage.limit === null
+            ? `Testing account · no daily limit · ${usage.used} interviews started today.`
+            : `Free trial · ${usage.used} of ${usage.limit} interviews started today.`}{" "}
+          Continuing saved interviews does not use another session. Deleting an
+          interview does not restore usage.
         </p>
         <p>
           Billing and paid plans are deferred. No payment details are collected.
@@ -114,9 +116,9 @@ export function Profile({
         <p>
           Interview transcripts and reports are stored in this installation’s
           database. Active sessions also retain resume and job-description text;
-          that context is removed when the report is generated, or after 7
-          days for unfinished interviews. Questions and
-          answers may still include personal details.
+          that context is removed when the report is generated, or after 7 days
+          for unfinished interviews. Questions and answers may still include
+          personal details.
         </p>
         <p>
           Interview text is processed by the configured AI provider. Spoken

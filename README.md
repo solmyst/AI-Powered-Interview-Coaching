@@ -133,6 +133,7 @@ Vite proxies `/api` to the Node server on loopback port 3001. SQLite is created 
 | `AI_TIMEOUT_MS`         | `120000` per text-generation request, including its one retry                   |
 | `DAILY_INTERVIEW_LIMIT` | `5` successful starts per user per UTC day                                        |
 | `DAILY_SPEECH_LIMIT`    | `300` paid transcription and interviewer-voice calls per user per UTC day         |
+| `UNLIMITED_EMAILS`      | Comma-separated owner/testing emails with no daily caps; register them first      |
 | `ASSEMBLYAI_API_KEY`    | Server-only transcription credential                                              |
 | `ASSEMBLYAI_MODEL`      | `universal-3-5-pro`                                                               |
 | `SARVAM_API_KEY`        | Server-only TTS credential                                                        |

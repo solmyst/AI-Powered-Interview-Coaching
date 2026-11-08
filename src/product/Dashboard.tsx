@@ -159,10 +159,20 @@ export function Dashboard({
         <article>
           <span>Sessions available today</span>
           <strong>
-            {Math.max(0, usage.limit - usage.used)}
-            <sub>/{usage.limit}</sub>
+            {usage.limit === null ? (
+              "∞"
+            ) : (
+              <>
+                {Math.max(0, usage.limit - usage.used)}
+                <sub>/{usage.limit}</sub>
+              </>
+            )}
           </strong>
-          <small>Resets at {usage.reset}</small>
+          <small>
+            {usage.limit === null
+              ? "Testing account · no daily limit"
+              : `Free trial · resets at ${usage.reset}`}
+          </small>
         </article>
       </div>
       <div className="section-heading">

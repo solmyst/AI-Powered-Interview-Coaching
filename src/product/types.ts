@@ -10,7 +10,8 @@ export type Delivery = {
   selfConfidence?: number;
 };
 export type User = { id: string; name: string; email: string };
-export type Usage = { used: number; limit: number; reset: string };
+// limit is null for owner/testing accounts, which have no daily cap.
+export type Usage = { used: number; limit: number | null; reset: string };
 export type Health = {
   ready: boolean;
   provider: string;

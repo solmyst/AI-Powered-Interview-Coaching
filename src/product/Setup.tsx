@@ -242,8 +242,9 @@ export function Setup({
               </button>
             )}
             <p className="muted">
-              {Math.max(0, usage.limit - usage.used)} of {usage.limit} daily
-              sessions remaining
+              {usage.limit === null
+                ? "Testing account · no daily limit"
+                : `${Math.max(0, usage.limit - usage.used)} of ${usage.limit} free trial sessions remaining today`}
             </p>
             {error && (
               <p className="error" role="alert">
@@ -256,7 +257,7 @@ export function Setup({
                 busy ||
                 !health?.ready ||
                 !health?.transcription.ready ||
-                usage.used >= usage.limit
+                (usage.limit !== null && usage.used >= usage.limit)
               }
             >
               {busy ? "Preparing your first question…" : "Begin interview"}
