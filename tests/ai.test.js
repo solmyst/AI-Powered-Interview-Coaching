@@ -31,6 +31,7 @@ test("NVIDIA sends the key only to its server endpoint and validates responses",
             {
               message: {
                 content: JSON.stringify({
+                  lead: "Let us start.",
                   question: "Explain cache invalidation.",
                   focus: "Caching",
                   difficulty: "Intermediate",
@@ -77,6 +78,7 @@ test("NVIDIA Lightning disables reasoning and uses its documented sampling setti
             {
               message: {
                 content: JSON.stringify({
+                  lead: "Good point.",
                   question: "How would you invalidate that cache?",
                   focus: "Caching",
                   difficulty: "Intermediate",

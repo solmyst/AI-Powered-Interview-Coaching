@@ -21,7 +21,7 @@ import {
   setupSchema,
   answerSchema,
   questionSchema,
-  turnSchema,
+  replySchema,
   evaluationSchema,
   reportSchema,
   dimensions,
@@ -45,6 +45,53 @@ const now = () => new Date().toISOString();
 const fail = (status, message) => {
   throw new ServiceError(status, message);
 };
+const replyTask =
+  "You are mid-interview, speaking with the candidate. Decide what their latest words (candidateSaid) are. kind 'conversation': they ask you something (what do you mean, can you repeat, can you give an example, is it okay to…), ask for a moment, or think aloud without really answering yet. Then reply like a human interviewer in one to three short spoken sentences: answer their question about the question, restate it more simply if they were confused, or reassure them if they need time; never give away the answer or any part of the solution: if they ask for an example, give one from a different, simpler topic; end by inviting them to go ahead. nextQuestion is null. kind 'answer': they attempted an answer, even a weak or partial one, or clearly said they cannot answer or want to move on. Then reply is an empty string and nextQuestion follows these rules: ";
+const nextQuestionTask =
+  "ONE nextQuestion, written the way a thoughtful human interviewer talks. nextQuestion.lead: one short spoken sentence reacting to what the candidate actually said (name a specific good point, or, if the answer was empty, off-topic or 'I don't know', reassure briefly without judging, e.g. 'No problem, let's look at something different.'). nextQuestion.question: never repeat or reword anything in alreadyAsked, and do not stay on the same scenario. Use a concrete situational question ('Imagine…', 'Suppose…', 'Tell me about a time…') answerable in about two minutes of speech. Prefer realistic workplace scenarios over résumé recaps. The lead never asks anything. The question is one or two sentences, at most 45 words, with exactly one question mark.";
+// Small models sometimes leak CJK characters into English text; Hindi uses Devanagari and is unaffected.
+const stray = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/g;
+// The lead is spoken before the question, so it must be a plain remark: no asking, no echo, no cut-off sentence.
+export const tidyQuestion = (q) => ({
+  ...q,
+  question: q.question
+    .replace(stray, "")
+    .replace(/\s{2,}/g, " ")
+    .trim(),
+  lead: (q.lead || "")
+    .replace(stray, "")
+    .split(/(?<=[.!?])\s+/)
+    .filter(
+      (sentence) =>
+        /[.!]$/.test(sentence.trim()) &&
+        !/\?|^(could|can|would|will) you\b|\b(tell|walk) me\b/i.test(
+          sentence,
+        ) &&
+        !repeats(sentence, [q]),
+    )
+    .join(" "),
+});
+// Used only when the model keeps repeating itself, so the interview never stalls on one question.
+const fallbackQuestions = [
+  "Imagine your team ships a release and, an hour later, users report that checkout is failing. What do you do in the first fifteen minutes?",
+  "Suppose a teammate's pull request works but is hard to read. How would you give feedback, and what would you want to see change?",
+  "Imagine you are given a task with unclear requirements and a deadline in two days. How do you get unstuck?",
+  "Suppose a page you built loads slowly for users on weak connections. How would you find the cause and what would you try first?",
+];
+// Only words of 4+ letters count, so "would you what" filler cannot hide a reworded question.
+const words = (text) =>
+  new Set(text.toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) || []);
+// True when a new question shares at least three, and half or more, of its meaningful words with one already asked.
+export function repeats(question, asked) {
+  const next = words(question);
+  return asked.some((earlier) => {
+    const before = words(
+      typeof earlier === "string" ? earlier : earlier.question,
+    );
+    const shared = [...next].filter((w) => before.has(w)).length;
+    return shared >= 3 && shared / Math.min(next.size, before.size) >= 0.5;
+  });
+}
 export function createApp({
   env = process.env,
   db = openDatabase(env.DATABASE_PATH || "./data/interviewace.db"),
@@ -323,6 +370,13 @@ export function createApp({
     return JSON.parse(row.data);
   }
   function save(id, session) {
+    // Answers are scored in the background; never overwrite a score that landed meanwhile.
+    const stored = db.prepare("SELECT data FROM interviews WHERE id=?").get(id);
+    if (stored)
+      JSON.parse(stored.data).turns.forEach((turn, i) => {
+        if (turn.evaluation && session.turns[i] && !session.turns[i].evaluation)
+          session.turns[i].evaluation = turn.evaluation;
+      });
     db.prepare("UPDATE interviews SET state=?, data=? WHERE id=?").run(
       session.state,
       JSON.stringify(session),
@@ -340,7 +394,7 @@ export function createApp({
       turns: session.turns.map((t) => ({
         question: t.question,
         answer: t.answer.slice(0, 2500),
-        evaluation: {
+        evaluation: t.evaluation && {
           scores: t.evaluation.scores,
           rationale: t.evaluation.rationale.slice(0, 500),
         },
@@ -382,7 +436,7 @@ export function createApp({
         .slice(0, 5);
       const generated = await ai.generate(
         questionSchema,
-        "Begin the interview with one relevant question. Use resume and role context where available. Do not provide the answer.",
+        "Open the interview the way a warm, experienced human interviewer would. lead: one or two short spoken sentences introducing yourself as Maya and the round (role, track) and putting the candidate at ease. question: ONE concrete situational question tailored to the role, track and level (for example 'Imagine…', 'Suppose your team…', or 'Tell me about a time…'), answerable in about two minutes of speech, at most 45 words with exactly one question mark. The question must describe a concrete scenario or task; never ask for an overview, background, summary or résumé walk-through. The lead is at most 25 words, ends with a full stop, and never asks or requests anything. Use specific resume or job-description details when present. Do not open with 'walk me through your resume' or 'tell me about yourself'. Do not provide the answer.",
         { setup, previousWeaknesses },
       );
       const session = {
@@ -390,7 +444,7 @@ export function createApp({
         created: now(),
         state: "active",
         setup,
-        currentQuestion: generated.value,
+        currentQuestion: tidyQuestion(generated.value),
         turns: [],
         report: null,
         previousWeaknesses,
@@ -435,7 +489,7 @@ export function createApp({
         );
       const generated = await ai.generate(
         questionSchema,
-        "Rephrase the current question in plain language, preserving its technical meaning, difficulty, and constraints. Explain ambiguous wording only. Do not give hints, solutions, an example answer, or a new question. Ask ONE question. Use the same language as the current question.",
+        "lead: a short phrase such as 'Sure, let me put that another way.' question: rephrase the current question in plain language, preserving its technical meaning, difficulty, and constraints. Explain ambiguous wording only. Do not give hints, solutions, an example answer, or a new question. Ask ONE question. Use the same language as the current question.",
         { role: session.setup.role, currentQuestion: session.currentQuestion },
       );
       session.clarifications[expectedTurn] = used + 1;
@@ -457,36 +511,159 @@ export function createApp({
           "This answer is already saved or the session changed. Reload the interview.",
         );
       const last = session.turns.length + 1 >= session.setup.questionCount;
-      const generated = await ai.generate(
-        last ? evaluationSchema : turnSchema,
-        `Evaluate the candidate's latest answer with concrete evidence. ${last ? "Return its evaluation." : "Return its evaluation and ONE nextQuestion that probes a specific gap or claim in this answer; if answered well, explore a new relevant concept. Adjust difficulty based on performance."}`,
-        {
-          ...context(session),
-          currentQuestion: session.currentQuestion,
-          answer: input.answer,
+      const asked = [
+        ...session.turns.map((t) => t.question),
+        session.currentQuestion,
+      ];
+      const exchanges = session.exchanges || [];
+      // After three back-and-forths on one question, the next thing they say counts as the answer.
+      const mustAnswer = exchanges.length >= 3;
+      const thin = input.answer.trim().split(/\s+/).length < 8;
+      const task = `${replyTask}${last ? "This was the final question, so nextQuestion is null." : `${nextQuestionTask} ${thin ? "If this is an answer, it was almost empty, so leave this topic: switch to a different, more approachable topic from alreadyAsked." : "If this is an answer, the lead and the question must refer to a specific detail the candidate actually said."}`}${mustAnswer ? " The candidate has already talked about this question several times: treat this as kind answer." : ""}`;
+      const turnContext = {
+        setup: {
+          role: session.setup.role,
+          experience: session.setup.experience,
+          track: session.setup.track,
+          difficulty: session.setup.difficulty,
+          industry: session.setup.industry,
+          company: session.setup.company,
         },
-      );
+        earlierAnswers: session.turns.map((t) => ({
+          question: t.question.question,
+          answer: t.answer.slice(0, 1200),
+        })),
+        alreadyAsked: asked.map((q) => q.question),
+        currentQuestion: session.currentQuestion,
+        conversationAboutCurrentQuestion: exchanges,
+        candidateSaid: input.answer,
+      };
+      const needsRetry = (value) =>
+        (value.kind === "answer" || mustAnswer) &&
+        !last &&
+        (!value.nextQuestion || repeats(value.nextQuestion.question, asked));
+      let generated = await ai.generate(replySchema, task, turnContext);
+      // A missing or repeated question feels robotic. A real answer gets one regeneration; an almost
+      // empty one skips it, because waiting for a second model call only adds silence.
+      if (needsRetry(generated.value) && !thin) {
+        const retry = await ai.generate(
+          replySchema,
+          `${task} IMPORTANT: treat this as kind answer and give a nextQuestion about a clearly different situation or skill than ${JSON.stringify(generated.value.nextQuestion?.question || "")}.`,
+          turnContext,
+        );
+        generated = {
+          value: retry.value,
+          usage: {
+            input: generated.usage.input + retry.usage.input,
+            output: generated.usage.output + retry.usage.output,
+          },
+        };
+      }
+      if (needsRetry(generated.value)) {
+        const question = fallbackQuestions.find((q) => !repeats(q, asked));
+        if (question)
+          generated.value = {
+            kind: "answer",
+            reply: "",
+            nextQuestion: {
+              lead: "Let's look at it from a different angle.",
+              question,
+              focus: "Problem solving",
+              difficulty: session.setup.difficulty,
+            },
+          };
+      }
+      const { value } = generated;
+      const answered = value.kind === "answer" || mustAnswer;
+      if (!answered || (!last && !value.nextQuestion)) {
+        session.exchanges = [
+          ...exchanges,
+          {
+            said: input.answer,
+            reply:
+              value.reply || "Take your time. Go ahead whenever you're ready.",
+          },
+        ];
+        db.transaction(() => {
+          save(session.id, session);
+          recordUsage(req.user.id, generated.usage);
+        })();
+        return res.json({ ...session, reply: session.exchanges.at(-1).reply });
+      }
+      const index = session.turns.length;
       session.turns.push({
         question: session.currentQuestion,
         answer: input.answer,
-        evaluation: last ? generated.value : generated.value.evaluation,
+        ...(exchanges.length ? { exchanges } : {}),
         ...(input.delivery ? { delivery: input.delivery } : {}),
       });
-      session.currentQuestion = last ? null : generated.value.nextQuestion;
+      session.exchanges = [];
+      session.currentQuestion = last ? null : tidyQuestion(value.nextQuestion);
       session.state = last ? "report_pending" : "active";
       db.transaction(() => {
         save(session.id, session);
         recordUsage(req.user.id, generated.usage);
       })();
       res.json(session);
+      scoreLater(req.user.id, session.id, index).catch(() => {
+        /* The report scores any answer still missing an evaluation. */
+      });
     }),
   );
+  // Scoring is slow and the candidate should not wait for it between questions.
+  const scoring = new Map();
+  function scoreLater(userId, id, index) {
+    const key = `${id}:${index}`;
+    if (scoring.has(key)) return scoring.get(key);
+    const read = () => {
+      const row = db
+        .prepare("SELECT data FROM interviews WHERE id=? AND user_id=?")
+        .get(id, userId);
+      return row && JSON.parse(row.data);
+    };
+    const job = (async () => {
+      const session = read();
+      const turn = session?.turns[index];
+      if (!turn || turn.evaluation) return;
+      const generated = await ai.generate(
+        evaluationSchema,
+        "Evaluate the candidate's answer to this interview question with concrete evidence from what they said. Consider any conversation they had about the question before answering.",
+        {
+          setup: session.setup,
+          earlierAnswers: session.turns.slice(0, index).map((t) => ({
+            question: t.question.question,
+            answer: t.answer.slice(0, 800),
+          })),
+          question: turn.question,
+          conversationBeforeAnswer: turn.exchanges || [],
+          answer: turn.answer,
+        },
+      );
+      const fresh = read();
+      if (!fresh?.turns[index] || fresh.turns[index].evaluation) return;
+      fresh.turns[index].evaluation = generated.value;
+      db.transaction(() => {
+        save(id, fresh);
+        recordUsage(userId, generated.usage);
+      })();
+    })().finally(() => scoring.delete(key));
+    scoring.set(key, job);
+    return job;
+  }
   app.post("/api/interviews/:id/report", auth, async (req, res) =>
     locked(req.user.id, async () => {
-      const session = owned(req);
+      let session = owned(req);
       if (session.report) return res.json(session);
       if (!session.turns.length)
         fail(400, "Answer at least one question before generating a report.");
+      for (const [i, turn] of session.turns.entries())
+        if (!turn.evaluation) await scoreLater(req.user.id, session.id, i);
+      session = owned(req);
+      if (session.turns.some((turn) => !turn.evaluation))
+        fail(
+          502,
+          "Some answers are still being scored. Please retry in a moment.",
+        );
       const generated = await ai.generate(
         reportSchema,
         "Create an evidence-based coaching summary and a concrete study plan, with practice questions. Consider only answered questions. Never invent performance or hiring outcomes.",

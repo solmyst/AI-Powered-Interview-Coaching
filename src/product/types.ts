@@ -40,7 +40,7 @@ export type Setup = {
   jobDescription: string;
   questionCount: number;
 };
-export type Question = { question: string; focus: string; difficulty: string };
+export type Question = { lead?: string; question: string; focus: string; difficulty: string };
 export type Evaluation = {
   scores: Record<string, number>;
   rationale: string;

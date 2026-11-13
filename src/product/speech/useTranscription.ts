@@ -45,8 +45,12 @@ export function useTranscription(append: (text: string) => void) {
     "ready" | "requesting" | "recording" | "transcribing" | "error"
   >("ready");
   const [error, setError] = useState("");
+  // Live input level (0–1) so the call screen can prove the microphone hears the candidate.
+  const [level, setLevel] = useState(0);
+  const levelAt = useRef(0);
 
   function release() {
+    setLevel(0);
     clearTimeout(timer.current);
     cancelAnimationFrame(monitorFrame.current);
     void monitor.current?.close().catch(() => {});
@@ -165,12 +169,17 @@ export function useTranscription(append: (text: string) => void) {
               return sum + normalized * normalized;
             }, 0) / levels.length,
           );
+          if (time - levelAt.current > 80) {
+            levelAt.current = time;
+            setLevel(Math.min(1, rms * 6));
+          }
           if (rms > 0.018) {
             heardSpeech = true;
             quietSince = 0;
           } else if (heardSpeech) {
             quietSince ||= time;
-            if (time - quietSince > 1800 && Date.now() - started.current > 2500) {
+            // Generous silence window: being cut off mid-thought is the top AI-interview complaint.
+            if (time - quietSince > 2600 && Date.now() - started.current > 2500) {
               nextRecorder.stop();
               return;
             }
@@ -221,6 +230,7 @@ export function useTranscription(append: (text: string) => void) {
 
   return {
     status,
+    level,
     error,
     record,
     stop,

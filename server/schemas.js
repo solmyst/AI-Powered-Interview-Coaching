@@ -43,9 +43,17 @@ export const evaluationSchema = z.object({
   modelAnswer: text,
 });
 export const questionSchema = z.object({
+  // Spoken before the question: a greeting, a reaction to the last answer, or a transition.
+  lead: z.string().trim().max(300),
   question: z.string().trim().min(1).max(1200),
   focus: z.string().min(1).max(150),
   difficulty: z.enum(difficulty),
+});
+// One fast call per candidate utterance: either talk back about the current question, or move on.
+export const replySchema = z.object({
+  kind: z.enum(["answer", "conversation"]),
+  reply: z.string().trim().max(600),
+  nextQuestion: questionSchema.nullable(),
 });
 export const turnSchema = z.object({
   evaluation: evaluationSchema,

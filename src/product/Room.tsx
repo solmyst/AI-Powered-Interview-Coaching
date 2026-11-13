@@ -3,17 +3,20 @@ import {
   Brain,
   Camera,
   Check,
+  HelpCircle,
+  Clock,
   Headphones,
+  Keyboard,
   Maximize,
   Mic,
   Minimize,
   MessageCircle,
+  Moon,
   Pause,
   Play,
-  PhoneOff,
   RotateCcw,
   ShieldCheck,
-  Sparkles,
+  Sun,
   Volume2,
 } from "lucide-react";
 import { api } from "./api";
@@ -85,7 +88,21 @@ export function Room({
   const [fullscreen, setFullscreen] = useState(false);
   const [briefingError, setBriefingError] = useState("");
   const [clarifiedQuestion, setClarifiedQuestion] = useState("");
+  // Maya's spoken reply when the candidate asked her something instead of answering.
+  const [mayaReply, setMayaReply] = useState("");
   const [clarifying, setClarifying] = useState(false);
+  const [typing, setTyping] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [answerStartedAt, setAnswerStartedAt] = useState(0);
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    try { return localStorage.getItem("interviewace:call-theme") === "light" ? "light" : "dark"; } catch { return "dark"; }
+  });
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    try { localStorage.setItem("interviewace:call-theme", next); } catch { /* Theme still applies for this call. */ }
+  }
 
   async function submitSpokenAnswer(text: string) {
     if (callEnded.current) return;
@@ -100,7 +117,7 @@ export function Room({
     setPhase("thinking");
     setError("");
     try {
-      const next = await api<Session>(`/interviews/${session.id}/answers`, {
+      const { reply, ...next } = await api<Session & { reply?: string }>(`/interviews/${session.id}/answers`, {
         method: "POST",
         body: JSON.stringify({
           answer,
@@ -116,10 +133,21 @@ export function Room({
           },
         }),
       });
+      setAnswerPending(false);
+      if (reply) {
+        // Same question, Maya talks back; delivery counters keep running for this question.
+        setMayaReply(reply);
+        setLastAnswer("");
+        setPhase("interviewer");
+        update(next);
+        voice.speak(reply, () => {
+          if (!callEnded.current && !paused.current) resumeInterview();
+        });
+        return;
+      }
       visual.current = emptyVisual();
       spoken.current = { words: 0, fillers: 0 };
       transcription.reset();
-      setAnswerPending(false);
       update(next);
     } catch (reason) {
       // A response can be lost after the server saves a turn. Reconcile before
@@ -173,6 +201,19 @@ export function Room({
     },
     [],
   );
+
+  // Space ends the answer, like a push-to-talk release, unless the user is typing or on a control.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (event.code !== "Space" || /^(INPUT|TEXTAREA|BUTTON|SELECT)$/.test(target.tagName)) return;
+      if (transcription.status !== "recording" || phase !== "listening") return;
+      event.preventDefault();
+      transcription.stop();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   useEffect(() => {
     const sync = () => setFullscreen(Boolean(document.fullscreenElement));
@@ -268,9 +309,10 @@ export function Room({
     deliveredTurn.current = session.turns.length;
     setPhase("interviewer");
     setClarifiedQuestion("");
+    setMayaReply("");
     setLastAnswer("");
     setError("");
-    voice.speak(question, () => {
+    voice.speak(`${session.currentQuestion?.lead || ""} ${question}`.trim(), () => {
       if (callEnded.current || paused.current) return;
       setPhase("listening");
       void transcription.record({
@@ -281,6 +323,10 @@ export function Room({
     // retry intentionally replays the current turn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joined, question, session.turns.length, session.state, transcription.status, retry]);
+
+  useEffect(() => {
+    if (transcription.status === "recording") setAnswerStartedAt(Date.now());
+  }, [transcription.status]);
 
   useEffect(() => {
     if (transcription.status === "transcribing") setPhase("transcribing");
@@ -327,7 +373,21 @@ export function Room({
     setPhase("paused");
   }
 
+  // Typing is a fallback for noisy rooms or speech trouble; it pauses the microphone first.
+  function openTyping() {
+    if (typing) { setTyping(false); return; }
+    pauseInterview();
+    setTyping(true);
+  }
+
+  // Candidates who read the question faster than Maya speaks can start answering at once.
+  function skipToAnswer() {
+    voice.stop();
+    resumeInterview();
+  }
+
   function resumeInterview() {
+    setTyping(false);
     paused.current = false;
     setPhase("listening");
     void transcription.record({ autoStop: true, mediaStream: sharedStream.current || undefined });
@@ -483,53 +543,134 @@ export function Room({
       </div>
     );
 
+  const total = session.setup.questionCount;
+  const current = Math.min(session.turns.length + 1, total);
+  const locked = phase === "thinking" || phase === "transcribing" || phase === "complete" || clarifying || answerPending;
+  const shown = clarifiedQuestion || question;
+  const recording = transcription.status === "recording";
+  const answerSeconds = recording && answerStartedAt ? Math.floor((Date.now() - answerStartedAt) / 1000) : 0;
+  const level = recording ? transcription.level : 0;
   return (
-    <div className="interview-call-shell">
+    <div className="interview-call-shell" data-theme={theme} style={{ "--level": level } as React.CSSProperties}>
       <header className="call-topbar">
-        <div className="call-brand"><Brain size={21} /> InterviewAce</div>
-        <div className={`call-status phase-${phase}`}><i /> {status}</div>
+        <div className="call-brand"><Brain size={20} aria-hidden="true" /><span>InterviewAce</span></div>
+        <span className="call-round">{session.setup.role} · {session.setup.track}</span>
         <div className="call-meta">
-          <span>{formatTime(elapsed)}</span>
-          <span>Question {Math.min(session.turns.length + 1, session.setup.questionCount)} of {session.setup.questionCount}</span>
+          <span className="call-timer" title="Time in this interview"><Clock size={14} aria-hidden="true" /> {formatTime(elapsed)}</span>
+          <button className="icon-only" onClick={toggleTheme} aria-label={theme === "dark" ? "Use light theme" : "Use dark theme"} title="Switch theme">
+            {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+          <button className="icon-only" onClick={() => setHelpOpen((open) => !open)} aria-label="Interview help" aria-expanded={helpOpen} title="Help">
+            <HelpCircle size={18} />
+          </button>
+          <button
+            className="hang-up"
+            disabled={locked}
+            onClick={() => void endInterview()}
+            aria-label="End interview"
+            title={phase === "thinking" || phase === "transcribing" ? "Saving your answer before ending the interview" : "End interview and prepare briefing"}
+          >
+            End interview
+          </button>
         </div>
+        {helpOpen && (
+          <section className="call-help" aria-label="How this interview works">
+            <h2>How this works</h2>
+            <p>Maya asks one question at a time out loud. Take a moment to think; the microphone only waits for you to start. It stops after a short pause, or press <b>Space</b>.</p>
+            <p>Say “repeat the question”, “could you clarify that?” or “pause the interview” at any time, or use the buttons below.</p>
+            <p>Prefer typing? Use the keyboard button. Each answer is saved before the next question.</p>
+          </section>
+        )}
       </header>
 
       <div className="call-stage">
-        <section className="interviewer-tile" aria-label="AI interviewer">
-          <div className={`interviewer-presence ${phase === "interviewer" ? "speaking" : ""}`}>
-            <div className="voice-ring ring-one" />
-            <div className="voice-ring ring-two" />
-            <div className="interviewer-avatar"><Brain size={48} /></div>
+        <nav className="interview-map" aria-label="Interview progress">
+          <p className="map-title">Question {current} of {total}</p>
+          <ol>
+            {Array.from({ length: total }, (_, i) => {
+              const done = session.turns[i];
+              const state = done ? "done" : i === session.turns.length ? "current" : "upcoming";
+              return (
+                <li key={i} className={state} aria-current={state === "current" ? "step" : undefined}>
+                  <span className="map-dot" aria-hidden="true">{done ? <Check size={12} /> : i + 1}</span>
+                  {done ? (
+                    <details>
+                      <summary>{done.question.focus}</summary>
+                      <p className="map-q">{done.question.question}</p>
+                      <p className="map-a"><span className="sr-only">Your answer: </span>{done.answer}</p>
+                    </details>
+                  ) : (
+                    <span className="map-label">{state === "current" ? session.currentQuestion?.focus || "Current question" : "Coming up"}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </nav>
+
+        <section className={`interviewer-tile phase-${phase}`} aria-label="AI interviewer">
+          <div className="maya-presence" aria-hidden="true">
+            <span className="maya-ring r1" />
+            <span className="maya-ring r2" />
+            <span className="maya-core"><Brain size={26} /></span>
           </div>
-          <div className="interviewer-identity">
-            <strong>Maya</strong><span>AI interview coach</span>
-          </div>
+          <p className={`turn-badge phase-${phase}`} aria-live="polite"><i aria-hidden="true" />{status}</p>
           <div
-            className={`question-caption ${question.length > 170 ? "question-very-long" : question.length > 105 ? "question-long" : ""}`}
+            className={`question-caption ${shown.length > 170 ? "question-very-long" : shown.length > 105 ? "question-long" : ""}`}
             aria-live="polite"
           >
-            <span>{phase === "thinking" ? "MAYA IS PREPARING YOUR FOLLOW-UP" : "MAYA ASKS"}</span>
-            <h1>{clarifiedQuestion || question}</h1>
+            {mayaReply ? <p className="question-lead maya-reply">{mayaReply}</p> : session.currentQuestion?.lead && !clarifiedQuestion && <p className="question-lead">{session.currentQuestion.lead}</p>}
+            {session.currentQuestion && (
+              <span className="question-meta">{session.currentQuestion.focus} · {session.currentQuestion.difficulty}</span>
+            )}
+            <h1>{shown}</h1>
           </div>
           <div className="turn-state-slot" aria-live="polite">
-            {phase === "listening" && (
-              <div className="listening-prompt"><span className="audio-wave"><i/><i/><i/><i/><i/></span> Answer naturally. I’ll continue when you finish.</div>
+            {phase === "listening" && !recording && <p className="turn-hint">Take a moment. I’m listening as soon as you start.</p>}
+            {recording && <p className="turn-hint">Answer naturally. I’ll continue after a short pause.</p>}
+            {phase === "transcribing" && <p className="turn-hint">Turning your answer into text…</p>}
+            {lastAnswer && (phase === "thinking" || answerPending) && (
+              <blockquote className="answer-receipt"><span>You said</span>{lastAnswer}</blockquote>
             )}
-            {phase === "transcribing" && <div className="listening-prompt"><Sparkles size={18}/> Understanding your response…</div>}
-            {lastAnswer && phase === "thinking" && <p className="answer-received"><Check size={16}/> Answer received</p>}
-            {phase === "paused" && <p className="listening-prompt">Microphone paused. Resume when you’re ready.</p>}
+            {phase === "paused" && !typing && <p className="turn-hint">Microphone paused. Resume when you’re ready.</p>}
           </div>
         </section>
 
-        <CameraCoach
-          autoStart
-          callMode
-          mediaStream={sharedStream.current}
-          paused={phase !== "listening"}
-          turn={session.turns.length}
-          onSummary={(summary) => { visual.current = summary; }}
-        />
+        <aside className="call-side">
+          <CameraCoach
+            autoStart
+            callMode
+            mediaStream={sharedStream.current}
+            paused={phase !== "listening"}
+            turn={session.turns.length}
+            onSummary={(summary) => { visual.current = summary; }}
+          />
+          <div className={`mic-meter ${recording ? "live" : ""}`}>
+            <Mic size={16} aria-hidden="true" />
+            <span className="meter-track" aria-hidden="true"><span className="meter-fill" /></span>
+            <span className="meter-time">{recording ? formatTime(answerSeconds) : "—"}</span>
+          </div>
+          {recording && answerSeconds >= 120 && <p className="pace-hint">Good time to wrap up this answer.</p>}
+        </aside>
       </div>
+
+      {typing && (
+        <form
+          className="type-answer"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const text = draft.trim();
+            if (text.length < 2 || locked) return;
+            setTyping(false);
+            setDraft("");
+            void submitSpokenAnswer(text);
+          }}
+        >
+          <label htmlFor="typed-answer" className="sr-only">Type your answer</label>
+          <textarea id="typed-answer" autoFocus rows={3} maxLength={8000} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Type your answer…" />
+          <button className="primary-action" disabled={draft.trim().length < 2 || locked}>Send answer</button>
+        </form>
+      )}
 
       {(mediaError || error || transcription.error || voice.error) && (
         <div className="call-error" role="alert">
@@ -539,28 +680,27 @@ export function Room({
       )}
 
       <footer className="call-controls" aria-label="Interview controls">
-        <button
-          className="round-control"
-          onClick={() => void toggleFullscreen()}
-          aria-label={fullscreen ? "Exit full screen" : "Enter full screen"}
-        >{fullscreen ? <Minimize /> : <Maximize />}</button>
-        <button
-          className="round-control"
-          disabled={phase === "thinking" || phase === "transcribing" || phase === "complete" || clarifying || answerPending}
-          onClick={repeatQuestion}
-          aria-label="Repeat question"
-        ><RotateCcw /></button>
-        <button className="round-control" disabled={phase === "thinking" || phase === "transcribing" || phase === "complete" || clarifying || answerPending} onClick={() => phase === "paused" ? resumeInterview() : pauseInterview()} aria-label={phase === "paused" ? "Resume interview" : "Pause interview"}>{phase === "paused" ? <Play /> : <Pause />}</button>
-        <button className="round-control" disabled={phase === "thinking" || phase === "transcribing" || phase === "complete" || clarifying || answerPending} onClick={() => void clarifyQuestion()} aria-label="Clarify question"><MessageCircle /></button>
-        <div className="active-mic" aria-label={transcription.status === "recording" ? "Microphone is recording" : "Microphone is paused"}>
-          <Mic /><span>{transcription.status === "recording" ? "Mic live" : "Mic paused"}</span>
-        </div>
-          <button className="done-speaking" disabled={transcription.status !== "recording" || phase !== "listening"} onClick={transcription.stop}>
-            Done speaking
+        <div className="call-dock">
+          <div className={`active-mic ${recording ? "live" : ""}`} role="img" aria-label={recording ? "Microphone is recording" : "Microphone is paused"}>
+            <Mic size={18} />
+          </div>
+          <button className="round-control" disabled={locked} onClick={repeatQuestion} aria-label="Repeat question" data-tip="Repeat"><RotateCcw size={18} /></button>
+          <button className="round-control" disabled={locked} onClick={() => void clarifyQuestion()} aria-label="Clarify question" data-tip="Clarify"><MessageCircle size={18} /></button>
+          <button className={`round-control ${typing ? "on" : ""}`} disabled={locked} onClick={openTyping} aria-label={typing ? "Close typed answer" : "Type your answer instead"} aria-pressed={typing} data-tip="Type"><Keyboard size={18} /></button>
+          <button className="round-control" disabled={locked} onClick={() => phase === "paused" ? resumeInterview() : pauseInterview()} aria-label={phase === "paused" ? "Resume interview" : "Pause interview"} data-tip={phase === "paused" ? "Resume" : "Pause"}>
+            {phase === "paused" ? <Play size={18} /> : <Pause size={18} />}
           </button>
-        <button className="hang-up" disabled={phase === "thinking" || phase === "transcribing" || phase === "complete" || clarifying || answerPending} onClick={() => void endInterview()} aria-label="End interview" title={phase === "thinking" || phase === "transcribing" ? "Saving your answer before ending the interview" : "End interview and prepare briefing"}>
-          <PhoneOff />
-        </button>
+          <button className="round-control" onClick={() => void toggleFullscreen()} aria-label={fullscreen ? "Exit full screen" : "Enter full screen"} data-tip={fullscreen ? "Exit full screen" : "Full screen"}>
+            {fullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+          </button>
+        </div>
+        {phase === "interviewer" && !clarifying ? (
+          <button className="primary-action" onClick={skipToAnswer}>Skip to my answer</button>
+        ) : (
+          <button className="primary-action" aria-label="Done speaking" aria-keyshortcuts="Space" disabled={!recording || phase !== "listening"} onClick={transcription.stop}>
+            Done speaking <kbd aria-hidden="true">Space</kbd>
+          </button>
+        )}
       </footer>
       {phase === "complete" && <BriefingDialog error={briefingError} retry={() => void endInterview()} back={back} />}
     </div>

@@ -53,8 +53,8 @@ const ai = {
             transferQuestion: "What changes when two regions write at once?" }
         : shape.checks
         ? { summary: "Write handling is now explicit.", checks: [0, 1, 2].map(() => ({ status: "demonstrated", evidence: "invalidate", reason: "Names write invalidation." })), nextStep: "Explain a concurrent write." }
-        : shape.nextQuestion
-        ? { evaluation, nextQuestion: question }
+        : shape.kind
+        ? { kind: "answer", reply: "", nextQuestion: question }
         : shape.scores
           ? evaluation
           : shape.summary

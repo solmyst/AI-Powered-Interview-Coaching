@@ -80,3 +80,26 @@ test("disconnected devices pause the call and reconnect without leaving the inte
   await page.getByRole("button", { name: "Resume interview", exact: true }).click();
   await expect(page.getByLabel("Microphone is recording", { exact: true })).toBeVisible();
 });
+
+test("candidates can type an answer instead of speaking, and Space ends a spoken answer", async ({ page }) => {
+  let sent: { answer: string; expectedTurn: number } | null = null;
+  let transcribed = 0;
+  await page.route("**/api/transcribe", (route) => { transcribed++; return route.fulfill({ json: { text: "", confidence: null, durationMs: 0 } }); });
+  await room(page);
+  await page.route("**/api/interviews/*/answers", (route) => {
+    sent = route.request().postDataJSON();
+    return route.fulfill({ status: 503, json: { error: "Saved for test." } });
+  });
+  await page.getByRole("button", { name: "Allow camera & microphone" }).click();
+  await page.getByRole("button", { name: "Join interview" }).click();
+  await expect(page.getByLabel("Microphone is recording", { exact: true })).toBeVisible();
+  await page.waitForTimeout(1600);
+  await page.locator("body").press("Space");
+  await expect.poll(() => transcribed).toBe(1);
+  await page.getByRole("button", { name: "Repeat question" }).click();
+  await page.getByRole("button", { name: "Type your answer instead" }).click();
+  await expect(page.getByLabel("Microphone is paused", { exact: true })).toBeVisible();
+  await page.getByLabel("Type your answer").fill("I traced the bug with logs and fixed the race.");
+  await page.getByRole("button", { name: "Send answer" }).click();
+  await expect.poll(() => sent).toMatchObject({ answer: "I traced the bug with logs and fixed the race.", expectedTurn: 1 });
+});
