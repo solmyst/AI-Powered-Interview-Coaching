@@ -111,6 +111,11 @@ export type Summary = {
   score: number | null;
 };
 export type Bookmark = Turn & { interviewId: string; turn: number };
+// What the call screen needs. Practice sessions and company screenings both satisfy it;
+// a screening never carries scores, rubric or reports.
+export type RoomSession = Pick<Session, "id" | "state" | "setup" | "currentQuestion"> & {
+  turns: { question: Question; answer: string }[];
+};
 export type Page =
   | "home"
   | "dashboard"
@@ -119,4 +124,37 @@ export type Page =
   | "report"
   | "history"
   | "library"
+  | "company"
   | "profile";
+
+// Company screening: what a candidate and a company user see.
+export type CandidateSummary = {
+  company: string;
+  roleTitle: string;
+  questionCount: number;
+  minutes: number;
+  expires: number;
+  status: string;
+  consentVersion: string;
+  consented: boolean;
+  retentionDays: number;
+  contactEmail: string;
+  answered: number;
+  state: string | null;
+  feedback: { strengths: string[]; areasToPrepare: string[] } | null;
+  noteSent: boolean;
+};
+export type RubricItem = { key: string; label: string; description: string; weight: number };
+export type RoleConfig = {
+  title: string;
+  role: string;
+  experience: string;
+  track: string;
+  difficulty: string;
+  industry: string;
+  jobDescription: string;
+  questionCount: number;
+  rubric: RubricItem[];
+  inviteDays: number;
+  candidateFeedback: "none" | "summary";
+};

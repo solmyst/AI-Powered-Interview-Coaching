@@ -2,6 +2,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { createApp, repeats, tidyQuestion } from "../server/app.js";
+import { answerOf } from "../server/turn.js";
 import { dimensions } from "../server/schemas.js";
 const origin = "http://localhost:5173";
 const evaluation = {
@@ -162,7 +163,10 @@ test("a repeated follow-up is regenerated once and the new question is saved", a
   ).json();
   assert.equal(replyCalls(), 2);
   assert.match(tasks[0], /never repeat or reword anything in alreadyAsked/);
-  assert.match(tasks[0], /refer to a specific detail the candidate actually said/);
+  assert.match(
+    tasks[0],
+    /refer to a specific detail the candidate actually said/,
+  );
   assert.equal(answered.currentQuestion.question, fresh);
 });
 
@@ -260,4 +264,52 @@ test("an almost empty answer skips the retry and moves to a fresh scenario strai
     session.currentQuestion.question,
   );
   assert.match(moved.currentQuestion.lead, /different angle/);
+});
+
+test("a real answer is never treated as chat, and earlier substantive statements stay with it", async () => {
+  const reg = await post("/auth/register", null, {
+    name: "Tester",
+    email: "long@example.test",
+    password: "long-test-password",
+  });
+  const cookie = reg.headers.get("set-cookie").split(";")[0];
+  const session = await (
+    await post(
+      "/interviews",
+      cookie,
+      {
+        role: "Backend",
+        experience: "Early career",
+        track: "Technical",
+        difficulty: "Intermediate",
+        industry: "Technology",
+        questionCount: 3,
+      },
+      { "Idempotency-Key": crypto.randomUUID() },
+    )
+  ).json();
+  // The stub model insists on "conversation", like a small model misreading a real answer.
+  mode = "conversation";
+  tasks.length = 0;
+  const real =
+    "I would store an idempotency key with each request and return the saved result when the same key arrives again.";
+  const moved = await (
+    await post(`/interviews/${session.id}/answers`, cookie, {
+      answer: real,
+      expectedTurn: 0,
+    })
+  ).json();
+  mode = "answer";
+  assert.equal(moved.turns.length, 1);
+  assert.equal(moved.turns[0].answer, real);
+  assert.match(tasks[0], /treat this as kind answer/);
+  // A short question stays chat; a real attempt made earlier is kept when the question finally closes.
+  assert.equal(
+    answerOf(
+      [{ said: "what do you mean?" }, { said: real }],
+      "ok that is my answer",
+    ),
+    real + "\n\nok that is my answer",
+  );
+  assert.equal(answerOf([], "just this"), "just this");
 });

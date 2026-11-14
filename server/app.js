@@ -17,11 +17,13 @@ import { createAI, ServiceError } from "./ai.js";
 import { createTranscriber } from "./transcription.js";
 import { createSpeech } from "./speech.js";
 import { registerRehearsal } from "./rehearsal.js";
+import { answerOf, decideTurn, tidyQuestion } from "./turn.js";
+import { registerScreening } from "./screening.js";
+export { tidyQuestion, repeats } from "./turn.js";
 import {
   setupSchema,
   answerSchema,
   questionSchema,
-  replySchema,
   evaluationSchema,
   reportSchema,
   dimensions,
@@ -45,53 +47,6 @@ const now = () => new Date().toISOString();
 const fail = (status, message) => {
   throw new ServiceError(status, message);
 };
-const replyTask =
-  "You are mid-interview, speaking with the candidate. Decide what their latest words (candidateSaid) are. kind 'conversation': they ask you something (what do you mean, can you repeat, can you give an example, is it okay to…), ask for a moment, or think aloud without really answering yet. Then reply like a human interviewer in one to three short spoken sentences: answer their question about the question, restate it more simply if they were confused, or reassure them if they need time; never give away the answer or any part of the solution: if they ask for an example, give one from a different, simpler topic; end by inviting them to go ahead. nextQuestion is null. kind 'answer': they attempted an answer, even a weak or partial one, or clearly said they cannot answer or want to move on. Then reply is an empty string and nextQuestion follows these rules: ";
-const nextQuestionTask =
-  "ONE nextQuestion, written the way a thoughtful human interviewer talks. nextQuestion.lead: one short spoken sentence reacting to what the candidate actually said (name a specific good point, or, if the answer was empty, off-topic or 'I don't know', reassure briefly without judging, e.g. 'No problem, let's look at something different.'). nextQuestion.question: never repeat or reword anything in alreadyAsked, and do not stay on the same scenario. Use a concrete situational question ('Imagine…', 'Suppose…', 'Tell me about a time…') answerable in about two minutes of speech. Prefer realistic workplace scenarios over résumé recaps. The lead never asks anything. The question is one or two sentences, at most 45 words, with exactly one question mark.";
-// Small models sometimes leak CJK characters into English text; Hindi uses Devanagari and is unaffected.
-const stray = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/g;
-// The lead is spoken before the question, so it must be a plain remark: no asking, no echo, no cut-off sentence.
-export const tidyQuestion = (q) => ({
-  ...q,
-  question: q.question
-    .replace(stray, "")
-    .replace(/\s{2,}/g, " ")
-    .trim(),
-  lead: (q.lead || "")
-    .replace(stray, "")
-    .split(/(?<=[.!?])\s+/)
-    .filter(
-      (sentence) =>
-        /[.!]$/.test(sentence.trim()) &&
-        !/\?|^(could|can|would|will) you\b|\b(tell|walk) me\b/i.test(
-          sentence,
-        ) &&
-        !repeats(sentence, [q]),
-    )
-    .join(" "),
-});
-// Used only when the model keeps repeating itself, so the interview never stalls on one question.
-const fallbackQuestions = [
-  "Imagine your team ships a release and, an hour later, users report that checkout is failing. What do you do in the first fifteen minutes?",
-  "Suppose a teammate's pull request works but is hard to read. How would you give feedback, and what would you want to see change?",
-  "Imagine you are given a task with unclear requirements and a deadline in two days. How do you get unstuck?",
-  "Suppose a page you built loads slowly for users on weak connections. How would you find the cause and what would you try first?",
-];
-// Only words of 4+ letters count, so "would you what" filler cannot hide a reworded question.
-const words = (text) =>
-  new Set(text.toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) || []);
-// True when a new question shares at least three, and half or more, of its meaningful words with one already asked.
-export function repeats(question, asked) {
-  const next = words(question);
-  return asked.some((earlier) => {
-    const before = words(
-      typeof earlier === "string" ? earlier : earlier.question,
-    );
-    const shared = [...next].filter((w) => before.has(w)).length;
-    return shared >= 3 && shared / Math.min(next.size, before.size) >= 0.5;
-  });
-}
 export function createApp({
   env = process.env,
   db = openDatabase(env.DATABASE_PATH || "./data/interviewace.db"),
@@ -110,6 +65,15 @@ export function createApp({
       .map((email) => email.trim().toLowerCase())
       .filter(Boolean),
   );
+  // Company screening is a pilot: only these emails (plus the unlimited testing accounts) can create companies.
+  const screeners = new Set(
+    (env.SCREENING_EMAILS || "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const candidateSpeechLimit = Number(env.CANDIDATE_SPEECH_LIMIT || 150);
+  let screening = null;
   const secure = env.NODE_ENV === "production";
   const origin = env.APP_ORIGIN || "http://localhost:5173";
   if (secure && !origin.startsWith("https://"))
@@ -316,9 +280,27 @@ export function createApp({
         "You've reached today's voice limit. Type your answers or return after 00:00 UTC.",
       );
   }
+  // Speech endpoints serve signed-in users and invited screening candidates.
+  function speaker(req, _res, next) {
+    const user = userFromCookie(req);
+    if (user) {
+      req.user = user;
+      return next();
+    }
+    const candidate = screening.resolveCandidate(req);
+    if (candidate?.status === "started" && candidate.consent) {
+      req.candidate = candidate;
+      return next();
+    }
+    next(new ServiceError(401, "Please sign in to continue."));
+  }
+  const spend = (req) =>
+    req.candidate
+      ? screening.spendCandidateSpeech(req.candidate, candidateSpeechLimit)
+      : spendSpeech(req.user);
   app.post(
     "/api/transcribe",
-    auth,
+    speaker,
     express.raw({ type: "audio/wav", limit: "12mb" }),
     async (req, res) => {
       if (
@@ -328,16 +310,16 @@ export function createApp({
         req.body.subarray(8, 12).toString("ascii") !== "WAVE"
       )
         fail(415, "A valid WAV recording is required.");
-      spendSpeech(req.user);
+      spend(req);
       res.json(await transcriber.transcribe(req.body));
     },
   );
-  app.post("/api/speech", auth, async (req, res) => {
+  app.post("/api/speech", speaker, async (req, res) => {
     const { text } = z
       .object({ text: z.string().trim().min(1).max(2000) })
       .strict()
       .parse(req.body);
-    spendSpeech(req.user);
+    spend(req);
     const generated = await speech.synthesize(text);
     res.type(generated.contentType).send(Buffer.from(generated.audio));
   });
@@ -403,6 +385,17 @@ export function createApp({
     };
   }
   registerRehearsal(app, { auth, locked, owned, save, recordUsage, ai });
+  screening = registerScreening(app, {
+    db,
+    ai,
+    auth,
+    locked,
+    authLimit,
+    hash,
+    secure,
+    origin,
+    allowed: (user) => unlimited.has(user.email) || screeners.has(user.email),
+  });
   app.get("/api/interviews", auth, (req, res) => {
     const sessions = db
       .prepare(
@@ -510,95 +503,30 @@ export function createApp({
           409,
           "This answer is already saved or the session changed. Reload the interview.",
         );
-      const last = session.turns.length + 1 >= session.setup.questionCount;
-      const asked = [
-        ...session.turns.map((t) => t.question),
-        session.currentQuestion,
-      ];
-      const exchanges = session.exchanges || [];
-      // After three back-and-forths on one question, the next thing they say counts as the answer.
-      const mustAnswer = exchanges.length >= 3;
-      const thin = input.answer.trim().split(/\s+/).length < 8;
-      const task = `${replyTask}${last ? "This was the final question, so nextQuestion is null." : `${nextQuestionTask} ${thin ? "If this is an answer, it was almost empty, so leave this topic: switch to a different, more approachable topic from alreadyAsked." : "If this is an answer, the lead and the question must refer to a specific detail the candidate actually said."}`}${mustAnswer ? " The candidate has already talked about this question several times: treat this as kind answer." : ""}`;
-      const turnContext = {
-        setup: {
-          role: session.setup.role,
-          experience: session.setup.experience,
-          track: session.setup.track,
-          difficulty: session.setup.difficulty,
-          industry: session.setup.industry,
-          company: session.setup.company,
-        },
-        earlierAnswers: session.turns.map((t) => ({
-          question: t.question.question,
-          answer: t.answer.slice(0, 1200),
-        })),
-        alreadyAsked: asked.map((q) => q.question),
-        currentQuestion: session.currentQuestion,
-        conversationAboutCurrentQuestion: exchanges,
-        candidateSaid: input.answer,
-      };
-      const needsRetry = (value) =>
-        (value.kind === "answer" || mustAnswer) &&
-        !last &&
-        (!value.nextQuestion || repeats(value.nextQuestion.question, asked));
-      let generated = await ai.generate(replySchema, task, turnContext);
-      // A missing or repeated question feels robotic. A real answer gets one regeneration; an almost
-      // empty one skips it, because waiting for a second model call only adds silence.
-      if (needsRetry(generated.value) && !thin) {
-        const retry = await ai.generate(
-          replySchema,
-          `${task} IMPORTANT: treat this as kind answer and give a nextQuestion about a clearly different situation or skill than ${JSON.stringify(generated.value.nextQuestion?.question || "")}.`,
-          turnContext,
-        );
-        generated = {
-          value: retry.value,
-          usage: {
-            input: generated.usage.input + retry.usage.input,
-            output: generated.usage.output + retry.usage.output,
-          },
-        };
-      }
-      if (needsRetry(generated.value)) {
-        const question = fallbackQuestions.find((q) => !repeats(q, asked));
-        if (question)
-          generated.value = {
-            kind: "answer",
-            reply: "",
-            nextQuestion: {
-              lead: "Let's look at it from a different angle.",
-              question,
-              focus: "Problem solving",
-              difficulty: session.setup.difficulty,
-            },
-          };
-      }
-      const { value } = generated;
-      const answered = value.kind === "answer" || mustAnswer;
-      if (!answered || (!last && !value.nextQuestion)) {
+      const turn = await decideTurn(ai, session, input.answer);
+      if (!turn.answered) {
         session.exchanges = [
-          ...exchanges,
-          {
-            said: input.answer,
-            reply:
-              value.reply || "Take your time. Go ahead whenever you're ready.",
-          },
+          ...(session.exchanges || []),
+          { said: input.answer, reply: turn.reply },
         ];
         db.transaction(() => {
           save(session.id, session);
-          recordUsage(req.user.id, generated.usage);
+          recordUsage(req.user.id, turn.usage);
         })();
-        return res.json({ ...session, reply: session.exchanges.at(-1).reply });
+        return res.json({ ...session, reply: turn.reply });
       }
+      const exchanges = session.exchanges || [];
+      const { last } = turn;
+      const generated = { usage: turn.usage };
       const index = session.turns.length;
       session.turns.push({
         question: session.currentQuestion,
-        answer: input.answer,
+        answer: answerOf(exchanges, input.answer),
         ...(exchanges.length ? { exchanges } : {}),
         ...(input.delivery ? { delivery: input.delivery } : {}),
       });
       session.exchanges = [];
-      session.currentQuestion = last ? null : tidyQuestion(value.nextQuestion);
+      session.currentQuestion = last ? null : turn.nextQuestion;
       session.state = last ? "report_pending" : "active";
       db.transaction(() => {
         save(session.id, session);

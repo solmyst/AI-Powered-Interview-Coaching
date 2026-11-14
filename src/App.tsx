@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   BookOpen,
   History,
+  Briefcase,
   UserRound,
   LogOut,
 } from "lucide-react";
@@ -16,6 +17,7 @@ import { Dashboard, SessionList } from "./product/Dashboard";
 import { Room } from "./product/Room";
 import { Report } from "./product/Report";
 import { Profile } from "./product/Profile";
+import { Company, type Org } from "./product/company/Company";
 import type {
   User,
   Usage,
@@ -43,6 +45,18 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("All");
+  // Company screening is a pilot: the Hiring area shows only for approved accounts and company members.
+  const [hiring, setHiring] = useState<{
+    canCreate: boolean;
+    orgs: Org[];
+  } | null>(null);
+  const loadHiring = useCallback(() => {
+    // Plain fetch, not api(): this menu is optional and must never trigger the global sign-out on a 401.
+    void fetch("/api/orgs")
+      .then((response) => (response.ok ? response.json() : null))
+      .then(setHiring)
+      .catch(() => setHiring(null));
+  }, []);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const refreshHealth = useCallback(() => {
     void api<Health>("/health")
@@ -85,10 +99,13 @@ function App() {
       setPage("home");
       setAuth(true);
       setAuthExpired(true);
-      setError("Your session has expired. Sign in again to reopen your saved interviews.");
+      setError(
+        "Your session has expired. Sign in again to reopen your saved interviews.",
+      );
     };
     window.addEventListener("interviewace:session-expired", expired);
-    return () => window.removeEventListener("interviewace:session-expired", expired);
+    return () =>
+      window.removeEventListener("interviewace:session-expired", expired);
   }, []);
   useEffect(() => {
     refreshHealth();
@@ -103,13 +120,18 @@ function App() {
       .catch((reason) => setError((reason as Error).message))
       .finally(() => setLoading(false));
     // Remove old client-stored API configuration from previous prototype installations.
-    try { localStorage.removeItem("interview_ace_ai_config"); } catch {
+    try {
+      localStorage.removeItem("interview_ace_ai_config");
+    } catch {
       // Privacy settings may disable localStorage; account access uses cookies.
     }
   }, [refreshHealth]);
   useEffect(() => {
-    if (user) void refresh().catch((err) => setError(err.message));
-  }, [user, refresh]);
+    if (user) {
+      void refresh().catch((err) => setError(err.message));
+      loadHiring();
+    } else setHiring(null);
+  }, [user, refresh, loadHiring]);
   function navigate(next: Page) {
     setPage(next);
     setError("");
@@ -152,7 +174,10 @@ function App() {
   }
   const start = () => {
     if (user) navigate("setup");
-    else { setAuthExpired(false); setAuth(true); }
+    else {
+      setAuthExpired(false);
+      setAuth(true);
+    }
   };
   if (loading)
     return (
@@ -165,6 +190,9 @@ function App() {
     ["dashboard", LayoutDashboard, "Overview"],
     ["history", History, "My interviews"],
     ["library", BookOpen, "Revision library"],
+    ...(hiring && (hiring.orgs.length || hiring.canCreate)
+      ? ([["company", Briefcase, "Hiring"]] as const)
+      : []),
     ["profile", UserRound, "Profile"],
   ] as const;
   return (
@@ -172,74 +200,85 @@ function App() {
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      {page !== "room" && <header className="site-header">
-        <div className="wrap header-inner">
-          <button
-            className="brand"
-            onClick={() => {
-              setAuth(false);
-              navigate(user ? "dashboard" : "home");
-            }}
-            aria-label="InterviewAce home"
-          >
-            <span>
-              <Brain size={23} />
-            </span>
-            InterviewAce<span className="brand-period">.</span>
-          </button>
-          {user ? (
-            <>
-              <nav aria-label="Main navigation">
-                {nav.map(([p, Icon, label]) => (
-                  <button
-                    key={p}
-                    className={page === p ? "active" : ""}
-                    aria-current={page === p ? "page" : undefined}
-                    onClick={() => navigate(p)}
-                  >
-                    <Icon size={16} />
-                    <span>{label}</span>
-                  </button>
-                ))}
+      {page !== "room" && (
+        <header className="site-header">
+          <div className="wrap header-inner">
+            <button
+              className="brand"
+              onClick={() => {
+                setAuth(false);
+                navigate(user ? "dashboard" : "home");
+              }}
+              aria-label="InterviewAce home"
+            >
+              <span>
+                <Brain size={23} />
+              </span>
+              InterviewAce<span className="brand-period">.</span>
+            </button>
+            {user ? (
+              <>
+                <nav aria-label="Main navigation">
+                  {nav.map(([p, Icon, label]) => (
+                    <button
+                      key={p}
+                      className={page === p ? "active" : ""}
+                      aria-current={page === p ? "page" : undefined}
+                      onClick={() => navigate(p)}
+                    >
+                      <Icon size={16} />
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                </nav>
+                <button
+                  className="icon-button"
+                  onClick={logout}
+                  aria-label="Sign out"
+                >
+                  <LogOut size={19} />
+                </button>
+              </>
+            ) : (
+              <nav>
+                <a
+                  className="how-link"
+                  href="#how-it-works"
+                  onClick={() => setAuth(false)}
+                >
+                  How it works
+                </a>
+                <button className="primary small" onClick={start}>
+                  Start practicing <ArrowUpRight size={16} />
+                </button>
               </nav>
-              <button
-                className="icon-button"
-                onClick={logout}
-                aria-label="Sign out"
-              >
-                <LogOut size={19} />
-              </button>
-            </>
-          ) : (
-            <nav>
-              <a
-                className="how-link"
-                href="#how-it-works"
-                onClick={() => setAuth(false)}
-              >
-                How it works
-              </a>
-              <button className="primary small" onClick={start}>
-                Start practicing <ArrowUpRight size={16} />
-              </button>
-            </nav>
-          )}
-        </div>
-      </header>}
+            )}
+          </div>
+        </header>
+      )}
       <main id="main">
         {error && (
           <div className="wrap error" role="alert">
             {error}
-            {user && <button
-              className="text-button"
-              onClick={() => {
-                setError("");
-                void refresh().catch((err) => setError(err.message));
-              }}
-            >
-              Retry
-            </button>}
-            {!user && !authExpired && <button className="text-button" onClick={() => window.location.reload()}>Reload connection</button>}
+            {user && (
+              <button
+                className="text-button"
+                onClick={() => {
+                  setError("");
+                  void refresh().catch((err) => setError(err.message));
+                }}
+              >
+                Retry
+              </button>
+            )}
+            {!user && !authExpired && (
+              <button
+                className="text-button"
+                onClick={() => window.location.reload()}
+              >
+                Reload connection
+              </button>
+            )}
           </div>
         )}
         {!user ? (
@@ -287,7 +326,7 @@ function App() {
                 transcriptionReady={Boolean(health?.transcription.ready)}
                 speechReady={Boolean(health?.speech.ready)}
                 update={(s) => {
-                  opened(s);
+                  opened(s as unknown as Session);
                   void refresh().catch((err) => setError(err.message));
                 }}
                 back={() => navigate("dashboard")}
@@ -421,6 +460,13 @@ function App() {
                   ))
                 )}
               </div>
+            )}
+            {page === "company" && hiring && (
+              <Company
+                canCreate={hiring.canCreate}
+                orgs={hiring.orgs}
+                reload={loadHiring}
+              />
             )}
             {page === "profile" && (
               <Profile

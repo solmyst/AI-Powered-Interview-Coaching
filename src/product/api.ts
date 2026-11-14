@@ -15,7 +15,8 @@ export async function api<T>(
   const data = await response.json().catch(() => null);
   if (data === null) throw new Error("The server returned an unreadable response. Please retry.");
   if (!response.ok) {
-    if (response.status === 401 && !path.startsWith("/auth/")) {
+    // Candidates have no account: their 401 means "link expired or replaced", never "sign in".
+    if (response.status === 401 && !path.startsWith("/auth/") && !path.startsWith("/candidate/")) {
       window.dispatchEvent(new Event("interviewace:session-expired"));
       throw new Error("Your session has expired. Sign in again to reopen your saved interviews.");
     }

@@ -134,6 +134,8 @@ Vite proxies `/api` to the Node server on loopback port 3001. SQLite is created 
 | `DAILY_INTERVIEW_LIMIT` | `5` successful starts per user per UTC day                                        |
 | `DAILY_SPEECH_LIMIT`    | `300` paid transcription and interviewer-voice calls per user per UTC day         |
 | `UNLIMITED_EMAILS`      | Comma-separated owner/testing emails with no daily caps; register them first      |
+| `SCREENING_EMAILS`      | Comma-separated emails that may create a company for candidate screening (pilot); unlimited accounts can too |
+| `CANDIDATE_SPEECH_LIMIT`| `150` voice calls per invited screening candidate                                  |
 | `ASSEMBLYAI_API_KEY`    | Server-only transcription credential                                              |
 | `ASSEMBLYAI_MODEL`      | `universal-3-5-pro`                                                               |
 | `SARVAM_API_KEY`        | Server-only TTS credential                                                        |

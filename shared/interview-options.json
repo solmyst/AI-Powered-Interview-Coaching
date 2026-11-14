@@ -25,5 +25,161 @@
     "Experienced",
     "Senior / lead"
   ],
-  "difficulty": ["Foundational", "Intermediate", "Advanced"]
+  "difficulty": [
+    "Foundational",
+    "Intermediate",
+    "Advanced"
+  ],
+  "rubrics": {
+    "Technical": [
+      {
+        "key": "problem_solving",
+        "label": "Problem solving",
+        "description": "Breaks the problem down, weighs options and reaches a workable approach.",
+        "weight": 3
+      },
+      {
+        "key": "technical_depth",
+        "label": "Technical depth",
+        "description": "Explains how and why things work, not only what to use.",
+        "weight": 3
+      },
+      {
+        "key": "communication",
+        "label": "Communication",
+        "description": "Explains clearly, structured, answers what was asked.",
+        "weight": 2
+      },
+      {
+        "key": "practical_judgment",
+        "label": "Practical judgment",
+        "description": "Considers trade-offs, failure cases and real constraints.",
+        "weight": 2
+      }
+    ],
+    "Coding": [
+      {
+        "key": "problem_solving",
+        "label": "Problem solving",
+        "description": "Chooses a sound algorithm and handles edge cases.",
+        "weight": 3
+      },
+      {
+        "key": "code_quality",
+        "label": "Code quality",
+        "description": "Describes readable, testable and maintainable code.",
+        "weight": 2
+      },
+      {
+        "key": "complexity",
+        "label": "Complexity awareness",
+        "description": "Reasons about time and space cost.",
+        "weight": 2
+      },
+      {
+        "key": "communication",
+        "label": "Communication",
+        "description": "Explains the approach step by step.",
+        "weight": 2
+      }
+    ],
+    "System design": [
+      {
+        "key": "architecture",
+        "label": "Architecture",
+        "description": "Proposes components that fit the requirements.",
+        "weight": 3
+      },
+      {
+        "key": "scalability",
+        "label": "Scalability and reliability",
+        "description": "Handles load, failure and data growth.",
+        "weight": 3
+      },
+      {
+        "key": "trade_offs",
+        "label": "Trade-offs",
+        "description": "Compares options and justifies choices.",
+        "weight": 2
+      },
+      {
+        "key": "communication",
+        "label": "Communication",
+        "description": "Structures the design clearly.",
+        "weight": 2
+      }
+    ],
+    "Behavioral": [
+      {
+        "key": "ownership",
+        "label": "Ownership",
+        "description": "Takes responsibility and drives outcomes.",
+        "weight": 3
+      },
+      {
+        "key": "collaboration",
+        "label": "Collaboration",
+        "description": "Works well with others, handles disagreement.",
+        "weight": 2
+      },
+      {
+        "key": "self_awareness",
+        "label": "Self-awareness and learning",
+        "description": "Reflects honestly and learns from mistakes.",
+        "weight": 2
+      },
+      {
+        "key": "communication",
+        "label": "Communication",
+        "description": "Tells a clear, specific story.",
+        "weight": 2
+      }
+    ],
+    "Product sense": [
+      {
+        "key": "user_focus",
+        "label": "User focus",
+        "description": "Understands users and their problems.",
+        "weight": 3
+      },
+      {
+        "key": "prioritization",
+        "label": "Prioritization",
+        "description": "Chooses what to do first and why.",
+        "weight": 3
+      },
+      {
+        "key": "metrics",
+        "label": "Metrics",
+        "description": "Defines how success is measured.",
+        "weight": 2
+      },
+      {
+        "key": "communication",
+        "label": "Communication",
+        "description": "Explains reasoning clearly.",
+        "weight": 2
+      }
+    ],
+    "Aptitude": [
+      {
+        "key": "reasoning",
+        "label": "Reasoning",
+        "description": "Works logically toward the right answer.",
+        "weight": 3
+      },
+      {
+        "key": "accuracy",
+        "label": "Accuracy",
+        "description": "Gets details and numbers right.",
+        "weight": 3
+      },
+      {
+        "key": "approach",
+        "label": "Approach",
+        "description": "Chooses an efficient method and checks it.",
+        "weight": 2
+      }
+    ]
+  }
 }

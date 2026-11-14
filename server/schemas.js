@@ -23,6 +23,60 @@ export const setupSchema = z
   })
   .strict();
 const text = z.string().trim().min(1).max(3000);
+// Screening: a role is the setup form plus a company-written rubric.
+export const rubricItem = z.object({
+  key: z.string().regex(/^[a-z][a-z0-9_]{1,30}$/),
+  label: z.string().trim().min(1).max(60),
+  description: z.string().trim().min(1).max(400),
+  weight: z.number().int().min(1).max(5),
+});
+export const roleConfigSchema = z
+  .object({
+    title: z.string().trim().min(2).max(100),
+    role: z.enum(roles),
+    experience: z.enum(experience),
+    track: z.enum(tracks),
+    difficulty: z.enum(difficulty),
+    industry: z.string().trim().min(1).max(80),
+    jobDescription: z.string().trim().min(50).max(6000),
+    questionCount: z.number().int().min(3).max(8),
+    rubric: z
+      .array(rubricItem)
+      .min(2)
+      .max(6)
+      .refine(
+        (items) => new Set(items.map((i) => i.key)).size === items.length,
+        "Rubric keys must be unique",
+      ),
+    inviteDays: z.number().int().min(1).max(30).default(7),
+    candidateFeedback: z.enum(["none", "summary"]).default("summary"),
+  })
+  .strict();
+export const screeningEvaluationSchema = (rubric) =>
+  z.object({
+    scores: z.object(
+      Object.fromEntries(
+        rubric.map((r) => [r.key, z.number().int().min(0).max(100)]),
+      ),
+    ),
+    evidence: z
+      .array(
+        z.object({
+          competency: z.enum(rubric.map((r) => r.key)),
+          quote: z.string().trim().min(8).max(300),
+          supports: z.enum(["strength", "concern"]),
+        }),
+      )
+      .max(6),
+    rationale: z.string().trim().min(1).max(1200),
+    followUpForHuman: z.string().trim().max(300).optional(),
+  });
+export const screeningReportSchema = z.object({
+  summary: z.string().trim().min(1).max(1500),
+  strengths: z.array(z.string().trim().min(1).max(400)).min(1).max(4),
+  concerns: z.array(z.string().trim().min(1).max(400)).max(4),
+  suggestedFollowUps: z.array(z.string().trim().min(1).max(400)).min(1).max(4),
+});
 const score = z.number().int().min(0).max(100);
 export const dimensions = [
   "correctness",

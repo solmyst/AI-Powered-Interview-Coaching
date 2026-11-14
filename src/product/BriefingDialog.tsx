@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 import { Check } from "lucide-react";
 
-export function BriefingDialog({ error, retry, back }: {
+export function BriefingDialog({ error, retry, back, screening = false }: {
+  screening?: boolean;
   error: string;
   retry: () => void;
   back: () => void;
@@ -27,12 +28,12 @@ export function BriefingDialog({ error, retry, back }: {
       <p className="eyebrow">SESSION SAVED</p>
       <h2 id="briefing-title" tabIndex={-1} ref={heading}>Interview complete</h2>
       {error ? <>
-        <p>We couldn’t prepare your briefing yet. Your saved answers are safe.</p>
+        <p>{screening ? "We couldn’t submit your interview yet. Your saved answers are safe." : "We couldn’t prepare your briefing yet. Your saved answers are safe."}</p>
         <p className="briefing-error" role="alert">{error}</p>
-        <button className="primary" onClick={retry}>Try preparing briefing again</button>
+        <button className="primary" onClick={retry}>{screening ? "Try submitting again" : "Try preparing briefing again"}</button>
         <button className="text-button" onClick={back}>Return to dashboard</button>
       </> : <div role="status">
-        <p>Maya is preparing your briefing, answer feedback, and next-step study plan.</p>
+        <p>{screening ? "Submitting your interview. This can take a few seconds." : "Maya is preparing your briefing, answer feedback, and next-step study plan."}</p>
         <div className="briefing-progress" aria-hidden="true"><i /><i /><i /></div>
         <small>This can take a little time. Please keep this window open.</small>
       </div>}
