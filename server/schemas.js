@@ -109,6 +109,14 @@ export const replySchema = z.object({
   reply: z.string().trim().max(600),
   nextQuestion: questionSchema.nullable(),
 });
+// The server decides which of the two it is, then constrains the model to that shape.
+export const answerReplySchema = replySchema.extend({
+  kind: z.literal("answer"),
+});
+export const talkReplySchema = replySchema.extend({
+  kind: z.literal("conversation"),
+  nextQuestion: z.null(),
+});
 export const turnSchema = z.object({
   evaluation: evaluationSchema,
   nextQuestion: questionSchema,

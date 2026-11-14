@@ -2,7 +2,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { createApp, repeats, tidyQuestion } from "../server/app.js";
-import { answerOf } from "../server/turn.js";
+import { answerOf, intentOf, tidyReply } from "../server/turn.js";
 import { dimensions } from "../server/schemas.js";
 const origin = "http://localhost:5173";
 const evaluation = {
@@ -312,4 +312,20 @@ test("a real answer is never treated as chat, and earlier substantive statements
     real + "\n\nok that is my answer",
   );
   assert.equal(answerOf([], "just this"), "just this");
+});
+
+test("intent is decided by the server, not the model", () => {
+  const want = {
+    "I would use a lock on the payment record": "answer",
+    "I don't know, I have not worked on that.": "answer",
+    "What do you mean by two requests at once?": "talk",
+    "Sorry, can you repeat the question?": "talk",
+    "Hmm, give me a second to think about it.": "talk",
+    okay: "talk",
+    "I would check the database first, is that what you mean?": "talk",
+  };
+  for (const [said, intent] of Object.entries(want))
+    assert.equal(intentOf(said), intent, said);
+  assert.equal(intentOf("what do you mean?", [{}, {}, {}]), "answer");
+  assert.equal(tidyReply("Good instinct. Take your time."), "Take your time.");
 });
