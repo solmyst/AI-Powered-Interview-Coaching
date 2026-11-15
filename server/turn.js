@@ -10,7 +10,7 @@ export const answerTask =
   midInterview +
   "The candidate's latest words (candidateSaid) are their answer to currentQuestion, even if weak, partial or 'I don't know'. Set kind to 'answer' and reply to an empty string. nextQuestion follows these rules: ";
 export const nextQuestionTask =
-  "ONE nextQuestion, written the way a thoughtful human interviewer talks. nextQuestion.lead: one short spoken sentence reacting to what the candidate actually said (when they said something concrete, name that exact detail in your own words; when the answer was empty or 'I don't know', reassure them briefly and kindly without judging; never reuse a stock phrase, vary the wording every turn and never say 'let's look at something different' after a real answer). nextQuestion.question: never repeat or reword anything in alreadyAsked, and do not stay on the same scenario. Use a concrete situational question ('Imagine…', 'Suppose…', 'Tell me about a time…') answerable in about two minutes of speech. Prefer realistic workplace scenarios over résumé recaps. The lead never asks anything. The question is one or two sentences, at most 45 words, with exactly one question mark.";
+  "ONE nextQuestion, written the way a thoughtful human interviewer talks. nextQuestion.lead: one short spoken sentence reacting to what the candidate actually said (when they said something concrete, name that exact detail in your own words; when the answer was empty or 'I don't know', reassure them briefly and kindly without judging; never reuse a stock phrase, vary the wording every turn and never say 'let's look at something different' after a real answer). nextQuestion.question: never repeat or reword anything in alreadyAsked, and do not stay on the same scenario. Use a concrete situational question ('Imagine…', 'Suppose…', 'Tell me about a time…') answerable in about two minutes of speech. Prefer realistic workplace scenarios over résumé recaps. The lead never asks anything and never suggests an approach, technique, tool or hint toward the answer; it only reacts. The question is one or two sentences, at most 45 words, with exactly one question mark.";
 // Small models sometimes leak CJK characters into English text; Hindi uses Devanagari and is unaffected.
 const stray = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/g;
 // The lead is spoken before the question, so it must be a plain remark: no asking, no echo, no cut-off sentence.
@@ -35,7 +35,7 @@ export const tidyQuestion = (q) => ({
     .filter(
       (sentence) =>
         /[.!]$/.test(sentence.trim()) &&
-        !/\?|^(could|can|would|will) you\b|\b(tell|walk) me\b/i.test(
+        !/\?|^(could|can|would|will) you\b|\b(tell|walk) me\b|\b(one approach|an approach|you could|you might|consider|try using|a good way|comes to mind)\b/i.test(
           sentence,
         ) &&
         !repeats(sentence, [q]),
