@@ -44,7 +44,7 @@ The Azure pilot is configured with:
 | ---------------------------------------------------- | ----------------------- | ------------------------------------------------ |
 | Questions, answer evaluations, reports, and coaching | NVIDIA hosted inference | `nvidia/nemotron-3.5-lightning-30b-a3b`          |
 | Spoken-answer transcription                          | AssemblyAI              | `universal-3-5-pro`                              |
-| Interviewer speech                                   | Sarvam                  | `bulbul:v4-flash` / `simran_enhi_customer`       |
+| Interviewer speech                                   | Sarvam                  | `bulbul:v4-flash` / `sophia_en_conversational`       |
 | Optional local text generation                       | Ollama                  | Default: `qwen2.5:7b-instruct`                   |
 | Camera presence analysis                             | MediaPipe Tasks Vision  | Face and pose landmarks processed in the browser |
 
@@ -82,7 +82,7 @@ ASSEMBLYAI_MODEL=universal-3-5-pro
 
 SARVAM_API_KEY=your_sarvam_key
 SARVAM_MODEL=bulbul:v4-flash
-SARVAM_VOICE=simran_enhi_customer
+SARVAM_VOICE=sophia_en_conversational
 ```
 
 Use credentials and model access available to your accounts. AssemblyAI is required for spoken answers. Sarvam is optional if browser TTS is sufficient. V4 Flash requires a compatible persona ID; old v3 names such as `priya` are not valid v4 voices.
@@ -140,7 +140,7 @@ Vite proxies `/api` to the Node server on loopback port 3001. SQLite is created 
 | `ASSEMBLYAI_MODEL`      | `universal-3-5-pro`                                                               |
 | `SARVAM_API_KEY`        | Server-only TTS credential                                                        |
 | `SARVAM_MODEL`          | `bulbul:v4-flash`                                                                 |
-| `SARVAM_VOICE`          | `simran_enhi_customer`                                                            |
+| `SARVAM_VOICE`          | `sophia_en_conversational`                                                            |
 | `NODE_ENV`              | `production` on the deployed server                                               |
 
 ## Architecture and storage

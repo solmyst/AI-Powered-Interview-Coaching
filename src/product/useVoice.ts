@@ -32,6 +32,8 @@ export function useVoice(
 ) {
   const recognition = useRef<Recognition | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
+  // One element that a user click has already played, so later automatic playback is allowed (Safari, iOS).
+  const shared = useRef<HTMLAudioElement | null>(null);
   const audioUrl = useRef("");
   const speechRequest = useRef<AbortController | null>(null);
   const speechGeneration = useRef(0);
@@ -46,6 +48,14 @@ export function useVoice(
   const engine =
     (window as unknown as VoiceWindow).SpeechRecognition ||
     (window as unknown as VoiceWindow).webkitSpeechRecognition;
+  function unlock() {
+    if (shared.current) return;
+    const el = new Audio(
+      "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAwF0AAIC7AAACABAAZGF0YQAAAAA=",
+    );
+    shared.current = el;
+    void el.play().catch(() => {});
+  }
   function stop() {
     setPreparing(false);
     speechGeneration.current++;
@@ -105,11 +115,17 @@ export function useVoice(
       setError("Could not start the microphone. Please retry.");
     }
   }
-  function speakWithBrowser(text: string, generation: number, onDone?: () => void) {
+  function speakWithBrowser(
+    text: string,
+    generation: number,
+    onDone?: () => void,
+  ) {
     if (generation !== speechGeneration.current) return;
     setPreparing(false);
     if (!window.speechSynthesis) {
-      setError("Spoken questions are unavailable. Read the question on screen.");
+      setError(
+        "Spoken questions are unavailable. Read the question on screen.",
+      );
       setSpeaking(false);
       onDone?.();
       return;
@@ -147,9 +163,13 @@ export function useVoice(
     setPreparing(true);
     speechRequest.current = controller;
     let usedFallback = false;
-    const fallback = () => {
+    const fallback = (why: string) => {
       if (usedFallback) return;
       usedFallback = true;
+      console.warn("Interviewer voice fell back to the device voice:", why);
+      setError(
+        `Maya's studio voice could not play (${why}), so your device voice is used.`,
+      );
       audio.current?.pause();
       speakWithBrowser(text, generation, onDone);
     };
@@ -160,26 +180,41 @@ export function useVoice(
       signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12000)]),
     })
       .then(async (response) => {
-        if (!response.ok) throw new Error("Cloud speech unavailable");
+        if (!response.ok) throw new Error(`speech service ${response.status}`);
         return response.blob();
       })
       .then((blob) => {
         if (generation !== speechGeneration.current) return;
         setPreparing(false);
         audioUrl.current = URL.createObjectURL(blob);
-        const player = new Audio(audioUrl.current);
+        const player = shared.current ?? new Audio();
+        player.src = audioUrl.current;
         audio.current = player;
         player.onended = () => {
           if (generation !== speechGeneration.current) return;
           setSpeaking(false);
           onDone?.();
         };
-        player.onerror = fallback;
-        return player.play();
+        player.onerror = () => fallback("audio could not be decoded");
+        return player.play().catch((reason) => {
+          throw Object.assign(new Error("blocked"), {
+            why: "the browser blocked playback",
+            cause: reason,
+          });
+        });
       })
       .catch((reason) => {
-        if (generation !== speechGeneration.current || reason?.name === "AbortError") return;
-        fallback();
+        if (
+          generation !== speechGeneration.current ||
+          reason?.name === "AbortError"
+        )
+          return;
+        fallback(
+          reason?.why ||
+            (reason?.name === "TimeoutError"
+              ? "it took too long"
+              : reason?.message || "unknown error"),
+        );
       });
   }
   useEffect(
@@ -207,6 +242,7 @@ export function useVoice(
     available: Boolean(engine),
     dictate,
     speak,
+    unlock,
     stop,
     durationMs: () =>
       Math.round(

@@ -101,7 +101,7 @@ ASSEMBLYAI_API_KEY=configure_on_the_vm_only
 ASSEMBLYAI_MODEL=universal-3-5-pro
 SARVAM_API_KEY=configure_on_the_vm_only
 SARVAM_MODEL=bulbul:v4-flash
-SARVAM_VOICE=simran_enhi_customer
+SARVAM_VOICE=sophia_en_conversational
 ```
 
 Install and start the service:

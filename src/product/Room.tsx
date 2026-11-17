@@ -560,6 +560,7 @@ export function Room({
               disabled={!transcriptionReady || transcription.status !== "ready" || mediaState !== "ready"}
               onClick={() => {
                 callStartedAt.current = Date.now();
+                voice.unlock();
                 setPhase("joining");
                 void document.documentElement.requestFullscreen?.().catch(() => {});
                 setJoined(true);

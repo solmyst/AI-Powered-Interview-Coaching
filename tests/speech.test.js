@@ -39,7 +39,7 @@ test("Sarvam TTS reports readiness only with a key", async () => {
   assert.deepEqual(createSpeech({}).status(), {
     provider: "sarvam",
     model: "bulbul:v4-flash",
-    voiceId: "simran_enhi_customer",
+    voiceId: "sophia_en_conversational",
     ready: false,
   });
   await assert.rejects(createSpeech({}).synthesize("Hello"), /not configured/);
