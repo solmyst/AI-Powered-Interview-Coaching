@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import { useRef, useState } from "react";
 import { ArrowRight, FileText, SlidersHorizontal } from "lucide-react";
 import { api } from "./api";
@@ -41,7 +42,7 @@ export function Setup({
   const select = (label: string, key: keyof SetupType, options: string[]) => (
     <label>
       {label}
-      <select
+      <NativeSelect
         disabled={busy}
         value={form[key]}
         onChange={(e) => update(key, e.target.value)}
@@ -49,7 +50,7 @@ export function Setup({
         {options.map((s) => (
           <option key={s}>{s}</option>
         ))}
-      </select>
+      </NativeSelect>
     </label>
   );
   return (
@@ -203,7 +204,7 @@ export function Setup({
             <hr />
             <label>
               Number of questions
-              <select
+              <NativeSelect
                 disabled={busy}
                 value={form.questionCount}
                 onChange={(e) =>
@@ -215,7 +216,7 @@ export function Setup({
                     {n} questions · about {n * 3} minutes
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </label>
             <ul className="checklist">
               <li>Adaptive follow-up questions</li>

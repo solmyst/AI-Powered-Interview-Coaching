@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Brain, Check, ShieldCheck } from "lucide-react";
 import { api } from "./api";
 import { Room } from "./Room";
@@ -440,25 +441,28 @@ function Notice({
           </p>
         </div>
       </div>
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={ai}
-          onChange={(e) => setAi(e.target.checked)}
-        />
-        <span>
-          I understand an AI conducts and scores this interview and a person
-          reviews it.
-        </span>
-      </label>
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={data}
-          onChange={(e) => setData(e.target.checked)}
-        />
-        <span>I agree to the processing described above.</span>
-      </label>
+      <fieldset className="consent-fields">
+        <legend>Your consent</legend>
+        <label className="check" htmlFor="candidate-ai-consent">
+          <Checkbox
+            id="candidate-ai-consent"
+            checked={ai}
+            onCheckedChange={(checked) => setAi(checked === true)}
+          />
+          <span>
+            I understand an AI conducts and scores this interview and a person
+            reviews it.
+          </span>
+        </label>
+        <label className="check" htmlFor="candidate-data-consent">
+          <Checkbox
+            id="candidate-data-consent"
+            checked={data}
+            onCheckedChange={(checked) => setData(checked === true)}
+          />
+          <span>I agree to the processing described above.</span>
+        </label>
+      </fieldset>
       {error && (
         <p className="error" role="alert">
           {error}

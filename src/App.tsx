@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import { useCallback, useEffect, useState } from "react";
 import {
   Brain,
@@ -401,14 +402,14 @@ function WorkspaceApp({ mode }: { mode: "practice" | "hiring" }) {
                 </div>
                 <label className="filter-label">
                   Show
-                  <select
+                  <NativeSelect
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
                   >
                     <option>All</option>
                     <option>Complete</option>
                     <option>In progress</option>
-                  </select>
+                  </NativeSelect>
                 </label>
                 {deleteId && (
                   <section className="notice" role="alert">

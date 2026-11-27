@@ -83,7 +83,7 @@ input[data-slot="input"] {
   min-height: 46px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--surface);
+  background: var(--field-surface, var(--surface));
   color: var(--ink);
   padding: 12px 14px;
   font: inherit;
@@ -105,6 +105,83 @@ input[data-slot="input"]:disabled {
 .password-field input[data-slot="input"] {
   padding-right: 52px;
 }
+
+/* shadcn Native Select: native keyboard/mobile picker, with an inset Lucide icon. */
+.ui-select-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin-top: 8px;
+}
+.ui-select-wrap > select[data-slot="native-select"] {
+  appearance: none;
+  width: 100%;
+  min-width: 0;
+  height: 46px;
+  margin: 0;
+  padding: 10px 40px 10px 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field-surface, var(--surface));
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  box-shadow: 0 1px 2px #03121105;
+  cursor: pointer;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+.ui-select-wrap > [data-slot="native-select-icon"] {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+.ui-select-wrap > select:hover:not(:disabled) { border-color: var(--accent); }
+.ui-select-wrap > select:focus-visible {
+  outline: 0;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px #00666e24;
+}
+.ui-select-wrap:has(select:disabled) { opacity: 0.6; }
+.ui-select-wrap > select:disabled { cursor: not-allowed; }
+.ui-select-wrap > select[aria-invalid="true"] { border-color: var(--danger-ink); }
+
+/* shadcn/Radix Checkbox: a single visual control with native form integration. */
+[data-slot="checkbox"].ui-checkbox {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  min-height: 18px;
+  flex: 0 0 18px;
+  padding: 0;
+  border: 1px solid #7e9690;
+  border-radius: 4px;
+  background: var(--field-surface, var(--surface));
+  color: var(--paper);
+  box-shadow: 0 1px 2px #0312110a;
+  cursor: pointer;
+  transition: border-color 120ms, background-color 120ms, box-shadow 120ms;
+}
+[data-slot="checkbox"].ui-checkbox[data-state="checked"],
+[data-slot="checkbox"].ui-checkbox[data-state="indeterminate"] {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+[data-slot="checkbox"].ui-checkbox:hover:not(:disabled) { border-color: var(--accent); }
+[data-slot="checkbox"].ui-checkbox:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px #00666e18;
+}
+[data-slot="checkbox"].ui-checkbox:disabled { opacity: 0.5; cursor: not-allowed; }
+[data-slot="checkbox-indicator"] { display: grid; place-items: center; }
+[data-slot="checkbox"][data-state="indeterminate"] svg { clip-path: inset(45% 0); }
 .progress-card {
   margin-top: 28px;
 }
@@ -209,7 +286,9 @@ input[data-slot="input"]:disabled {
 }
 @media (prefers-reduced-motion: reduce) {
   [data-slot="button"],
-  input[data-slot="input"] {
+  input[data-slot="input"],
+  [data-slot="native-select"],
+  [data-slot="checkbox"] {
     transition: none;
   }
   .shine-border {

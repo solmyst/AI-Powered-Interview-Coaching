@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import { useCallback, useEffect, useState } from "react";
 import {
   ArrowLeft,
@@ -316,7 +317,7 @@ function CreateOrg({
             </label>
             <label>
               Hiring team size <small>optional</small>
-              <select
+              <NativeSelect
                 value={teamSize}
                 onChange={(e) => setTeamSize(e.target.value)}
               >
@@ -325,7 +326,7 @@ function CreateOrg({
                 <option>11-50</option>
                 <option>51-200</option>
                 <option>200+</option>
-              </select>
+              </NativeSelect>
             </label>
             <label>
               Roles you want to screen for <small>optional</small>
@@ -622,7 +623,7 @@ function RoleForm({
   ) => (
     <label>
       {label}
-      <select
+      <NativeSelect
         value={form[key]}
         onChange={(e) => {
           set(key, e.target.value);
@@ -634,7 +635,7 @@ function RoleForm({
         {options.map((o) => (
           <option key={o}>{o}</option>
         ))}
-      </select>
+      </NativeSelect>
     </label>
   );
   return (
@@ -733,14 +734,14 @@ function RoleForm({
               </label>
               <label>
                 Weight
-                <select
+                <NativeSelect
                   value={r.weight}
                   onChange={(e) => item(i, { weight: Number(e.target.value) })}
                 >
                   {[1, 2, 3, 4, 5].map((n) => (
                     <option key={n}>{n}</option>
                   ))}
-                </select>
+                </NativeSelect>
               </label>
               <button
                 type="button"
@@ -825,7 +826,7 @@ function RoleForm({
           <div className="form-grid">
             <label>
               Questions
-              <select
+              <NativeSelect
                 value={form.questionCount}
                 onChange={(e) => set("questionCount", Number(e.target.value))}
               >
@@ -836,11 +837,11 @@ function RoleForm({
                       {n} questions · about {n * 4} minutes
                     </option>
                   ))}
-              </select>
+              </NativeSelect>
             </label>
             <label>
               Invite links stay valid for
-              <select
+              <NativeSelect
                 value={form.inviteDays}
                 onChange={(e) => set("inviteDays", Number(e.target.value))}
               >
@@ -849,38 +850,45 @@ function RoleForm({
                     {n} days
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </label>
             <label>
               Proctoring
-              <select
+              <NativeSelect
+                aria-label="Proctoring"
+                aria-describedby="role-proctoring-help"
                 value={form.proctoring}
                 onChange={(e) =>
                   set("proctoring", e.target.value as "strict" | "standard")
                 }
               >
-                <option value="strict">
-                  Strict: full screen and one display; leaving for 10 s ends the
-                  interview
-                </option>
-                <option value="standard">
-                  Standard: leaving full screen or the tab is noted for review
-                </option>
-              </select>
+                <option value="strict">Strict monitoring</option>
+                <option value="standard">Standard monitoring</option>
+              </NativeSelect>
+              <small id="role-proctoring-help" className="field-help">
+                {form.proctoring === "strict"
+                  ? "Requires full screen and one display. Leaving for 10 seconds ends the interview."
+                  : "Leaving full screen or the tab is noted for human review."}
+              </small>
             </label>
             <label>
               After submitting, candidates see
-              <select
+              <NativeSelect
+                aria-label="After submitting, candidates see"
+                aria-describedby="role-feedback-help"
                 value={form.candidateFeedback}
                 onChange={(e) =>
                   set("candidateFeedback", e.target.value as "none" | "summary")
                 }
               >
-                <option value="summary">
-                  A short “areas to prepare” summary, no scores
-                </option>
-                <option value="none">Only a thank-you</option>
-              </select>
+                <option value="summary">Preparation summary</option>
+                <option value="none">Thank-you message</option>
+              </NativeSelect>
+              <small id="role-feedback-help" className="field-help">
+                {form.candidateFeedback === "summary"
+                  ? "A short summary of areas to prepare. Scores stay private to your team."
+                  : "Candidates see a thank-you message without scores or feedback."}
+              </small>
             </label>
           </div>
         </section>

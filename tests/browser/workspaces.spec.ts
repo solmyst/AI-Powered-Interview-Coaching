@@ -189,6 +189,17 @@ test("hiring has its own overview, role form and company settings without practi
   ).toBeVisible();
   await inspect(page, "hiring-role-form");
   await page
+    .locator(".co-form > .panel")
+    .first()
+    .screenshot({ path: "test-results/role-controls-desktop.png" });
+  await page.getByLabel("Proctoring", { exact: true }).selectOption("standard");
+  await expect(
+    page.getByText(
+      "Leaving full screen or the tab is noted for human review.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await page
     .getByRole("button", { name: "Add a question", exact: true })
     .click();
   await inspect(page, "hiring-question-form");
@@ -322,5 +333,35 @@ test("candidate notice, submitted and invalid-link pages remain isolated and acc
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expect(page.getByRole("navigation")).toHaveCount(0);
     await inspect(page, `candidate-${state}`);
+    if (state === "notice") {
+      const first = page.getByRole("checkbox", { name: /I understand an AI/ });
+      const second = page.getByRole("checkbox", {
+        name: /I agree to the processing/,
+      });
+      const accept = page.getByRole("button", { name: "Accept and continue" });
+      await expect(accept).toBeDisabled();
+      await first.focus();
+      await page.keyboard.press("Space");
+      await expect(first).toBeChecked();
+      await expect(accept).toBeDisabled();
+      await page
+        .getByText("I agree to the processing described above.", {
+          exact: true,
+        })
+        .click();
+      await expect(second).toBeChecked();
+      await expect(accept).toBeEnabled();
+      await inspect(page, "candidate-consent-checked");
+      for (const width of [320, 1440]) {
+        await page.setViewportSize({ width, height: 1000 });
+        await first.focus();
+        await page
+          .locator(".consent-fields")
+          .screenshot({ path: `test-results/consent-controls-${width}.png` });
+      }
+      await first.press("Space");
+      await expect(first).not.toBeChecked();
+      await expect(accept).toBeDisabled();
+    }
   }
 });

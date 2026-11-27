@@ -1,11 +1,13 @@
 # UI component sources
 
-The UI foundation uses app-owned, adapted shadcn/ui primitives (Button and Card) and a Magic UI Shine Border adaptation. Their original MIT notices follow. Input follows the same forward-ref composition pattern. The Aceternity-inspired Reveal is a local Motion component; it is not an imported Aceternity package or copied premium component. Origin UI/coss UI and Flowscope are design references, not runtime dependencies. Lucide, Recharts, Motion, Tailwind, and Radix retain their respective package licences.
+The UI foundation uses app-owned, adapted shadcn/ui primitives (Button, Card, Native Select, and Radix Checkbox) and a Magic UI Shine Border adaptation. Their original MIT notices follow. Input follows the same forward-ref composition pattern. The Aceternity-inspired Reveal is a local Motion component; it is not an imported Aceternity package or copied premium component. Origin UI/coss UI and Flowscope are design references, not runtime dependencies. Lucide, Recharts, Motion, Tailwind, and Radix retain their respective package licences.
 
 Sources:
 
 - https://ui.shadcn.com/r/styles/new-york/button.json
 - https://ui.shadcn.com/r/styles/new-york/card.json
+- https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/new-york-v4/ui/native-select.tsx
+- https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/new-york-v4/ui/checkbox.tsx
 - https://magicui.design/r/shine-border.json
 - https://ui.aceternity.com/components/text-generate-effect
 

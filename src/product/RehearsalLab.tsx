@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check, Mic, RotateCcw, Sparkles, Volume2 } from "lucide-react";
 import { api } from "./api";
@@ -110,9 +111,9 @@ export function RehearsalLab({ session, update, speechReady, transcriptionReady 
       {["Find your focus", "Retry aloud", "Apply it elsewhere"].map((label, i) => <li key={label} aria-current={attempt < 2 && currentStep === i ? "step" : undefined} className={currentStep >= i ? "active" : ""}><span>{i + 1}</span>{label}</li>)}
     </ol>
     <label className="lab-select">Choose an answer to work on
-      <select value={turn} disabled={waiting} onChange={(e) => { cancelRecording(); setTurn(Number(e.target.value)); setError(""); setPendingAnswer(""); }}>
+      <NativeSelect value={turn} disabled={waiting} onChange={(e) => { cancelRecording(); setTurn(Number(e.target.value)); setError(""); setPendingAnswer(""); }}>
         {session.turns.map((t, i) => <option key={i} value={i}>Question {i + 1}{i === weakest ? " · Suggested focus" : ""}: {t.question.focus}</option>)}
-      </select>
+      </NativeSelect>
     </label>
     {!lab ? <div className="lab-start">
       <h3>{session.turns[turn].question.question}</h3>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Camera, CameraOff } from "lucide-react";
 import type { FaceLandmarker, PoseLandmarker } from "@mediapipe/tasks-vision";
 import {
@@ -353,11 +354,11 @@ export function CameraCoach({
               ? "Turn camera off"
               : "Enable camera coaching"}
         </button>
-        <label className="checkbox">
-          <input
-            type="checkbox"
+        <label className="checkbox" htmlFor="camera-tracking-overlay">
+          <Checkbox
+            id="camera-tracking-overlay"
             checked={overlay}
-            onChange={(e) => setOverlay(e.target.checked)}
+            onCheckedChange={(checked) => setOverlay(checked === true)}
           />
           <span>Tracking overlay</span>
         </label>

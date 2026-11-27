@@ -36,12 +36,26 @@ export async function assertControlLayout(page: Page) {
       el.getClientRects().length > 0 &&
       getComputedStyle(el).visibility !== "hidden";
     const center = (rect: DOMRect) => rect.top + rect.height / 2;
+    for (const wrapper of document.querySelectorAll(
+      '[data-slot="native-select-wrapper"]',
+    )) {
+      if (!visible(wrapper)) continue;
+      const select = wrapper.querySelector("select")!.getBoundingClientRect();
+      const icon = wrapper.querySelector("svg")!.getBoundingClientRect();
+      if (
+        Math.abs(center(select) - center(icon)) > 1 ||
+        select.right - icon.right < 12
+      )
+        issues.push(
+          "Select chevron is not centered and inset from the field edge",
+        );
+    }
     for (const label of document.querySelectorAll(
       "label.check, label.checkbox",
     )) {
       if (!visible(label)) continue;
-      const input = label.querySelector("input")!;
-      const text = label.querySelector("span")!;
+      const input = label.querySelector('[data-slot="checkbox"]')!;
+      const text = label.querySelector(":scope > span")!;
       const box = input.getBoundingClientRect();
       const range = document.createRange();
       range.selectNodeContents(text);
