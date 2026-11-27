@@ -170,6 +170,21 @@ test("only approved accounts can create a company; others cannot see it", async 
     (await call("/orgs", { method: "GET", cookie: nobody })).body.canCreate,
     false,
   );
+  // Not yet approved: they can ask for access, and the request is remembered.
+  assert.equal(
+    (
+      await call("/orgs/request", {
+        method: "POST",
+        cookie: nobody,
+        body: { company: "Nope Inc", teamSize: "11-50" },
+      })
+    ).status,
+    201,
+  );
+  assert.equal(
+    (await call("/orgs", { method: "GET", cookie: nobody })).body.requested,
+    true,
+  );
   orgId = (
     await call("/orgs", {
       method: "POST",

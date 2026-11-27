@@ -73,16 +73,21 @@ const slug = (label: string) =>
 // The hiring area: companies, roles, invite links, a ranked list and per-candidate reports.
 export function Company({
   canCreate,
+  requested,
   orgs,
   reload,
 }: {
   canCreate: boolean;
+  requested: boolean;
   orgs: Org[];
   reload: () => void;
 }) {
   const [view, setView] = useState<View>({ name: "roles" });
   const org = orgs[0];
-  if (!org) return <CreateOrg canCreate={canCreate} done={reload} />;
+  if (!org)
+    return (
+      <CreateOrg canCreate={canCreate} requested={requested} done={reload} />
+    );
   return (
     <div className="wrap workspace co">
       {view.name === "roles" && (
@@ -128,23 +133,98 @@ export function Company({
 
 function CreateOrg({
   canCreate,
+  requested,
   done,
 }: {
   canCreate: boolean;
+  requested: boolean;
   done: () => void;
 }) {
   const [name, setName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
+  const [teamSize, setTeamSize] = useState("");
+  const [note, setNote] = useState("");
   const [error, setError] = useState("");
   if (!canCreate)
     return (
       <div className="wrap workspace narrow">
-        <p className="eyebrow">HIRING</p>
+        <p className="eyebrow">HIRING · EARLY ACCESS</p>
         <h1>Screen candidates with Maya.</h1>
         <p className="lead">
-          Company screening is in a closed pilot. Ask the InterviewAce team to
-          add your account, then come back to create your company.
+          Maya runs a structured first-round interview for each candidate,
+          scores it against your criteria with quoted evidence, and gives you a
+          ranked shortlist. A person on your team makes every decision.
         </p>
+        {requested ? (
+          <section className="panel" role="status">
+            <h2>Request received</h2>
+            <p>
+              Our team will turn on company screening for this account. Sign in
+              again later and this page will let you set up your company and
+              first role.
+            </p>
+          </section>
+        ) : (
+          <form
+            className="panel"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setError("");
+              try {
+                await api("/orgs/request", {
+                  method: "POST",
+                  body: JSON.stringify({ company: name, teamSize, note }),
+                });
+                done();
+              } catch (reason) {
+                setError((reason as Error).message);
+              }
+            }}
+          >
+            <h2>Request access</h2>
+            <p className="muted">
+              Company accounts are approved by our team during early access.
+            </p>
+            <label>
+              Company name
+              <input
+                required
+                minLength={2}
+                maxLength={100}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </label>
+            <label>
+              Hiring team size <small>optional</small>
+              <select
+                value={teamSize}
+                onChange={(e) => setTeamSize(e.target.value)}
+              >
+                <option value="">Choose</option>
+                <option>1-10</option>
+                <option>11-50</option>
+                <option>51-200</option>
+                <option>200+</option>
+              </select>
+            </label>
+            <label>
+              Roles you want to screen for <small>optional</small>
+              <textarea
+                maxLength={1000}
+                rows={3}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
+            </label>
+            {error && (
+              <p className="error" role="alert">
+                {error}
+              </p>
+            )}
+            <button className="primary">Request access</button>
+          </form>
+        )}
       </div>
     );
   return (

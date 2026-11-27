@@ -2,12 +2,21 @@ import {
   ArrowUpRight,
   AudioLines,
   Brain,
+  Briefcase,
   Check,
+  ClipboardCheck,
   CornerDownRight,
+  ListChecks,
   MessageSquare,
   ShieldCheck,
 } from "lucide-react";
-export function Landing({ start }: { start: () => void }) {
+export function Landing({
+  start,
+  hire,
+}: {
+  start: () => void;
+  hire: () => void;
+}) {
   return (
     <>
       <section className="hero wrap">
@@ -144,6 +153,72 @@ export function Landing({ start }: { start: () => void }) {
           })}
         </div>
       </section>
+      <section className="wrap process hiring-teams" id="hiring">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">FOR HIRING TEAMS</p>
+            <h2>
+              Shortlist with evidence,
+              <br />
+              not guesswork.
+            </h2>
+          </div>
+          <p>
+            Send one link. Maya runs a structured first-round interview, scores
+            each answer against your criteria with quotes from what the
+            candidate said, and gives your team a ranked shortlist. A person on
+            your team makes every decision.
+          </p>
+        </div>
+        <div className="three-col">
+          {[
+            [
+              ClipboardCheck,
+              "01",
+              "Set up a role in minutes",
+              "Paste the job description, add your own questions if you like, and choose the criteria and their weights. Maya asks your questions first, then follows up on what each candidate says.",
+            ],
+            [
+              Briefcase,
+              "02",
+              "Candidates interview on their own time",
+              "Each candidate gets a private link with no sign-up. They answer by voice or typing, in English or Hindi, and can resume if the connection drops. Full-screen proctoring is on by default.",
+            ],
+            [
+              ListChecks,
+              "03",
+              "Review a ranked shortlist",
+              "See scores per criterion with the quotes behind them, the full transcript, focus notes and questions for your own round. Advance, hold or reject, and export the list.",
+            ],
+          ].map(([Icon, n, title, desc]) => {
+            const I = Icon as typeof Brain;
+            return (
+              <article className="process-item" key={String(n)}>
+                <div>
+                  <I size={24} />
+                  <span>{String(n)}</span>
+                </div>
+                <h3>{String(title)}</h3>
+                <p>{String(desc)}</p>
+              </article>
+            );
+          })}
+        </div>
+        <div className="hiring-cta">
+          <button className="primary large" onClick={hire}>
+            Start hiring with InterviewAce <ArrowUpRight size={20} />
+          </button>
+          <div className="hero-notes">
+            <span>
+              <Check size={15} /> Early access: our team approves company
+              accounts
+            </span>
+            <span>
+              <Check size={15} /> No video is recorded
+            </span>
+          </div>
+        </div>
+      </section>
       <section className="wrap">
         <div className="closing">
           <div>
@@ -161,7 +236,7 @@ export function Landing({ start }: { start: () => void }) {
       </section>
       <footer className="wrap footer">
         <strong>InterviewAce</strong>
-        <p>AI feedback is coaching, not a hiring decision.</p>
+        <p>AI scores support people. They never make the hiring decision.</p>
         <span>Built for the next step.</span>
       </footer>
     </>

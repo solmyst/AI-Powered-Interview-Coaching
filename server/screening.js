@@ -307,9 +307,38 @@ export function registerScreening(
     });
   });
 
+  // Accounts not yet approved for company screening ask for access here; the team approves them
+  // by adding the email to SCREENING_EMAILS. The log line lets the team find new requests.
+  app.post("/api/orgs/request", auth, (req, res) => {
+    const input = z
+      .object({
+        company: z.string().trim().min(2).max(100),
+        teamSize: z.string().trim().max(40).default(""),
+        note: z.string().trim().max(1000).default(""),
+      })
+      .strict()
+      .parse(req.body);
+    db.prepare(
+      "INSERT INTO hiring_requests(user_id,company,team_size,note,created) VALUES (?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET company=excluded.company, team_size=excluded.team_size, note=excluded.note, created=excluded.created",
+    ).run(req.user.id, input.company, input.teamSize, input.note, iso());
+    console.info(
+      JSON.stringify({
+        event: "hiring_access_request",
+        email: req.user.email,
+        company: input.company,
+      }),
+    );
+    res.status(201).json({ requested: true });
+  });
+
   app.get("/api/orgs", auth, (req, res) => {
     purge();
     res.json({
+      requested: Boolean(
+        db
+          .prepare("SELECT 1 FROM hiring_requests WHERE user_id=?")
+          .get(req.user.id),
+      ),
       canCreate: allowed(req.user),
       orgs: db
         .prepare(

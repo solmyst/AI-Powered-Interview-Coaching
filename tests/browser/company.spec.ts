@@ -259,7 +259,7 @@ test("a reviewer sees a ranked list, evidence and flags, and records a human dec
   ]);
 });
 
-test("people without company access do not see Hiring", async ({ page }) => {
+test("people without company access can request it from Hiring", async ({ page }) => {
   await page.route("**/api/health", (route) =>
     route.fulfill({
       json: {
@@ -287,11 +287,20 @@ test("people without company access do not see Hiring", async ({ page }) => {
     }),
   );
   await page.route("**/api/orgs", (route) =>
-    route.fulfill({ json: { canCreate: false, orgs: [] } }),
+    route.fulfill({ json: { canCreate: false, requested: false, orgs: [] } }),
   );
+  let asked: unknown = null;
+  await page.route("**/api/orgs/request", (route) => {
+    asked = route.request().postDataJSON();
+    return route.fulfill({ status: 201, json: { requested: true } });
+  });
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
     "Good to see you",
   );
-  await expect(page.getByRole("button", { name: "Hiring" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Hiring" }).click();
+  await expect(page.getByRole("heading", { name: "Request access" })).toBeVisible();
+  await page.getByLabel("Company name").fill("Acme");
+  await page.getByRole("button", { name: "Request access" }).click();
+  await expect.poll(() => asked).toEqual({ company: "Acme", teamSize: "", note: "" });
 });

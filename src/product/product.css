@@ -431,6 +431,21 @@ a {
 .process {
   padding: 75px 0;
 }
+.hiring-teams {
+  border-top: 1px solid var(--line);
+}
+.hiring-teams .section-heading > div {
+  flex: 0 0 auto;
+}
+.hiring-teams .section-heading > p {
+  max-width: 540px;
+}
+.hiring-cta {
+  margin-top: 36px;
+}
+.hiring-cta .hero-notes {
+  flex-wrap: wrap;
+}
 .section-heading {
   display: flex;
   justify-content: space-between;

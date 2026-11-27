@@ -31,6 +31,8 @@ import "./product/product.css";
 function App() {
   const [page, setPage] = useState<Page>("home");
   const [auth, setAuth] = useState(false);
+  // Which door the visitor came through, so sign-up speaks to them and lands them in the right place.
+  const [intent, setIntent] = useState<"practice" | "hiring">("practice");
   const [authExpired, setAuthExpired] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [usage, setUsage] = useState<Usage>({
@@ -45,9 +47,10 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("All");
-  // Company screening is a pilot: the Hiring area shows only for approved accounts and company members.
+  // Company screening is in early access: everyone can see Hiring and ask for access; approved accounts create a company.
   const [hiring, setHiring] = useState<{
     canCreate: boolean;
+    requested: boolean;
     orgs: Org[];
   } | null>(null);
   const loadHiring = useCallback(() => {
@@ -175,8 +178,19 @@ function App() {
   const start = () => {
     if (user) navigate("setup");
     else {
+      setIntent("practice");
       setAuthExpired(false);
       setAuth(true);
+      window.scrollTo({ top: 0 });
+    }
+  };
+  const hire = () => {
+    if (user) navigate("company");
+    else {
+      setIntent("hiring");
+      setAuthExpired(false);
+      setAuth(true);
+      window.scrollTo({ top: 0 });
     }
   };
   if (loading)
@@ -190,9 +204,7 @@ function App() {
     ["dashboard", LayoutDashboard, "Overview"],
     ["history", History, "My interviews"],
     ["library", BookOpen, "Revision library"],
-    ...(hiring && (hiring.orgs.length || hiring.canCreate)
-      ? ([["company", Briefcase, "Hiring"]] as const)
-      : []),
+    ...(hiring ? ([["company", Briefcase, "Hiring"]] as const) : []),
     ["profile", UserRound, "Profile"],
   ] as const;
   return (
@@ -248,6 +260,13 @@ function App() {
                 >
                   How it works
                 </a>
+                <a
+                  className="how-link"
+                  href="#hiring"
+                  onClick={() => setAuth(false)}
+                >
+                  For hiring teams
+                </a>
                 <button className="primary small" onClick={start}>
                   Start practicing <ArrowUpRight size={16} />
                 </button>
@@ -285,16 +304,17 @@ function App() {
           auth ? (
             <Auth
               initialRegister={!authExpired}
+              hiring={intent === "hiring"}
               back={() => setAuth(false)}
               done={(u, used) => {
                 setUser(u);
                 setUsage(used);
                 setAuth(false);
-                navigate("dashboard");
+                navigate(intent === "hiring" ? "company" : "dashboard");
               }}
             />
           ) : (
-            <Landing start={start} />
+            <Landing start={start} hire={hire} />
           )
         ) : (
           <>
@@ -464,6 +484,7 @@ function App() {
             {page === "company" && hiring && (
               <Company
                 canCreate={hiring.canCreate}
+                requested={hiring.requested}
                 orgs={hiring.orgs}
                 reload={loadHiring}
               />

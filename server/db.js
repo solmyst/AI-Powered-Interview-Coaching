@@ -58,5 +58,13 @@ export function openDatabase(path) {
       `);
       db.pragma("user_version = 4");
     })();
+  // Version 5: early-access requests for company accounts. Approval is SCREENING_EMAILS on the server.
+  if (db.pragma("user_version", { simple: true }) < 5)
+    db.transaction(() => {
+      db.exec(
+        "CREATE TABLE hiring_requests (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, company TEXT NOT NULL, team_size TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', created TEXT NOT NULL)",
+      );
+      db.pragma("user_version = 5");
+    })();
   return db;
 }

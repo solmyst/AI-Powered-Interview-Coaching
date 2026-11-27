@@ -6,10 +6,12 @@ export function Auth({
   done,
   back,
   initialRegister = true,
+  hiring = false,
 }: {
   done: (user: User, usage: Usage) => void;
   back: () => void;
   initialRegister?: boolean;
+  hiring?: boolean;
 }) {
   const [register, setRegister] = useState(initialRegister);
   const [busy, setBusy] = useState(false);
@@ -17,27 +19,52 @@ export function Auth({
   const [showPassword, setShowPassword] = useState(false);
   return (
     <div className="auth-layout wrap">
-      <section>
-        <p className="eyebrow">A LITTLE PRACTICE GOES A LONG WAY</p>
-        <h1>
-          Make room for
-          <br />
-          <em>your next move.</em>
-        </h1>
-        <p className="lead">
-          Your interviews, feedback, and progress.
-          <br />
-          All in one place, ready when you are.
-        </p>
-        <div className="privacy-note">
-          <LockKeyhole size={20} />
-          <p>
-            Resumes are used to personalize your interview.
+      {hiring ? (
+        <section>
+          <p className="eyebrow">FOR HIRING TEAMS</p>
+          <h1>
+            Your first round,
             <br />
-            You control your saved sessions and account data.
+            <em>handled.</em>
+          </h1>
+          <p className="lead">
+            Create your account, then set up your company and your first role.
+            <br />
+            Company accounts are in early access: if yours is new, request
+            access and our team will turn it on.
           </p>
-        </div>
-      </section>
+          <div className="privacy-note">
+            <LockKeyhole size={20} />
+            <p>
+              No video is recorded. Candidates see a plain notice and agree
+              before they start.
+              <br />A person on your team makes every decision.
+            </p>
+          </div>
+        </section>
+      ) : (
+        <section>
+          <p className="eyebrow">A LITTLE PRACTICE GOES A LONG WAY</p>
+          <h1>
+            Make room for
+            <br />
+            <em>your next move.</em>
+          </h1>
+          <p className="lead">
+            Your interviews, feedback, and progress.
+            <br />
+            All in one place, ready when you are.
+          </p>
+          <div className="privacy-note">
+            <LockKeyhole size={20} />
+            <p>
+              Resumes are used to personalize your interview.
+              <br />
+              You control your saved sessions and account data.
+            </p>
+          </div>
+        </section>
+      )}
       <form
         className="panel auth-panel"
         onSubmit={async (e) => {
@@ -69,13 +96,23 @@ export function Auth({
         <h2>{register ? "Create your account" : "Welcome back"}</h2>
         <p>
           {register
-            ? "Start with a focused practice session."
-            : "Pick up where you left off."}
+            ? hiring
+              ? "Use your work email. You'll set up your company next."
+              : "Start with a focused practice session."
+            : hiring
+              ? "Sign in to open your hiring workspace."
+              : "Pick up where you left off."}
         </p>
         {register && (
           <label>
             Your name
-            <input name="name" disabled={busy} autoComplete="name" required maxLength={80} />
+            <input
+              name="name"
+              disabled={busy}
+              autoComplete="name"
+              required
+              maxLength={80}
+            />
           </label>
         )}
         <label>
@@ -137,7 +174,12 @@ export function Auth({
             ? "Already have an account? Sign in"
             : "New here? Create an account"}
         </button>
-        <button type="button" disabled={busy} className="text-button" onClick={back}>
+        <button
+          type="button"
+          disabled={busy}
+          className="text-button"
+          onClick={back}
+        >
           Back to home
         </button>
         <small>
