@@ -157,7 +157,9 @@ export function createApp({
     "/api",
     rateLimit({
       windowMs: 60000,
-      limit: 100,
+      // Per IP address. Candidates in one office or lab share an address, so this is generous;
+      // sign-in and invite routes have their own stricter limit (authLimit).
+      limit: Number(env.API_RATE_LIMIT || 300),
       standardHeaders: "draft-7",
       legacyHeaders: false,
       message: { error: "Too many requests. Please wait a minute." },
@@ -226,6 +228,16 @@ export function createApp({
     standardHeaders: "draft-7",
     legacyHeaders: false,
     message: { error: "Too many sign-in attempts. Try again in 15 minutes." },
+  });
+  // Opening an invite link must not share the strict sign-in limit: a lab or office of testers shares one IP.
+  const candidateLimit = rateLimit({
+    windowMs: 15 * 60000,
+    limit: Number(env.CANDIDATE_LINK_LIMIT || 200),
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    message: {
+      error: "Too many attempts from this network. Try again in a few minutes.",
+    },
   });
   app.get("/api/health", async (_req, res) =>
     res.json({
@@ -422,6 +434,7 @@ export function createApp({
     auth,
     locked,
     authLimit,
+    candidateLimit,
     hash,
     secure,
     origin,

@@ -97,6 +97,7 @@ before(async () => {
       SCREENING_EMAILS:
         "other-owner@example.test,unregistered-listed@example.test",
       CANDIDATE_SPEECH_LIMIT: "2",
+      API_RATE_LIMIT: "5000",
     },
     ai,
     transcriber,
@@ -857,4 +858,63 @@ test("listing an email grants nothing to an account that registers it later", as
   });
   const before = await call("/orgs", { cookie: res.cookie });
   assert.equal(before.body.canCreate, false);
+});
+
+test("an open link lets testers sign themselves up, within a cap, and the owner controls it", async () => {
+  const made = await call(`/orgs/${orgId}/roles`, {
+    method: "POST",
+    cookie: owner,
+    body: roleBody("Open link role"),
+  });
+  const path = `/roles/${made.body.id}/open-link`;
+  assert.equal((await call(path, { cookie: owner })).body.enabled, false);
+  // Only an owner can switch it on; another company cannot even see it.
+  assert.equal((await call(path, { cookie: other })).status, 404);
+  const on = await call(path, {
+    method: "PUT",
+    cookie: owner,
+    body: { enabled: true, cap: 2 },
+  });
+  assert.equal(on.status, 200);
+  assert.match(on.body.link, /\/interviewace\/join#r=[a-f0-9]{64}$/);
+  const token = on.body.link.split("#r=")[1];
+  const info = await call(`/candidate/open/${token}`);
+  assert.equal(info.body.roleTitle, "Open link role");
+  const signUpLink = (name, email) =>
+    call(`/candidate/open/${token}`, { method: "POST", body: { name, email } });
+  const first = await signUpLink("Tess", "tess@example.test");
+  assert.equal(first.status, 201);
+  // The returned token opens the usual private invite flow.
+  const opened = await call("/candidate/session", {
+    method: "POST",
+    body: { token: first.body.token },
+  });
+  assert.equal(opened.body.roleTitle, "Open link role");
+  assert.equal(
+    (await signUpLink("Tess again", "tess@example.test")).status,
+    409,
+  );
+  assert.equal((await signUpLink("Uma", "uma@example.test")).status, 201);
+  // Cap of two reached: a third is refused, and the failed attempts did not use up places.
+  assert.equal((await signUpLink("Vic", "vic@example.test")).status, 409);
+  assert.equal((await call(path, { cookie: owner })).body.used, 2);
+  // Turning it off or rotating it kills the old link.
+  await call(path, {
+    method: "PUT",
+    cookie: owner,
+    body: { enabled: true, cap: 5, rotate: true },
+  });
+  assert.equal((await call(`/candidate/open/${token}`)).status, 404);
+  await call(path, {
+    method: "PUT",
+    cookie: owner,
+    body: { enabled: false, cap: 5 },
+  });
+  const list = await call(`/roles/${made.body.id}/candidates`, {
+    cookie: owner,
+  });
+  assert.deepEqual(list.body.candidates.map((c) => c.name).sort(), [
+    "Tess",
+    "Uma",
+  ]);
 });

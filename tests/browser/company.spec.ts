@@ -199,6 +199,16 @@ test("a reviewer sees a ranked list, evidence and flags, and records a human dec
       },
     }),
   );
+  await page.route("**/api/roles/r1/open-link", (route) =>
+    route.fulfill({
+      json: {
+        enabled: true,
+        link: "https://x.test/interviewace/join#r=abc",
+        cap: 50,
+        used: 3,
+      },
+    }),
+  );
   await page.route("**/api/invites/a/report", (route) =>
     route.fulfill({ json: report }),
   );
@@ -212,11 +222,31 @@ test("a reviewer sees a ranked list, evidence and flags, and records a human dec
   });
 
   await page.goto("/");
-  await page.getByRole("button", { name: "Hiring" }).click();
+  // Company members land in their own workspace: no practice navigation.
+  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "My interviews" })).toHaveCount(
+    0,
+  );
   await expect(
-    page.getByRole("heading", { name: "Your open roles." }),
+    page.getByRole("button", { name: "Practice interviews" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: /Backend engineer/ }).click();
+  await page
+    .getByRole("navigation", { name: "Hiring navigation" })
+    .getByRole("button", { name: /Backend engineer/ })
+    .click();
+  // One link for many candidates, and one private link per person.
+  await expect(
+    page.getByText("https://x.test/interviewace/join#r=abc"),
+  ).toBeVisible();
+  await expect(
+    page.getByText("3 of 50 places used.", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Invite candidates" }).first(),
+  ).toBeVisible();
+  await page.getByRole("tab", { name: /In progress/ }).click();
+  await expect(page.locator(".co-table tbody tr")).toHaveCount(1);
+  await page.getByRole("tab", { name: /All/ }).click();
 
   await expect(
     page.getByText("Scores are AI estimates against your rubric", {
@@ -259,7 +289,9 @@ test("a reviewer sees a ranked list, evidence and flags, and records a human dec
   ]);
 });
 
-test("people without company access can request it from Hiring", async ({ page }) => {
+test("people without company access can request it from Hiring", async ({
+  page,
+}) => {
   await page.route("**/api/health", (route) =>
     route.fulfill({
       json: {
@@ -299,8 +331,80 @@ test("people without company access can request it from Hiring", async ({ page }
     "Good to see you",
   );
   await page.getByRole("button", { name: "Hiring" }).click();
-  await expect(page.getByRole("heading", { name: "Request access" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Request access" }),
+  ).toBeVisible();
   await page.getByLabel("Company name").fill("Acme");
   await page.getByRole("button", { name: "Request access" }).click();
-  await expect.poll(() => asked).toEqual({ company: "Acme", teamSize: "", note: "" });
+  await expect
+    .poll(() => asked)
+    .toEqual({ company: "Acme", teamSize: "", note: "" });
+});
+
+test("a shared link asks for a name and email, then opens the candidate's own notice", async ({
+  page,
+}) => {
+  const link = "a".repeat(64);
+  const mine = "b".repeat(64);
+  let posted: unknown = null;
+  await page.route("**/api/health", (route) =>
+    route.fulfill({
+      json: {
+        ready: true,
+        transcription: { ready: true },
+        speech: { ready: false },
+      },
+    }),
+  );
+  await page.route(`**/api/candidate/open/${link}`, (route) => {
+    if (route.request().method() === "GET")
+      return route.fulfill({
+        json: {
+          company: "Park+",
+          roleTitle: "Product AI Intern",
+          questionCount: 5,
+          full: false,
+        },
+      });
+    posted = route.request().postDataJSON();
+    return route.fulfill({ status: 201, json: { token: mine } });
+  });
+  let session: unknown = null;
+  await page.route("**/api/candidate/session", (route) => {
+    session = route.request().postDataJSON();
+    return route.fulfill({
+      json: {
+        company: "Park+",
+        roleTitle: "Product AI Intern",
+        questionCount: 5,
+        minutes: 20,
+        expires: Date.now() + 1e9,
+        opensAt: 0,
+        proctoring: "standard",
+        status: "pending",
+        consentVersion: "v1",
+        consented: false,
+        retentionDays: 180,
+        contactEmail: "",
+        answered: 0,
+        state: null,
+        feedback: null,
+        noteSent: false,
+      },
+    });
+  });
+  await page.goto(`/interviewace/join#r=${link}`);
+  await expect(
+    page.getByRole("heading", { name: "Product AI Intern" }),
+  ).toBeVisible();
+  await page.getByLabel("Your name").fill("Tess Tester");
+  await page.getByLabel("Email address").fill("tess@example.test");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(
+    page.getByText("Before you start", { exact: false }),
+  ).toBeVisible();
+  expect(posted).toEqual({ name: "Tess Tester", email: "tess@example.test" });
+  expect(session).toEqual({ token: mine });
+  // The shared token never stays in the address bar.
+  expect(page.url()).not.toContain(link);
 });

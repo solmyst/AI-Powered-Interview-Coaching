@@ -7,6 +7,7 @@ import "./product.css";
 
 type Stage =
   | "loading"
+  | "signup"
   | "invalid"
   | "notice"
   | "declined"
@@ -23,6 +24,26 @@ export default function CandidateApp() {
   const [session, setSession] = useState<RoomSession | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
   const booted = useRef(false);
+  // A shared sign-up link: the candidate gives a name and email and receives their own private invite.
+  const [open, setOpen] = useState<{
+    token: string;
+    company: string;
+    roleTitle: string;
+    questionCount: number;
+    full: boolean;
+  } | null>(null);
+  function begin(token: string) {
+    setStage("loading");
+    return api<CandidateSummary>("/candidate/session", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    })
+      .then(enter)
+      .catch((reason) => {
+        setError((reason as Error).message);
+        setStage("invalid");
+      });
+  }
 
   async function enter(info: CandidateSummary) {
     setSummary(info);
@@ -56,9 +77,28 @@ export default function CandidateApp() {
       .then(setHealth)
       .catch(() => setHealth(null));
     // The token lives in the URL fragment so it never reaches a server log. Remove it from the address bar at once.
-    const token = new URLSearchParams(location.hash.slice(1)).get("t");
-    if (token)
+    const hash = new URLSearchParams(location.hash.slice(1));
+    const token = hash.get("t");
+    const shared = hash.get("r");
+    if (token || shared)
       history.replaceState(null, "", location.pathname + location.search);
+    if (shared) {
+      api<{
+        company: string;
+        roleTitle: string;
+        questionCount: number;
+        full: boolean;
+      }>(`/candidate/open/${encodeURIComponent(shared)}`)
+        .then((info) => {
+          setOpen({ token: shared, ...info });
+          setStage("signup");
+        })
+        .catch((reason) => {
+          setError((reason as Error).message);
+          setStage("invalid");
+        });
+      return;
+    }
     (token
       ? api<CandidateSummary>("/candidate/session", {
           method: "POST",
@@ -103,6 +143,74 @@ export default function CandidateApp() {
         <p className="cand-card" aria-busy="true">
           Opening your interview…
         </p>
+      )}
+      {stage === "signup" && open && (
+        <form
+          className="cand-card"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            setError("");
+            const data = new FormData(event.currentTarget);
+            try {
+              const made = await api<{ token: string }>(
+                `/candidate/open/${encodeURIComponent(open.token)}`,
+                {
+                  method: "POST",
+                  body: JSON.stringify({
+                    name: data.get("name"),
+                    email: data.get("email"),
+                  }),
+                },
+              );
+              await begin(made.token);
+            } catch (reason) {
+              setError((reason as Error).message);
+            }
+          }}
+        >
+          <p className="eyebrow">{open.company.toUpperCase()}</p>
+          <h1>{open.roleTitle}</h1>
+          <p>
+            {open.company} invited you to a screening interview with Maya, an AI
+            interviewer. It has {open.questionCount} spoken questions and takes
+            about {open.questionCount * 4} minutes. Enter your details to get
+            your own private interview link. The next page explains what is
+            collected before anything starts.
+          </p>
+          {open.full ? (
+            <p role="alert">
+              This sign-up link is full. Ask {open.company} for a new one.
+            </p>
+          ) : (
+            <>
+              <label>
+                Your name
+                <input
+                  name="name"
+                  required
+                  maxLength={100}
+                  autoComplete="name"
+                />
+              </label>
+              <label>
+                Email address
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  maxLength={254}
+                  autoComplete="email"
+                />
+              </label>
+              {error && (
+                <p className="error" role="alert">
+                  {error}
+                </p>
+              )}
+              <button className="primary">Continue</button>
+            </>
+          )}
+        </form>
       )}
       {stage === "invalid" && (
         <section className="cand-card" role="alert">
@@ -186,10 +294,12 @@ export default function CandidateApp() {
           <h1>Your interview opens at {opensAt(summary.opensAt)}</h1>
           <p>
             You’ve accepted the notice. Come back to this page at the start
-            time; the link works until{" "}
-            {opensAt(summary.expires)}.
+            time; the link works until {opensAt(summary.expires)}.
           </p>
-          <button className="primary" onClick={() => void openInterview(summary)}>
+          <button
+            className="primary"
+            onClick={() => void openInterview(summary)}
+          >
             Check again
           </button>
         </section>
@@ -253,10 +363,10 @@ function Notice({
           <p>
             Your answers as text, the AI’s score estimates with quotes from what
             you said, the focus notes below, and the share of your answering
-            time you looked at the screen (eye contact, as a percentage). Audio is sent to a speech
-            service to become text and is not stored by InterviewAce.{" "}
-            <strong>No video is recorded or sent.</strong> Your camera is
-            checked on your device only.
+            time you looked at the screen (eye contact, as a percentage). Audio
+            is sent to a speech service to become text and is not stored by
+            InterviewAce. <strong>No video is recorded or sent.</strong> Your
+            camera is checked on your device only.
           </p>
         </div>
         <div>
@@ -264,10 +374,10 @@ function Notice({
           {summary.proctoring === "strict" && (
             <p>
               <strong>
-                This interview runs in full screen on one display. If you
-                leave full screen or this tab, or connect a second display,
-                you have 10 seconds to return or the interview ends and your
-                answers so far are submitted.
+                This interview runs in full screen on one display. If you leave
+                full screen or this tab, or connect a second display, you have
+                10 seconds to return or the interview ends and your answers so
+                far are submitted.
               </strong>{" "}
               Use a laptop or desktop with Chrome, Edge or Firefox; phones
               cannot run it.

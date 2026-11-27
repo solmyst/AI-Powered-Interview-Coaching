@@ -2957,3 +2957,43 @@ details p {
 .co-invite-row { display: grid; gap: 6px; padding: 12px 0; border-top: 1px solid var(--c-line); }
 .co-window { display: flex; flex-wrap: wrap; gap: 12px; }
 .button-link { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+
+/* ===== Hiring workspace: its own shell, apart from practice ===== */
+.header-org { display: inline-flex; align-items: center; gap: 8px; margin-right: auto; margin-left: 12px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 13px; }
+.header-tools { display: flex; align-items: center; gap: 14px; }
+.co-shell { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 32px; max-width: 1360px; margin: 0 auto; padding: 32px 24px 60px; align-items: start; }
+.co-side { position: sticky; top: 16px; display: grid; gap: 2px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.co-org { margin: 0 0 10px; padding: 4px 10px 12px; border-bottom: 1px solid var(--line); font-size: 16px; font-weight: 600; }
+.co-side-label { margin: 14px 10px 4px; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.co-side button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 10px; border-radius: 8px; color: var(--ink); font-size: 14px; text-align: left; }
+.co-side button > span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.co-side button small { color: var(--muted); font-variant-numeric: tabular-nums; }
+.co-side button:hover { background: var(--surface-soft); }
+.co-side button.active { background: var(--surface-tint); color: var(--accent-strong); font-weight: 600; }
+.co-main { min-width: 0; }
+.co-main.co { max-width: none; }
+.co-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 0 0 20px; }
+.co-stats > div { display: grid; gap: 2px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.co-stats b { font-size: 28px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.co-stats span { color: var(--muted); font-size: 12px; }
+.co-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
+.co-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.co-tabs button { padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; font-size: 13px; }
+.co-tabs button small { margin-left: 4px; color: var(--muted); }
+.co-tabs button.active { border-color: var(--accent); background: var(--surface-tint); color: var(--accent-strong); font-weight: 600; }
+.co-search { display: flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
+.co-search input { min-width: 200px; padding: 8px 0; border: 0; background: transparent; outline: none; }
+.co-share { margin: 0 0 20px; }
+.co-share h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 18px; }
+.co-sharebox { display: flex; align-items: center; gap: 12px; margin: 12px 0 8px; padding: 10px 12px; border: 1px dashed var(--accent); border-radius: 10px; background: var(--surface-tint); }
+.co-sharebox code { flex: 1; min-width: 0; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.co-inline { display: inline-flex; align-items: center; gap: 6px; }
+.co-inline input { width: 72px; padding: 4px 6px; }
+@media (max-width: 900px) {
+  .co-shell { grid-template-columns: 1fr; padding: 16px; }
+  .co-side { position: static; grid-auto-flow: column; grid-auto-columns: max-content; overflow-x: auto; }
+  .co-side .co-org, .co-side .co-side-label { display: none; }
+  .co-side button { width: auto; white-space: nowrap; }
+  .co-share { grid-template-columns: 1fr; }
+  .header-org { display: none; }
+}

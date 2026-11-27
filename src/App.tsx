@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Brain,
   ArrowUpRight,
@@ -33,6 +33,11 @@ function App() {
   const [auth, setAuth] = useState(false);
   // Which door the visitor came through, so sign-up speaks to them and lands them in the right place.
   const [intent, setIntent] = useState<"practice" | "hiring">("practice");
+  // Company members work in their own hiring workspace; practice is one click away, not mixed in.
+  const [workspace, setWorkspace] = useState<"practice" | "company">(
+    "practice",
+  );
+  const routed = useRef(false);
   const [authExpired, setAuthExpired] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [usage, setUsage] = useState<Usage>({
@@ -133,8 +138,21 @@ function App() {
     if (user) {
       void refresh().catch((err) => setError(err.message));
       loadHiring();
-    } else setHiring(null);
+    } else {
+      setHiring(null);
+      setWorkspace("practice");
+      routed.current = false;
+    }
   }, [user, refresh, loadHiring]);
+  // Once, after sign-in: people who belong to a company land in the hiring workspace.
+  useEffect(() => {
+    if (!hiring || routed.current) return;
+    routed.current = true;
+    if (hiring.orgs.length) {
+      setWorkspace("company");
+      setPage("company");
+    }
+  }, [hiring]);
   function navigate(next: Page) {
     setPage(next);
     setError("");
@@ -200,6 +218,9 @@ function App() {
         <p>Opening your practice space…</p>
       </main>
     );
+  const inCompany = Boolean(
+    user && workspace === "company" && hiring?.orgs.length,
+  );
   const nav = [
     ["dashboard", LayoutDashboard, "Overview"],
     ["history", History, "My interviews"],
@@ -219,7 +240,7 @@ function App() {
               className="brand"
               onClick={() => {
                 setAuth(false);
-                navigate(user ? "dashboard" : "home");
+                navigate(user ? (inCompany ? "company" : "dashboard") : "home");
               }}
               aria-label="InterviewAce home"
             >
@@ -228,7 +249,32 @@ function App() {
               </span>
               InterviewAce<span className="brand-period">.</span>
             </button>
-            {user ? (
+            {inCompany ? (
+              <>
+                <span className="header-org">
+                  <Briefcase size={15} aria-hidden="true" />{" "}
+                  {hiring?.orgs[0].name} · Hiring
+                </span>
+                <span className="header-tools">
+                  <button
+                    className="text-button"
+                    onClick={() => {
+                      setWorkspace("practice");
+                      navigate("dashboard");
+                    }}
+                  >
+                    Practice interviews
+                  </button>
+                  <button
+                    className="icon-button"
+                    onClick={logout}
+                    aria-label="Sign out"
+                  >
+                    <LogOut size={19} />
+                  </button>
+                </span>
+              </>
+            ) : user ? (
               <>
                 <nav aria-label="Main navigation">
                   {nav.map(([p, Icon, label]) => (
@@ -236,7 +282,11 @@ function App() {
                       key={p}
                       className={page === p ? "active" : ""}
                       aria-current={page === p ? "page" : undefined}
-                      onClick={() => navigate(p)}
+                      onClick={() => {
+                        if (p === "company" && hiring?.orgs.length)
+                          setWorkspace("company");
+                        navigate(p);
+                      }}
                     >
                       <Icon size={16} />
                       <span>{label}</span>

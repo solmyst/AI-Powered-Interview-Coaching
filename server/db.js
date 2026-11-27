@@ -75,5 +75,14 @@ export function openDatabase(path) {
       );
       db.pragma("user_version = 6");
     })();
+  // Version 7: a shareable open link per role. Candidates open it, enter name and email, and get their own
+  // private invite. The token is kept (not hashed) so the owner can copy the link again.
+  if (db.pragma("user_version", { simple: true }) < 7)
+    db.transaction(() => {
+      db.exec(
+        "CREATE TABLE role_open_links (role_id TEXT PRIMARY KEY REFERENCES roles(id) ON DELETE CASCADE, token TEXT NOT NULL UNIQUE, enabled INTEGER NOT NULL DEFAULT 1, cap INTEGER NOT NULL DEFAULT 50, used INTEGER NOT NULL DEFAULT 0, created TEXT NOT NULL); ALTER TABLE invites ADD COLUMN via_open_link INTEGER NOT NULL DEFAULT 0;",
+      );
+      db.pragma("user_version = 7");
+    })();
   return db;
 }

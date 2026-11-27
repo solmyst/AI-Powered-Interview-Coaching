@@ -76,7 +76,7 @@ const openingTask = (rubric) =>
 
 export function registerScreening(
   app,
-  { db, ai, auth, locked, authLimit, hash, secure, origin, allowed },
+  { db, ai, auth, locked, candidateLimit, hash, secure, origin, allowed },
 ) {
   // ----- shared helpers -----
   const orgUsage = (orgId, add) =>
@@ -645,6 +645,7 @@ export function registerScreening(
         status: role.status,
         rubric: role.config.rubric,
         questionCount: role.config.questionCount,
+        proctoring: role.config.proctoring || "standard",
       },
       candidates: candidateRows(role),
     });
@@ -793,6 +794,143 @@ export function registerScreening(
       .send(lines.join("\r\n"));
   });
 
+  // ===== Open link: one shareable link per role =====
+  // For a group of testers or applicants: they enter their own name and email and get a private invite.
+  const openLinkUrl = (token) => `${origin}/interviewace/join#r=${token}`;
+  const openLinkView = (row) => ({
+    enabled: Boolean(row?.enabled),
+    link: row ? openLinkUrl(row.token) : null,
+    cap: row?.cap ?? 50,
+    used: row?.used ?? 0,
+  });
+  app.get("/api/roles/:roleId/open-link", auth, (req, res) => {
+    const role = loadRole(req);
+    res.json(
+      openLinkView(
+        db
+          .prepare("SELECT * FROM role_open_links WHERE role_id=?")
+          .get(role.id),
+      ),
+    );
+  });
+  app.put("/api/roles/:roleId/open-link", auth, (req, res) => {
+    const role = loadRole(req, "owner");
+    const input = z
+      .object({
+        enabled: z.boolean(),
+        cap: z.number().int().min(1).max(500).default(50),
+        rotate: z.boolean().default(false),
+      })
+      .strict()
+      .parse(req.body);
+    const existing = db
+      .prepare("SELECT * FROM role_open_links WHERE role_id=?")
+      .get(role.id);
+    if (!existing)
+      db.prepare(
+        "INSERT INTO role_open_links(role_id,token,enabled,cap,created) VALUES (?,?,?,?,?)",
+      ).run(role.id, newToken(), input.enabled ? 1 : 0, input.cap, iso());
+    else
+      db.prepare(
+        "UPDATE role_open_links SET enabled=?, cap=?, token=? WHERE role_id=?",
+      ).run(
+        input.enabled ? 1 : 0,
+        input.cap,
+        input.rotate ? newToken() : existing.token,
+        role.id,
+      );
+    res.json(
+      openLinkView(
+        db
+          .prepare("SELECT * FROM role_open_links WHERE role_id=?")
+          .get(role.id),
+      ),
+    );
+  });
+  const openLinkRow = (token) =>
+    db
+      .prepare(
+        "SELECT l.*, r.config, r.status AS role_status, r.org_id, o.name AS org_name FROM role_open_links l JOIN roles r ON r.id=l.role_id JOIN orgs o ON o.id=r.org_id WHERE l.token=?",
+      )
+      .get(token);
+  const openLinkToken = z.string().regex(/^[a-f0-9]{64}$/);
+  app.get("/api/candidate/open/:token", candidateLimit, (req, res) => {
+    const parsed = openLinkToken.safeParse(req.params.token);
+    const row = parsed.success && openLinkRow(parsed.data);
+    if (!row || !row.enabled || row.role_status !== "open")
+      fail(
+        404,
+        "This sign-up link is not active. Ask the company for a new one.",
+      );
+    res.json({
+      company: row.org_name,
+      roleTitle: JSON.parse(row.config).title,
+      questionCount: JSON.parse(row.config).questionCount,
+      full: row.used >= row.cap,
+    });
+  });
+  app.post("/api/candidate/open/:token", candidateLimit, (req, res) => {
+    const parsed = openLinkToken.safeParse(req.params.token);
+    const row = parsed.success && openLinkRow(parsed.data);
+    if (!row || !row.enabled || row.role_status !== "open")
+      fail(
+        404,
+        "This sign-up link is not active. Ask the company for a new one.",
+      );
+    const input = z
+      .object({
+        name: z.string().trim().min(1).max(100),
+        email: z
+          .string()
+          .trim()
+          .email()
+          .max(254)
+          .transform((e) => e.toLowerCase()),
+      })
+      .strict()
+      .parse(req.body);
+    const config = JSON.parse(row.config);
+    const token = newToken();
+    const id = randomUUID();
+    const starts = Date.now();
+    try {
+      db.transaction(() => {
+        // The cap is checked inside the transaction so parallel sign-ups cannot pass it.
+        const taken = db
+          .prepare(
+            "UPDATE role_open_links SET used=used+1 WHERE role_id=? AND used<cap",
+          )
+          .run(row.role_id).changes;
+        if (!taken)
+          fail(
+            409,
+            "This sign-up link is full. Ask the company for a new one.",
+          );
+        db.prepare(
+          "INSERT INTO invites(id,role_id,token_hash,candidate_name,candidate_email,status,expires,created,resume,starts,via_open_link) VALUES (?,?,?,?,?,'pending',?,?,'',?,1)",
+        ).run(
+          id,
+          row.role_id,
+          hash(token),
+          input.name,
+          input.email,
+          starts + config.inviteDays * DAY,
+          iso(),
+          starts,
+        );
+      })();
+    } catch (error) {
+      if (error.code === "SQLITE_CONSTRAINT_UNIQUE")
+        fail(
+          409,
+          "This email already has an interview for this role. Use the link you were given, or ask the company for a new one.",
+        );
+      throw error;
+    }
+    // The candidate continues with their own private link, exactly as if the company had invited them.
+    res.status(201).json({ token });
+  });
+
   // ===== Candidate API =====
   function resolveCandidate(req) {
     const token = req.cookies[COOKIE];
@@ -870,7 +1008,7 @@ export function registerScreening(
   const turnNow = (inviteId) =>
     readScreening(inviteId)?.session.turns.length ?? 0;
 
-  app.post("/api/candidate/session", authLimit, (req, res) => {
+  app.post("/api/candidate/session", candidateLimit, (req, res) => {
     const parsed = z
       .object({ token: z.string().regex(/^[a-f0-9]{64}$/) })
       .strict()
