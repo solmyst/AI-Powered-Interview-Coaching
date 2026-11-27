@@ -1,6 +1,7 @@
 // Real-provider acceptance check. No fixtures or canned fallback answers.
 import { writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import assert from "node:assert/strict";
 const base = process.env.TEST_BASE_URL || "http://127.0.0.1:3001";
 const origin = process.env.APP_ORIGIN || "http://localhost:5173";
 let cookie;
@@ -60,11 +61,26 @@ try {
       answer: answers[i],
       expectedTurn: i,
     });
-    console.log("EVALUATION:", session.turns[i].evaluation.rationale);
+    assert.equal(
+      session.turns.length,
+      i + 1,
+      "Answer must advance the interview",
+    );
+    assert.ok(session.turns[i].answer, "Accepted answer must be persisted");
+    console.log("ANSWER SAVED:", i + 1);
     if (session.currentQuestion)
       console.log("FOLLOW-UP:", session.currentQuestion.question);
   }
   session = await call(`/interviews/${session.id}/report`, "POST", {});
+  assert.equal(session.state, "complete");
+  assert.ok(Number.isFinite(session.report?.overall));
+  assert.equal(session.report.answered, answers.length);
+  for (const turn of session.turns) {
+    assert.ok(
+      turn.evaluation?.rationale,
+      "Report must include deferred evaluations",
+    );
+  }
   writeFileSync(
     "docs/live-smoke-result.json",
     JSON.stringify(
