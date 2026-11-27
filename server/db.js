@@ -43,5 +43,20 @@ export function openDatabase(path) {
       `);
       db.pragma("user_version = 3");
     })();
+  // Version 4: per-candidate résumé and interview window, and strict-proctoring event kinds.
+  // integrity_events is rebuilt because SQLite cannot change a CHECK; nothing references it.
+  if (db.pragma("user_version", { simple: true }) < 4)
+    db.transaction(() => {
+      db.exec(`
+        ALTER TABLE invites ADD COLUMN resume TEXT NOT NULL DEFAULT '';
+        ALTER TABLE invites ADD COLUMN starts INTEGER NOT NULL DEFAULT 0;
+        CREATE TABLE integrity_events_v4 (id INTEGER PRIMARY KEY, invite_id TEXT NOT NULL REFERENCES invites(id) ON DELETE CASCADE, at TEXT NOT NULL, turn INTEGER NOT NULL, kind TEXT NOT NULL CHECK (kind IN ('tab_hidden','fullscreen_exit','face_absent','multiple_faces','camera_off','paste','multiple_screens','terminated','reconnect','new_device')), duration_ms INTEGER, reviewed_by TEXT REFERENCES users(id) ON DELETE SET NULL, reviewed_at TEXT, verdict TEXT CHECK (verdict IN ('no_concern','concern')), review_note TEXT);
+        INSERT INTO integrity_events_v4 SELECT id, invite_id, at, turn, kind, duration_ms, reviewed_by, reviewed_at, verdict, review_note FROM integrity_events;
+        DROP TABLE integrity_events;
+        ALTER TABLE integrity_events_v4 RENAME TO integrity_events;
+        CREATE INDEX integrity_invite ON integrity_events(invite_id, at);
+      `);
+      db.pragma("user_version = 4");
+    })();
   return db;
 }

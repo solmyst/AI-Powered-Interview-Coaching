@@ -8,7 +8,7 @@ export const talkTask =
   "Their latest words (candidateSaid) are not an answer yet: they ask something about the question, want it repeated, ask for a moment, or think aloud. Set kind to 'conversation' and nextQuestion to null. reply is one to three short spoken sentences, like a human interviewer: answer what they asked about the question, restate it more simply using only what currentQuestion already says (never add detail about the problem or hint at what could go wrong), or reassure them if they need time. Never praise, grade or react to the quality of anything they said, never confirm or hint that an approach is right or wrong, and never give away any part of the solution. If they ask for an example, give one from everyday non-technical life (a cafe, a library, a bus queue), never from the candidate's field, and never describe how the real problem is solved. If they ask whether their idea is right, say you would like to hear their full answer first. End by inviting them to go ahead.";
 export const answerTask =
   midInterview +
-  "The candidate's latest words (candidateSaid) are their answer to currentQuestion, even if weak, partial or 'I don't know'. Set kind to 'answer' and reply to an empty string. nextQuestion follows these rules: ";
+  "The candidate's latest words (candidateSaid) are meant as their answer to currentQuestion. Set kind to 'answer'. relevant is false only when candidateSaid does not try to answer currentQuestion at all: it talks about something unrelated, or answers a different question. A weak, wrong, partial or 'I don't know' answer is still relevant true. When relevant is false: nextQuestion is null and reply is one or two short spoken sentences, in the language the candidate used, that briefly acknowledge what they said without praising or agreeing with it, then say plainly that it does not answer what you asked; do not repeat the question itself, it is added after your reply. When relevant is true: reply is an empty string and nextQuestion follows these rules: ";
 export const nextQuestionTask =
   "ONE nextQuestion, written the way a thoughtful human interviewer talks. nextQuestion.lead: one short spoken sentence reacting to what the candidate actually said (when they said something concrete, name that exact detail in your own words; when the answer was empty or 'I don't know', reassure them briefly and kindly without judging; never reuse a stock phrase, vary the wording every turn and never say 'let's look at something different' after a real answer). nextQuestion.question: never repeat or reword anything in alreadyAsked, and do not stay on the same scenario. Use a concrete situational question ('Imagine…', 'Suppose…', 'Tell me about a time…') answerable in about two minutes of speech. Prefer realistic workplace scenarios over résumé recaps. The lead never asks anything and never suggests an approach, technique, tool or hint toward the answer; it only reacts. The question is one or two sentences, at most 45 words, with exactly one question mark.";
 // Small models sometimes leak CJK characters into English text; Hindi uses Devanagari and is unaffected.
@@ -87,6 +87,7 @@ export function intentOf(said, exchanges = []) {
 // in the chat: "what do you mean?" is dropped, but a real attempt made before the final words is kept.
 export function answerOf(exchanges, final) {
   const earlier = (exchanges || [])
+    .filter((e) => !e.redirect)
     .map((e) => e.said)
     .filter(
       (said) => said.trim().split(/\s+/).length >= 8 && !said.includes("?"),
@@ -96,7 +97,8 @@ export function answerOf(exchanges, final) {
 
 // Decides what the candidate's latest words were and, for an answer, the next question.
 // Returns { answered, last, reply, nextQuestion, usage }; the caller applies it to its own storage.
-// persona: { intro, mode } lets screening change the wording without a second code path.
+// persona: { intro, mode, fixedNext } lets screening change the wording without a second code path.
+// fixedNext is a company-written question: asked next as written, with no model call.
 export async function decideTurn(ai, session, answer, persona = {}) {
   const last = session.turns.length + 1 >= session.setup.questionCount;
   const asked = [
@@ -105,24 +107,48 @@ export async function decideTurn(ai, session, answer, persona = {}) {
   ];
   const exchanges = session.exchanges || [];
   const talk = intentOf(answer, exchanges) === "talk";
-  // The final answer needs no reply or next question, so skip the model call and close at once.
-  if (last && !talk)
-    return {
-      answered: true,
-      last,
-      nextQuestion: null,
-      usage: { input: 0, output: 0 },
-    };
+  // An answer that ignores the question is pointed back to it once; after that it counts as the answer.
+  // "I don't know" is an honest answer, so it is never sent back to the question.
+  const redirected =
+    exchanges.some((e) => e.redirect) || gaveUp.test(answer);
+  // The final answer and a company-written next question need no generated question.
+  const closing = () =>
+    persona.fixedNext && !last
+      ? {
+          answered: true,
+          last,
+          nextQuestion: tidyQuestion({
+            lead: "Thank you. Here is the next question.",
+            question: persona.fixedNext,
+            focus: "Company question",
+            difficulty: session.setup.difficulty,
+          }),
+          usage: { input: 0, output: 0 },
+        }
+      : {
+          answered: true,
+          last,
+          nextQuestion: null,
+          usage: { input: 0, output: 0 },
+        };
+  const checkOnly = !talk && (last || Boolean(persona.fixedNext));
+  if (checkOnly && redirected) return closing();
   const thin = answer.trim().split(/\s+/).length < 8;
-  const next = `${nextQuestionTask} ${
-    thin
-      ? "The answer was almost empty, so leave this topic: switch to a different, more approachable topic from alreadyAsked."
-      : "The lead and the question must refer to a specific detail the candidate actually said."
-  }`;
+  const next = checkOnly
+    ? "The next question is already decided, so when relevant is true nextQuestion is null."
+    : `${nextQuestionTask} ${
+        thin
+          ? "The answer was almost empty, so leave this topic: switch to a different, more approachable topic from alreadyAsked."
+          : "The lead and the question must refer to a specific detail the candidate actually said."
+      }`;
   const task = `${persona.intro || ""}${
     talk
       ? talkTask
-      : `${answerTask}${next} The candidate has finished this question: treat this as kind answer.`
+      : `${answerTask}${next}${
+          redirected
+            ? " You already pointed them back to the question once, so relevant must be true."
+            : ""
+        } The candidate has finished this question: treat this as kind answer.`
   }`;
   const context = {
     setup: {
@@ -132,6 +158,9 @@ export async function decideTurn(ai, session, answer, persona = {}) {
       difficulty: session.setup.difficulty,
       industry: session.setup.industry,
       company: session.setup.company,
+      // Lets follow-ups probe real claims from the résumé and the job description.
+      resume: (session.setup.resume || "").slice(0, 3000),
+      jobDescription: (session.setup.jobDescription || "").slice(0, 2000),
     },
     earlierAnswers: session.turns.map((t) => ({
       question: t.question.question,
@@ -144,6 +173,8 @@ export async function decideTurn(ai, session, answer, persona = {}) {
   };
   const needsRetry = (value) =>
     !talk &&
+    !checkOnly &&
+    !(value.relevant === false && !redirected) &&
     (!value.nextQuestion || repeats(value.nextQuestion.question, asked));
   const options = { mode: persona.mode };
   const schema = talk ? talkReplySchema : answerReplySchema;
@@ -180,6 +211,18 @@ export async function decideTurn(ai, session, answer, persona = {}) {
       };
   }
   const { value } = generated;
+  if (!talk && value.relevant === false && !redirected)
+    return {
+      answered: false,
+      last,
+      redirect: true,
+      reply: `${
+        tidyReply(value.reply) ||
+        "Okay, I hear you, but that doesn't answer what I asked."
+      } Let me repeat the question. ${session.currentQuestion.question}`,
+      usage: generated.usage,
+    };
+  if (checkOnly) return { ...closing(), usage: generated.usage };
   if (talk)
     return {
       answered: false,

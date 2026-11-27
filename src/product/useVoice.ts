@@ -50,11 +50,18 @@ export function useVoice(
     (window as unknown as VoiceWindow).webkitSpeechRecognition;
   function unlock() {
     if (shared.current) return;
-    const el = new Audio(
-      "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAwF0AAIC7AAACABAAZGF0YQAAAAA=",
+    // An empty WAV played as a blob: URL; the page's CSP allows blob: media but not data:.
+    const silent = Uint8Array.from(
+      atob("UklGRiQAAABXQVZFZm10IBAAAAABAAEAwF0AAIC7AAACABAAZGF0YQAAAAA="),
+      (c) => c.charCodeAt(0),
     );
+    const url = URL.createObjectURL(new Blob([silent], { type: "audio/wav" }));
+    const el = new Audio(url);
     shared.current = el;
-    void el.play().catch(() => {});
+    void el
+      .play()
+      .catch(() => {})
+      .finally(() => URL.revokeObjectURL(url));
   }
   function stop() {
     setPreparing(false);

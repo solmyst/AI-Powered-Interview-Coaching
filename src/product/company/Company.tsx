@@ -34,6 +34,8 @@ export type CandidateRow = {
   answered: number;
   questionCount: number;
   unreviewedFlags: number;
+  attention: number | null;
+  terminated: boolean;
   decision: { status: string; note: string; by: string } | null;
   expires: number;
 };
@@ -361,6 +363,8 @@ function RoleForm({
     rubric: (choices.rubrics as Record<string, RubricItem[]>).Technical,
     inviteDays: 7,
     candidateFeedback: "summary",
+    questions: [],
+    proctoring: "strict",
   });
   const [edited, setEdited] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -538,6 +542,53 @@ function RoleForm({
           </button>
         </section>
         <section className="panel">
+          <h2>Your questions</h2>
+          <p className="muted">
+            Maya asks these first, word for word and in this order, then writes
+            follow-ups from the job description and each candidate’s résumé for
+            the remaining {Math.max(0, form.questionCount - form.questions.length)}.
+            Leave empty to let Maya write every question.
+          </p>
+          {form.questions.map((q, i) => (
+            <div className="co-question" key={i}>
+              <label>
+                Question {i + 1}
+                <textarea
+                  rows={2}
+                  required
+                  minLength={10}
+                  maxLength={600}
+                  value={q}
+                  onChange={(e) =>
+                    set(
+                      "questions",
+                      form.questions.map((x, j) => (j === i ? e.target.value : x)),
+                    )
+                  }
+                />
+              </label>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label={`Remove question ${i + 1}`}
+                onClick={() =>
+                  set("questions", form.questions.filter((_, j) => j !== i))
+                }
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="secondary"
+            disabled={form.questions.length >= form.questionCount}
+            onClick={() => set("questions", [...form.questions, ""])}
+          >
+            <Plus size={16} /> Add a question
+          </button>
+        </section>
+        <section className="panel">
           <h2>Interview settings</h2>
           <div className="form-grid">
             <label>
@@ -546,7 +597,7 @@ function RoleForm({
                 value={form.questionCount}
                 onChange={(e) => set("questionCount", Number(e.target.value))}
               >
-                {[3, 4, 5, 6, 7, 8].map((n) => (
+                {[3, 4, 5, 6, 7, 8].filter((n) => n >= form.questions.length).map((n) => (
                   <option key={n} value={n}>
                     {n} questions · about {n * 4} minutes
                   </option>
@@ -564,6 +615,22 @@ function RoleForm({
                     {n} days
                   </option>
                 ))}
+              </select>
+            </label>
+            <label>
+              Proctoring
+              <select
+                value={form.proctoring}
+                onChange={(e) =>
+                  set("proctoring", e.target.value as "strict" | "standard")
+                }
+              >
+                <option value="strict">
+                  Strict: full screen and one display; leaving for 10 s ends the interview
+                </option>
+                <option value="standard">
+                  Standard: leaving full screen or the tab is noted for review
+                </option>
               </select>
             </label>
             <label>
@@ -683,6 +750,8 @@ function Candidates({
       {inviting && (
         <InvitePanel
           roleId={role.id}
+          company={org.name}
+          title={role.title}
           close={() => {
             setInviting(false);
             load();
@@ -707,6 +776,7 @@ function Candidates({
                 <th>Candidate</th>
                 <th>Status</th>
                 <th>AI estimate</th>
+                <th>Eye contact</th>
                 {role.rubric.map((r) => (
                   <th key={r.key}>{r.label}</th>
                 ))}
@@ -749,6 +819,7 @@ function Candidates({
                       "—"
                     )}
                   </td>
+                  <td>{c.attention !== null ? `${c.attention}%` : "—"}</td>
                   {role.rubric.map((r) => (
                     <td key={r.key}>
                       {c.competencyScores ? (
@@ -759,6 +830,9 @@ function Candidates({
                     </td>
                   ))}
                   <td>
+                    {c.terminated && (
+                      <span className="co-chip flag">Ended by proctoring</span>
+                    )}
                     {c.unreviewedFlags ? (
                       <span className="co-chip flag">
                         {c.unreviewedFlags} to review
@@ -795,11 +869,66 @@ export function Bar({ value }: { value: number }) {
   );
 }
 
-function InvitePanel({ roleId, close }: { roleId: string; close: () => void }) {
+// datetime-local works in local time; the API takes epoch milliseconds.
+const localInput = (ms: number) => {
+  const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60000);
+  return d.toISOString().slice(0, 16);
+};
+const when = (ms: number) =>
+  new Date(ms).toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+type Created = {
+  id: string;
+  name: string;
+  email: string;
+  link: string;
+  opensAt: number;
+  closesAt: number;
+};
+const inviteEmail = (company: string, title: string, l: Created) => ({
+  subject: `${company}: your AI screening interview for ${title}`,
+  body: `Hi ${l.name},
+
+${company} invites you to a short AI screening interview for the ${title} role.
+
+Your private link (do not share it):
+${l.link}
+
+Open it between ${when(l.opensAt)} and ${when(l.closesAt)}.
+
+Before you start:
+- Use a laptop or desktop with Chrome or Edge, a camera and a microphone.
+- Use one screen only. The interview runs in full screen; leaving full screen or the tab for more than 10 seconds ends it.
+- Sit in a quiet, well-lit place. Headphones help.
+
+A person at ${company} reviews every interview and makes every decision.
+
+Best of luck,
+${company} hiring team`,
+});
+
+function InvitePanel({
+  roleId,
+  company,
+  title,
+  close,
+}: {
+  roleId: string;
+  company: string;
+  title: string;
+  close: () => void;
+}) {
   const [text, setText] = useState("");
-  const [links, setLinks] = useState<
-    { id: string; name: string; email: string; link: string }[] | null
-  >(null);
+  const [resumes, setResumes] = useState<Record<string, string>>({});
+  const [opens, setOpens] = useState(() => localInput(Date.now()));
+  const [closes, setCloses] = useState(() =>
+    localInput(Date.now() + 7 * 86400000),
+  );
+  const [links, setLinks] = useState<Created[] | null>(null);
   const [skipped, setSkipped] = useState<{ email: string; reason: string }[]>(
     [],
   );
@@ -815,27 +944,42 @@ function InvitePanel({ roleId, close }: { roleId: string; close: () => void }) {
       return match
         ? {
             name: match[1].replace(/["<>]/g, "").trim() || match[2],
-            email: match[2].replace(/[<>]/g, ""),
+            email: match[2].replace(/[<>]/g, "").toLowerCase(),
           }
         : null;
     });
+  const parsed = parse();
+  const copy = async (id: string, value: string) => {
+    await navigator.clipboard?.writeText(value);
+    setCopied(id);
+  };
   return (
     <section className="panel co-invite" aria-label="Invite candidates">
       {!links ? (
         <form
           onSubmit={async (event) => {
             event.preventDefault();
-            const parsed = parse();
             if (parsed.some((p) => !p))
               return setError("Use one candidate per line: name, email.");
+            const opensAt = new Date(opens).getTime();
+            const closesAt = new Date(closes).getTime();
+            if (!(closesAt > opensAt))
+              return setError("The window must close after it opens.");
             setError("");
             try {
               const result = await api<{
-                invites: typeof links;
+                invites: Created[];
                 skipped: typeof skipped;
               }>(`/roles/${roleId}/invites`, {
                 method: "POST",
-                body: JSON.stringify({ candidates: parsed }),
+                body: JSON.stringify({
+                  candidates: parsed.map((p) => ({
+                    ...p,
+                    resume: (resumes[p!.email] || "").slice(0, 10000),
+                  })),
+                  opensAt,
+                  closesAt,
+                }),
               });
               setLinks(result.invites);
               setSkipped(result.skipped);
@@ -848,7 +992,7 @@ function InvitePanel({ roleId, close }: { roleId: string; close: () => void }) {
           <label>
             One candidate per line: name, email <small>up to 50</small>
             <textarea
-              rows={5}
+              rows={4}
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder={
@@ -856,6 +1000,66 @@ function InvitePanel({ roleId, close }: { roleId: string; close: () => void }) {
               }
             />
           </label>
+          <div className="co-window">
+            <label>
+              Interview opens
+              <input
+                type="datetime-local"
+                required
+                value={opens}
+                onChange={(e) => setOpens(e.target.value)}
+              />
+            </label>
+            <label>
+              Must be finished by
+              <input
+                type="datetime-local"
+                required
+                value={closes}
+                onChange={(e) => setCloses(e.target.value)}
+              />
+            </label>
+          </div>
+          {parsed.some(Boolean) && (
+            <div>
+              <h3>Résumés (optional)</h3>
+              <p className="muted">
+                Maya asks follow-ups about real claims in each résumé. Paste the
+                text, or choose a .txt file. For a PDF, open it and copy the
+                text.
+              </p>
+              {parsed.map(
+                (p) =>
+                  p && (
+                    <div className="co-invite-row" key={p.email}>
+                      <label>
+                        {p.name} <small>{p.email}</small>
+                        <textarea
+                          rows={3}
+                          maxLength={10000}
+                          value={resumes[p.email] || ""}
+                          onChange={(e) =>
+                            setResumes((r) => ({ ...r, [p.email]: e.target.value }))
+                          }
+                          placeholder="Paste résumé text"
+                        />
+                      </label>
+                      <input
+                        type="file"
+                        accept=".txt,.md,text/plain"
+                        aria-label={`Résumé file for ${p.name}`}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const value = (await file.text()).slice(0, 10000);
+                          setResumes((r) => ({ ...r, [p.email]: value }));
+                        }}
+                      />
+                    </div>
+                  ),
+              )}
+            </div>
+          )}
           {error && (
             <p className="error" role="alert">
               {error}
@@ -872,31 +1076,40 @@ function InvitePanel({ roleId, close }: { roleId: string; close: () => void }) {
         </form>
       ) : (
         <>
-          <h2>Share these links</h2>
+          <h2>Send these invites</h2>
           <p className="notice">
             Each link is private to one candidate.{" "}
             <strong>They are shown only now</strong>; if you lose one, reissue
-            it from the candidate’s page.
+            it from the candidate’s page. “Email” opens a ready-to-send message
+            in your own mail app.
           </p>
           <ul className="co-links">
-            {links.map((l) => (
-              <li key={l.id}>
-                <span>
-                  <strong>{l.name}</strong>
-                  <small>{l.email}</small>
-                </span>
-                <code>{l.link}</code>
-                <button
-                  className="secondary"
-                  onClick={async () => {
-                    await navigator.clipboard?.writeText(l.link);
-                    setCopied(l.id);
-                  }}
-                >
-                  <Copy size={14} /> {copied === l.id ? "Copied" : "Copy"}
-                </button>
-              </li>
-            ))}
+            {links.map((l) => {
+              const mail = inviteEmail(company, title, l);
+              return (
+                <li key={l.id}>
+                  <span>
+                    <strong>{l.name}</strong>
+                    <small>
+                      {l.email} · {when(l.opensAt)} to {when(l.closesAt)}
+                    </small>
+                  </span>
+                  <code>{l.link}</code>
+                  <a
+                    className="secondary button-link"
+                    href={`mailto:${encodeURIComponent(l.email)}?subject=${encodeURIComponent(mail.subject)}&body=${encodeURIComponent(mail.body)}`}
+                  >
+                    <Send size={14} /> Email
+                  </a>
+                  <button
+                    className="secondary"
+                    onClick={() => void copy(l.id, mail.body)}
+                  >
+                    <Copy size={14} /> {copied === l.id ? "Copied" : "Copy message"}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
           {skipped.map((s) => (
             <p className="muted" key={s.email}>

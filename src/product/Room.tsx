@@ -16,6 +16,7 @@ import {
   Play,
   RotateCcw,
   ShieldCheck,
+  ShieldAlert,
   Sun,
   Volume2,
 } from "lucide-react";
@@ -51,8 +52,20 @@ function waitForVideoFrame(video: HTMLVideoElement) {
   });
 }
 
-type EventKind = "tab_hidden" | "fullscreen_exit" | "camera_off" | "paste";
+type EventKind = "tab_hidden" | "fullscreen_exit" | "camera_off" | "paste" | "face_absent" | "multiple_faces" | "multiple_screens";
+type StrictReason = "fullscreen_exit" | "tab_hidden" | "multiple_screens";
+const GRACE_MS = 10000;
+// Chromium reports a second connected display without any permission prompt.
+const extendedDisplay = () => Boolean((screen as Screen & { isExtended?: boolean }).isExtended);
+const strictMessage: Record<StrictReason, string> = {
+  fullscreen_exit: "You left full screen.",
+  tab_hidden: "You left the interview tab.",
+  multiple_screens: "A second display is connected.",
+};
 const eventNotice: Record<EventKind, string> = {
+  face_absent: "We can’t see your face. Stay in front of the camera.",
+  multiple_faces: "More than one person is in view. It is noted for the reviewer.",
+  multiple_screens: "A second display is connected. Disconnect it to continue.",
   tab_hidden: "You left this tab. It is noted for the reviewer.",
   fullscreen_exit: "You left full screen. It is noted for the reviewer.",
   camera_off: "Your camera stopped. It is noted for the reviewer.",
@@ -66,6 +79,7 @@ export function Room({
   update,
   back,
   mode = "practice",
+  strict = false,
 }: {
   session: RoomSession;
   transcriptionReady: boolean;
@@ -74,6 +88,8 @@ export function Room({
   back: () => void;
   // screening: a company's interview. Same call, candidate endpoints, no delivery metrics, visible focus notes.
   mode?: "practice" | "screening";
+  // strict screening: full screen and a single display are required; staying out past the grace period ends the interview.
+  strict?: boolean;
 }) {
   const screening = mode === "screening";
   const base = screening ? "/candidate/interview" : `/interviews/${session.id}`;
@@ -149,8 +165,8 @@ export function Room({
         body: JSON.stringify({
           answer,
           expectedTurn: session.turns.length,
-          // Delivery metrics are coaching for the candidate; screening never collects them.
-          ...(screening ? {} : {
+          // Screening sends only on-device camera counts (eye contact, face in frame); never speech style.
+          ...(screening ? (visual.current.samples ? { delivery: { visual: visual.current } } : {}) : {
             delivery: {
               ...(visual.current.samples ? { visual: visual.current } : {}),
               speech: {
@@ -278,6 +294,74 @@ export function Room({
     return () => document.removeEventListener("visibilitychange", onVisibility);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screening]);
+
+  // Face checks during answers: no face for 10 s, or two faces for 3 s, is noted once per episode.
+  const presence = useRef({ none: 0, many: 0, notedNone: false, notedMany: false });
+  function onFaces(count: number) {
+    if (!screening) return;
+    const p = presence.current;
+    const now = Date.now();
+    p.none = count === 0 ? p.none || now : 0;
+    p.many = count > 1 ? p.many || now : 0;
+    if (!p.none) p.notedNone = false;
+    if (!p.many) p.notedMany = false;
+    if (p.none && !p.notedNone && now - p.none >= 10000) { p.notedNone = true; noteEvent("face_absent"); }
+    if (p.many && !p.notedMany && now - p.many >= 3000) { p.notedMany = true; noteEvent("multiple_faces"); }
+  }
+
+  const [violation, setViolation] = useState<{ reason: StrictReason; deadline: number } | null>(null);
+  const [clock, setClock] = useState(0);
+  const [ended, setEnded] = useState("");
+  const actions = useRef({ pause: pauseInterview, terminate });
+  actions.current = { pause: pauseInterview, terminate };
+  useEffect(() => {
+    if (!strict || !joined) return;
+    let current: { reason: StrictReason; deadline: number } | null = null;
+    const check = () => {
+      if (callEnded.current) return;
+      const reason: StrictReason | null = extendedDisplay() ? "multiple_screens" : document.hidden ? "tab_hidden" : !document.fullscreenElement ? "fullscreen_exit" : null;
+      setClock(Date.now());
+      if (!reason) {
+        if (current) setViolation((current = null));
+        return;
+      }
+      if (!current) {
+        setViolation((current = { reason, deadline: Date.now() + GRACE_MS }));
+        if (reason === "multiple_screens") noteEvent("multiple_screens");
+        if (!paused.current) actions.current.pause();
+      } else if (Date.now() >= current.deadline) void actions.current.terminate(current.reason);
+    };
+    const timer = window.setInterval(check, 500);
+    document.addEventListener("fullscreenchange", check);
+    document.addEventListener("visibilitychange", check);
+    (screen as Screen & Partial<EventTarget>).addEventListener?.("change", check);
+    check();
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("fullscreenchange", check);
+      document.removeEventListener("visibilitychange", check);
+      (screen as Screen & Partial<EventTarget>).removeEventListener?.("change", check);
+    };
+    // noteEvent reads refs only; pause and terminate are read through a ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [strict, joined]);
+
+  async function terminate(reason: StrictReason) {
+    if (!callEnded.current) {
+      callEnded.current = true;
+      voice.stop();
+      transcription.cancel();
+      sharedStream.current?.getTracks().forEach((track) => track.stop());
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    }
+    setViolation(null);
+    setEnded(`${strictMessage[reason]} The interview has ended and your answers so far were sent to ${company}.`);
+    try {
+      update(await api(`${base}/terminate`, { method: "POST", body: JSON.stringify({ reason }) }));
+    } catch (reason2) {
+      setEnded(`${strictMessage[reason]} The interview has ended. ${(reason2 as Error).message}`);
+    }
+  }
 
   async function toggleFullscreen() {
     try {
@@ -531,6 +615,7 @@ export function Room({
             <div><Camera /><span><strong>Camera</strong>{screening ? "Self-view. The picture is checked on your device only; it is never recorded or sent" : "Private self-view and on-device presence coaching"}</span></div>
             <div><Mic /><span><strong>Microphone</strong>Automatic English and Hindi transcription</span></div>
             <div><Headphones /><span><strong>Headphones recommended</strong>Prevents the interviewer’s voice entering your answer</span></div>
+            {strict && <div><ShieldAlert /><span><strong>Full screen, one display</strong>The interview runs in full screen on one screen. If you leave full screen or the tab, or connect a second display, you have 10 seconds to return or the interview ends</span></div>}
             <div><ShieldCheck /><span><strong>{screening ? `What ${company} sees` : "Private by design"}</strong>{screening ? "Your transcript and focus notes. Video is never recorded; audio is sent for transcription only" : "Video stays on-device; audio is sent securely for transcription"}</span></div>
           </div>
           {(transcription.error || error) && <div className="call-error" role="alert">{transcription.error || error}</div>}
@@ -558,11 +643,20 @@ export function Room({
             <button
               className="join-call"
               disabled={!transcriptionReady || transcription.status !== "ready" || mediaState !== "ready"}
-              onClick={() => {
-                callStartedAt.current = Date.now();
+              onClick={async () => {
                 voice.unlock();
+                if (strict) {
+                  if (extendedDisplay())
+                    return setError("Disconnect your second display, then join. This interview allows one screen only.");
+                  try {
+                    await document.documentElement.requestFullscreen();
+                  } catch {
+                    return setError("This interview needs full screen. Use Chrome, Edge or Firefox on a laptop or desktop.");
+                  }
+                  setError("");
+                } else void document.documentElement.requestFullscreen?.().catch(() => {});
+                callStartedAt.current = Date.now();
                 setPhase("joining");
-                void document.documentElement.requestFullscreen?.().catch(() => {});
                 setJoined(true);
               }}
             >
@@ -588,7 +682,7 @@ export function Room({
           <div className="interviewer-orbit"><Brain size={54} /></div>
           <span className="availability"><i /> Ready now</span>
           <h2>Maya</h2>
-          <p>AI interview coach</p>
+          <p>{screening ? "AI interviewer" : "AI interview coach"}</p>
           <small>{session.setup.role} · {session.setup.track} round</small>
           <div className={`preflight-device-preview ${mediaState}`}>
             <video ref={previewVideo} autoPlay muted playsInline aria-label="Camera preview" />
@@ -657,6 +751,32 @@ export function Room({
       </header>
 
       {notice && <div className="call-toast" role="status">{notice}</div>}
+      {(violation || ended) && (
+        <div className="strict-overlay" role="alertdialog" aria-modal="true" aria-labelledby="strict-title">
+          <div>
+            <ShieldAlert size={36} aria-hidden="true" />
+            {ended ? (
+              <>
+                <h2 id="strict-title">Interview ended</h2>
+                <p>{ended}</p>
+              </>
+            ) : violation && (
+              <>
+                <h2 id="strict-title">{strictMessage[violation.reason]}</h2>
+                <p>
+                  {violation.reason === "multiple_screens" ? "Disconnect the second display" : "Return to full screen"} within{" "}
+                  <strong>{Math.max(0, Math.ceil((violation.deadline - clock) / 1000))} seconds</strong> or the interview ends. Your answers so far are saved.
+                </p>
+                {violation.reason !== "multiple_screens" && (
+                  <button className="primary" onClick={() => void document.documentElement.requestFullscreen().catch(() => {})}>
+                    <Maximize size={18} /> Return to full screen
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
       <div className="call-stage">
         <nav className="interview-map" aria-label="Interview progress">
           <p className="map-title">Question {current} of {total}</p>
@@ -718,6 +838,8 @@ export function Room({
             paused={phase !== "listening"}
             turn={session.turns.length}
             onSummary={(summary) => { visual.current = summary; }}
+            maxFaces={screening ? 2 : 1}
+            onFaces={onFaces}
           />
           <div className={`mic-meter ${recording ? "live" : ""}`}>
             <Mic size={16} aria-hidden="true" />

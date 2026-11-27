@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createSpeech } from "../server/speech.js";
+import { createSpeech, chunks, joinWav } from "../server/speech.js";
 
 test("Sarvam TTS keeps credentials server-side and decodes bilingual WAV audio", async () => {
   let captured;
@@ -13,7 +13,9 @@ test("Sarvam TTS keeps credentials server-side and decodes bilingual WAV audio",
     {
       fetchImpl: async (url, options) => {
         captured = { url, options };
-        return Response.json({ audios: [Buffer.from("RIFF1234WAVEfmt ").toString("base64")] });
+        return Response.json({
+          audios: [Buffer.from("RIFF1234WAVEfmt ").toString("base64")],
+        });
       },
     },
   );
@@ -55,12 +57,17 @@ test("Sarvam TTS sanitizes provider failures", async () => {
 
 test("Sarvam selects English for Latin text and respects configured voice", async () => {
   let request;
-  const speech = createSpeech({ SARVAM_API_KEY: "key", SARVAM_VOICE: "simran_en_customer" }, {
-    fetchImpl: async (_url, options) => {
-      request = JSON.parse(options.body);
-      return Response.json({ audios: [Buffer.from("RIFF1234WAVEfmt ").toString("base64")] });
+  const speech = createSpeech(
+    { SARVAM_API_KEY: "key", SARVAM_VOICE: "simran_en_customer" },
+    {
+      fetchImpl: async (_url, options) => {
+        request = JSON.parse(options.body);
+        return Response.json({
+          audios: [Buffer.from("RIFF1234WAVEfmt ").toString("base64")],
+        });
+      },
     },
-  });
+  );
   await speech.synthesize("Describe your project.");
   assert.equal(request.language_code, "en-IN");
   assert.equal(request.model, "bulbul:v4-flash");
@@ -68,12 +75,51 @@ test("Sarvam selects English for Latin text and respects configured voice", asyn
 });
 
 test("Sarvam rejects malformed audio and hides provider error details", async () => {
-  for (const response of [new Response("secret provider detail", { status: 403 }), Response.json({ audios: [] }), Response.json({ audios: ["not audio"] }), Response.json({ audios: [Buffer.from("not wav").toString("base64")] })]) {
-    const speech = createSpeech({ SARVAM_API_KEY: "secret" }, { fetchImpl: async () => response });
+  for (const response of [
+    new Response("secret provider detail", { status: 403 }),
+    Response.json({ audios: [] }),
+    Response.json({ audios: ["not audio"] }),
+    Response.json({ audios: [Buffer.from("not wav").toString("base64")] }),
+  ]) {
+    const speech = createSpeech(
+      { SARVAM_API_KEY: "secret" },
+      { fetchImpl: async () => response },
+    );
     await assert.rejects(speech.synthesize("Question"), (error) => {
       assert.equal(error.status, 503);
       assert.doesNotMatch(error.message, /secret|provider detail/);
       return true;
     });
   }
+});
+
+test("long speech is split by sentence and joined into one WAV", () => {
+  const long = "First sentence here. ".repeat(20) + "Last one?";
+  const parts = chunks(long);
+  assert.ok(parts.length > 1 && parts.every((p) => p.length <= 220));
+  assert.equal(
+    parts.join(" ").replace(/\s+/g, " "),
+    long.trim().replace(/\s+/g, " "),
+  );
+  const wav = (bytes) => {
+    const fmt = Buffer.alloc(16);
+    fmt.writeUInt16LE(1, 0);
+    fmt.writeUInt16LE(1, 2);
+    fmt.writeUInt32LE(24000, 4);
+    const head = Buffer.alloc(12);
+    head.write("RIFF");
+    head.writeUInt32LE(36 + bytes.length, 4);
+    head.write("WAVE", 8);
+    const f = Buffer.alloc(8);
+    f.write("fmt ");
+    f.writeUInt32LE(16, 4);
+    const d = Buffer.alloc(8);
+    d.write("data");
+    d.writeUInt32LE(bytes.length, 4);
+    return Buffer.concat([head, f, fmt, d, Buffer.from(bytes)]);
+  };
+  const joined = joinWav([wav([1, 2]), wav([3, 4, 5, 6])]);
+  assert.equal(joined.subarray(0, 4).toString(), "RIFF");
+  assert.equal(joined.readUInt32LE(40), 6);
+  assert.deepEqual([...joined.subarray(44)], [1, 2, 3, 4, 5, 6]);
 });

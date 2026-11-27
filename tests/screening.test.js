@@ -626,3 +626,103 @@ test("declining deletes nothing the company did not create; retention purge casc
     1,
   );
 });
+
+test("company questions, résumé, interview window, eye contact and strict-proctoring termination", async () => {
+  const questions = [
+    "Tell us about the hardest production incident you handled.",
+    "How would you design idempotent payment retries?",
+  ];
+  const made = await call(`/orgs/${orgId}/roles`, {
+    method: "POST",
+    cookie: owner,
+    body: { ...roleBody("Payments engineer"), questions, proctoring: "strict" },
+  });
+  assert.equal(made.status, 201);
+  // More company questions than the question count is rejected.
+  assert.equal(
+    (
+      await call(`/orgs/${orgId}/roles`, {
+        method: "POST",
+        cookie: owner,
+        body: { ...roleBody("Too many"), questions: [...questions, ...questions] },
+      })
+    ).status,
+    400,
+  );
+  const later = Date.now() + 86400000;
+  const sent = await call(`/roles/${made.body.id}/invites`, {
+    method: "POST",
+    cookie: owner,
+    body: {
+      candidates: [
+        { name: "Early", email: "early@example.test", resume: "Built a ledger at Acme Pay." },
+      ],
+      opensAt: later,
+      closesAt: later + 7200000,
+    },
+  });
+  assert.equal(sent.status, 201);
+  assert.equal(sent.body.invites[0].opensAt, later);
+  const now = await call(`/roles/${made.body.id}/invites`, {
+    method: "POST",
+    cookie: owner,
+    body: {
+      candidates: [{ name: "Now", email: "now@example.test", resume: "Built a ledger at Acme Pay." }],
+    },
+  });
+  async function join(link) {
+    const s = await call("/candidate/session", { method: "POST", body: { token: tokenOf(link) } });
+    await call("/candidate/consent", {
+      method: "POST",
+      cookie: s.cookie,
+      body: { accepted: true, version: s.body.consentVersion },
+    });
+    return s;
+  }
+  const early = await join(sent.body.invites[0].link);
+  assert.equal(early.body.opensAt, later);
+  assert.equal(early.body.proctoring, "strict");
+  const blocked = await call("/candidate/interview", { method: "POST", cookie: early.cookie, body: {} });
+  assert.equal(blocked.status, 409);
+  assert.match(blocked.body.error, /opens at/);
+
+  const cand = await join(now.body.invites[0].link);
+  const started = await call("/candidate/interview", { method: "POST", cookie: cand.cookie, body: {} });
+  assert.equal(started.body.currentQuestion.question, questions[0]);
+  const visual = {
+    samples: 40, observedMs: 10000, faceSamples: 40, gazeSamples: 40, alignedGazeSamples: 30,
+    centeredSamples: 40, headLevelSamples: 40, shoulderSamples: 40, levelShoulderSamples: 40,
+  };
+  const next = await call("/candidate/interview/answers", {
+    method: "POST",
+    cookie: cand.cookie,
+    body: { answer: answerText, expectedTurn: 0, delivery: { visual } },
+  });
+  assert.equal(next.body.currentQuestion.question, questions[1]);
+  assert.equal(next.body.turns[0].attention, undefined, "candidates never see their metrics");
+  const stored = JSON.parse(
+    db.prepare("SELECT data FROM screenings WHERE invite_id=?").get(now.body.invites[0].id).data,
+  );
+  assert.deepEqual(stored.turns[0].attention, { eyeContact: 75, inFrame: 100 });
+  assert.equal(stored.setup.resume, "Built a ledger at Acme Pay.");
+
+  const ended = await call("/candidate/interview/terminate", {
+    method: "POST",
+    cookie: cand.cookie,
+    body: { reason: "fullscreen_exit" },
+  });
+  assert.equal(ended.body.status, "completed");
+  const after = await call("/candidate/interview/answers", {
+    method: "POST",
+    cookie: cand.cookie,
+    body: { answer: answerText, expectedTurn: 1 },
+  });
+  assert.equal(after.status, 409);
+  const report = await call(`/invites/${now.body.invites[0].id}/report`, { cookie: owner });
+  assert.equal(report.body.screening.report.attention, 75);
+  assert.ok(report.body.events.some((e) => e.kind === "terminated"));
+  const list = await call(`/roles/${made.body.id}/candidates`, { cookie: owner });
+  const row = list.body.candidates.find((c) => c.email === "now@example.test");
+  assert.equal(row.terminated, true);
+  assert.equal(row.attention, 75);
+});

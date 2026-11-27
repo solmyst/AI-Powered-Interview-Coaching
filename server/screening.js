@@ -12,7 +12,7 @@ import {
   screeningReportSchema,
 } from "./schemas.js";
 
-export const CONSENT_VERSION = "2026-11-14";
+export const CONSENT_VERSION = "2026-11-27";
 const DAY = 86400000;
 const fail = (status, message) => {
   throw new ServiceError(status, message);
@@ -27,7 +27,25 @@ const CLIENT_EVENTS = [
   "multiple_faces",
   "camera_off",
   "paste",
+  "multiple_screens",
 ];
+// Eye contact and face-in-frame as whole percentages, from the on-device camera counts for one answer.
+export const attentionOf = (visual) =>
+  visual?.samples
+    ? {
+        eyeContact: visual.gazeSamples
+          ? Math.round((100 * visual.alignedGazeSamples) / visual.gazeSamples)
+          : 0,
+        inFrame: Math.round((100 * visual.faceSamples) / visual.samples),
+      }
+    : null;
+// Mean eye contact across answers that had camera data; null when the camera never ran.
+export const attentionScore = (turns) => {
+  const seen = turns.map((t) => t.attention).filter(Boolean);
+  return seen.length
+    ? Math.round(seen.reduce((n, a) => n + a.eyeContact, 0) / seen.length)
+    : null;
+};
 const normalize = (text) =>
   text
     .toLowerCase()
@@ -233,6 +251,7 @@ export function registerScreening(
       ...generated.value,
       competencyScores,
       overall,
+      attention: attentionScore(session.turns),
       answered: session.turns.length,
       questionCount: session.setup.questionCount,
     };
@@ -434,7 +453,7 @@ export function registerScreening(
   app.post("/api/roles/:roleId/invites", auth, (req, res) => {
     const role = loadRole(req);
     if (role.status !== "open") fail(409, "This role is closed.");
-    const { candidates } = z
+    const { candidates, opensAt, closesAt } = z
       .object({
         candidates: z
           .array(
@@ -446,17 +465,29 @@ export function registerScreening(
                 .email()
                 .max(254)
                 .transform((e) => e.toLowerCase()),
+              resume: z.string().trim().max(10000).default(""),
             }),
           )
           .min(1)
           .max(50),
+        // The interview window. Defaults: opens now, closes after the role's invite days.
+        opensAt: z.number().int().positive().optional(),
+        closesAt: z.number().int().positive().optional(),
       })
       .strict()
       .parse(req.body);
+    const starts = opensAt ?? Date.now();
+    const expires = closesAt ?? starts + role.config.inviteDays * DAY;
+    if (expires <= starts + 15 * 60000)
+      fail(400, "The interview window must be at least 15 minutes long.");
+    if (expires <= Date.now())
+      fail(400, "The interview window has already closed.");
+    if (expires > Date.now() + 60 * DAY)
+      fail(400, "The interview window can end at most 60 days from now.");
     const created = [];
     const skipped = [];
     const insert = db.prepare(
-      "INSERT INTO invites(id,role_id,token_hash,candidate_name,candidate_email,status,expires,created) VALUES (?,?,?,?,?,'pending',?,?)",
+      "INSERT INTO invites(id,role_id,token_hash,candidate_name,candidate_email,status,expires,created,resume,starts) VALUES (?,?,?,?,?,'pending',?,?,?,?)",
     );
     for (const c of candidates) {
       const token = newToken();
@@ -468,10 +499,19 @@ export function registerScreening(
           hash(token),
           c.name,
           c.email,
-          Date.now() + role.config.inviteDays * DAY,
+          expires,
           iso(),
+          c.resume,
+          starts,
         );
-        created.push({ id, name: c.name, email: c.email, link: link(token) });
+        created.push({
+          id,
+          name: c.name,
+          email: c.email,
+          link: link(token),
+          opensAt: starts,
+          closesAt: expires,
+        });
       } catch (error) {
         if (error.code !== "SQLITE_CONSTRAINT_UNIQUE") throw error;
         skipped.push({
@@ -539,7 +579,7 @@ export function registerScreening(
   function candidateRows(role) {
     return db
       .prepare(
-        "SELECT i.id, i.candidate_name AS name, i.candidate_email AS email, i.status, i.expires, i.decision, i.created, s.score, s.state, s.data, (SELECT COUNT(*) FROM integrity_events e WHERE e.invite_id=i.id AND e.reviewed_at IS NULL AND e.kind NOT IN ('reconnect','new_device')) AS unreviewedFlags FROM invites i LEFT JOIN screenings s ON s.invite_id=i.id WHERE i.role_id=?",
+        "SELECT i.id, i.candidate_name AS name, i.candidate_email AS email, i.status, i.expires, i.decision, i.created, s.score, s.state, s.data, (SELECT COUNT(*) FROM integrity_events e WHERE e.invite_id=i.id AND e.reviewed_at IS NULL AND e.kind NOT IN ('reconnect','new_device')) AS unreviewedFlags, (SELECT COUNT(*) FROM integrity_events e WHERE e.invite_id=i.id AND e.kind='terminated') AS terminated FROM invites i LEFT JOIN screenings s ON s.invite_id=i.id WHERE i.role_id=?",
       )
       .all(role.id)
       .map((r) => {
@@ -553,6 +593,8 @@ export function registerScreening(
           expires: r.expires,
           score: r.state === "complete" ? r.score : null,
           competencyScores: session?.report?.competencyScores || null,
+          attention: session ? attentionScore(session.turns) : null,
+          terminated: r.terminated > 0,
           answered: session?.turns.length || 0,
           questionCount: role.config.questionCount,
           unreviewedFlags: r.unreviewedFlags,
@@ -604,6 +646,7 @@ export function registerScreening(
           title: invite.config.title,
           rubric: invite.config.rubric,
           questionCount: invite.config.questionCount,
+          proctoring: invite.config.proctoring || "standard",
         },
         screening: session && {
           state: session.state,
@@ -612,6 +655,7 @@ export function registerScreening(
             answer: t.answer,
             exchanges: t.exchanges || [],
             evaluation: t.evaluation || null,
+            attention: t.attention || null,
             events: events.filter((e) => e.turn === i),
           })),
           currentQuestion: session.currentQuestion,
@@ -748,6 +792,8 @@ export function registerScreening(
       questionCount: invite.config.questionCount,
       minutes: invite.config.questionCount * 4,
       expires: invite.expires,
+      opensAt: invite.starts || 0,
+      proctoring: invite.config.proctoring || "standard",
       status: status(invite),
       consentVersion: CONSENT_VERSION,
       consented: Boolean(
@@ -760,13 +806,20 @@ export function registerScreening(
       state: found?.session.state || null,
       // Candidates may get "areas to prepare" after submission, never scores or the decision.
       feedback:
-        complete && invite.config.candidateFeedback === "summary"
+        complete &&
+        found.session.report &&
+        invite.config.candidateFeedback === "summary"
           ? {
               strengths: found.session.report.strengths,
               areasToPrepare: found.session.report.suggestedFollowUps,
             }
           : null,
       noteSent: Boolean(invite.candidate_note),
+      ended: Boolean(
+        db
+          .prepare("SELECT 1 FROM integrity_events WHERE invite_id=? AND kind='terminated'")
+          .get(invite.id),
+      ),
     };
   }
   function addEvent(inviteId, turn, kind, durationMs = null) {
@@ -888,6 +941,11 @@ export function registerScreening(
         fail(409, "This interview is not available.");
       if (invite.role_status !== "open")
         fail(409, "This role is no longer open.");
+      if (invite.starts > Date.now())
+        fail(
+          409,
+          `This interview opens at ${new Date(invite.starts).toUTCString()}. Come back then.`,
+        );
       const { config } = invite;
       const setup = {
         role: config.role,
@@ -897,15 +955,27 @@ export function registerScreening(
         industry: config.industry,
         company: invite.org_name,
         jobDescription: config.jobDescription,
-        resume: "",
+        resume: invite.resume || "",
         questionCount: config.questionCount,
       };
-      const generated = await ai.generate(
-        questionSchema,
-        openingTask(config.rubric),
-        { setup },
-        { mode: "screening" },
-      );
+      const own = config.questions || [];
+      // A company question needs no model call; Maya only writes the greeting around it.
+      const generated = own[0]
+        ? {
+            value: {
+              lead: `Hi, I'm Maya, the AI interviewer for ${invite.org_name}. Thanks for joining. Let's begin.`,
+              question: own[0],
+              focus: "Company question",
+              difficulty: config.difficulty,
+            },
+            usage: { input: 0, output: 0 },
+          }
+        : await ai.generate(
+            questionSchema,
+            openingTask(config.rubric),
+            { setup },
+            { mode: "screening" },
+          );
       const session = {
         id: randomUUID(),
         created: iso(),
@@ -970,12 +1040,17 @@ export function registerScreening(
         const session = activeScreening(invite, input.expectedTurn);
         const turn = await decideTurn(ai, session, input.answer, {
           mode: "screening",
+          fixedNext: (invite.config.questions || [])[session.turns.length + 1],
           intro: `You are Maya, an AI interviewer screening candidates for ${invite.org_name}. Stay neutral and professional: never praise or criticise the quality of an answer, and never hint at scores or hiring chances. `,
         });
         if (!turn.answered) {
           session.exchanges = [
             ...(session.exchanges || []),
-            { said: input.answer, reply: turn.reply },
+            {
+              said: input.answer,
+              reply: turn.reply,
+              ...(turn.redirect ? { redirect: true } : {}),
+            },
           ];
           db.transaction(() => {
             saveScreening(invite.id, session);
@@ -989,6 +1064,10 @@ export function registerScreening(
           answer: answerOf(session.exchanges, input.answer),
           ...(session.exchanges?.length
             ? { exchanges: session.exchanges }
+            : {}),
+          // Only the two percentages are kept, never raw camera data.
+          ...(attentionOf(input.delivery?.visual)
+            ? { attention: attentionOf(input.delivery.visual) }
             : {}),
         });
         session.exchanges = [];
@@ -1058,6 +1137,43 @@ export function registerScreening(
       }
       res.json(summary({ ...invite, status: "completed" }));
     }),
+  );
+
+  // Strict proctoring: the candidate stayed out of full screen, off the tab, or on a second display
+  // past the grace period. The interview ends and whatever was answered goes to the reviewer.
+  app.post(
+    "/api/candidate/interview/terminate",
+    candidateAuth,
+    async (req, res) =>
+      locked(req.candidate.id, async () => {
+        const invite = req.candidate;
+        z.object({
+          reason: z.enum(["fullscreen_exit", "tab_hidden", "multiple_screens"]),
+        })
+          .strict()
+          .parse(req.body);
+        const found = readScreening(invite.id);
+        if (!found || found.session.state !== "active")
+          return res.json(summary(invite));
+        const { session } = found;
+        addEvent(invite.id, session.turns.length, "terminated");
+        session.currentQuestion = null;
+        if (!session.turns.length) {
+          session.state = "complete";
+          db.transaction(() => {
+            saveScreening(invite.id, session);
+            db.prepare("UPDATE invites SET status='completed' WHERE id=?").run(
+              invite.id,
+            );
+          })();
+        } else {
+          session.state = "report_pending";
+          saveScreening(invite.id, session);
+          // A failed report is retried when the reviewer opens the candidate.
+          await finishReport(invite).catch(() => {});
+        }
+        res.json(summary({ ...invite, status: "completed" }));
+      }),
   );
 
   app.post("/api/candidate/integrity-events", candidateAuth, (req, res) => {

@@ -142,6 +142,9 @@ export type CandidateSummary = {
   answered: number;
   state: string | null;
   feedback: { strengths: string[]; areasToPrepare: string[] } | null;
+  opensAt: number;
+  proctoring: "strict" | "standard";
+  ended: boolean;
   noteSent: boolean;
 };
 export type RubricItem = { key: string; label: string; description: string; weight: number };
@@ -157,4 +160,6 @@ export type RoleConfig = {
   rubric: RubricItem[];
   inviteDays: number;
   candidateFeedback: "none" | "summary";
+  questions: string[];
+  proctoring: "strict" | "standard";
 };

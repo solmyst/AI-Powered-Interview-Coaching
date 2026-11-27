@@ -2911,3 +2911,34 @@ details p {
   .co-links li { grid-template-columns: 1fr; }
   .co-competencies > div { grid-template-columns: 1fr 100px; }
 }
+
+/* Strict proctoring: a blocking countdown when the candidate leaves full screen, the tab, or uses two displays. */
+.strict-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: #000c;
+}
+.strict-overlay > div {
+  max-width: 460px;
+  padding: 28px;
+  border: 1px solid var(--c-line);
+  border-radius: 16px;
+  color: var(--c-text);
+  background: var(--c-raised);
+  text-align: center;
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+.strict-overlay svg { color: #f5a524; }
+.strict-overlay h2 { margin: 0; font-size: 1.3rem; }
+.strict-overlay p { margin: 0; line-height: 1.5; }
+.co-badge-danger { color: #b42318; font-weight: 600; }
+.co-question { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; margin-bottom: 10px; }
+.co-invite-row { display: grid; gap: 6px; padding: 12px 0; border-top: 1px solid var(--c-line); }
+.co-window { display: flex; flex-wrap: wrap; gap: 12px; }
+.button-link { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }

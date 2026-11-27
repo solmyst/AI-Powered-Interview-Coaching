@@ -15,6 +15,8 @@ export function CameraCoach({
   autoStart = false,
   callMode = false,
   mediaStream = null,
+  maxFaces = 1,
+  onFaces,
 }: {
   paused: boolean;
   turn: number;
@@ -22,6 +24,9 @@ export function CameraCoach({
   autoStart?: boolean;
   callMode?: boolean;
   mediaStream?: MediaStream | null;
+  // Screening detects up to two faces so a second person in view can be noted.
+  maxFaces?: number;
+  onFaces?: (count: number) => void;
 }) {
   const video = useRef<HTMLVideoElement>(null),
     canvas = useRef<HTMLCanvasElement>(null);
@@ -38,6 +43,8 @@ export function CameraCoach({
     callback = useRef(onSummary);
   pauseRef.current = paused;
   callback.current = onSummary;
+  const facesCallback = useRef(onFaces);
+  facesCallback.current = onFaces;
   const [status, setStatus] = useState<"off" | "loading" | "active" | "error">(
     "off",
   );
@@ -146,7 +153,7 @@ export function CameraCoach({
           delegate: "CPU",
         },
         runningMode: "VIDEO",
-        numFaces: 1,
+        numFaces: maxFaces,
       });
       if (epoch !== generation.current) {
         loadedFace.close();
@@ -185,7 +192,9 @@ export function CameraCoach({
           v.currentTime !== lastFrame.current
         ) {
           try {
-            const f = face.current!.detectForVideo(v, time).faceLandmarks[0];
+            const faces = face.current!.detectForVideo(v, time).faceLandmarks;
+            const f = faces[0];
+            facesCallback.current?.(faces.length);
             const p = pose.current!.detectForVideo(v, time).landmarks[0];
             const signals = frameSignals(f, p, v.videoWidth / v.videoHeight);
             setLive(signals);

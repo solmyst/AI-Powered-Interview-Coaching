@@ -7,6 +7,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -k \"node --watch server/index.js\" \"vite\"",
+    "prebuild": "node scripts/setup-vision.js",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",

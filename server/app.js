@@ -507,7 +507,11 @@ export function createApp({
       if (!turn.answered) {
         session.exchanges = [
           ...(session.exchanges || []),
-          { said: input.answer, reply: turn.reply },
+          {
+            said: input.answer,
+            reply: turn.reply,
+            ...(turn.redirect ? { redirect: true } : {}),
+          },
         ];
         db.transaction(() => {
           save(session.id, session);

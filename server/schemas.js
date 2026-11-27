@@ -50,8 +50,16 @@ export const roleConfigSchema = z
       ),
     inviteDays: z.number().int().min(1).max(30).default(7),
     candidateFeedback: z.enum(["none", "summary"]).default("summary"),
+    // Company-written questions are asked first, in order; Maya writes the rest.
+    questions: z.array(z.string().trim().min(10).max(600)).max(8).default([]),
+    // strict: full screen and one display required; leaving for 10 s ends the interview.
+    proctoring: z.enum(["strict", "standard"]).default("strict"),
   })
-  .strict();
+  .strict()
+  .refine((c) => c.questions.length <= c.questionCount, {
+    message: "Add more questions to the count, or remove some of your own.",
+    path: ["questions"],
+  });
 export const screeningEvaluationSchema = (rubric) =>
   z.object({
     scores: z.object(
@@ -112,6 +120,8 @@ export const replySchema = z.object({
 // The server decides which of the two it is, then constrains the model to that shape.
 export const answerReplySchema = replySchema.extend({
   kind: z.literal("answer"),
+  // false only when the words do not try to answer the question at all
+  relevant: z.boolean(),
 });
 export const talkReplySchema = replySchema.extend({
   kind: z.literal("conversation"),

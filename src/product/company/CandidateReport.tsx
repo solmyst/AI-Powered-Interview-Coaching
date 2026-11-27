@@ -29,6 +29,7 @@ type Turn = {
     rationale: string;
     followUpForHuman?: string;
   } | null;
+  attention: { eyeContact: number; inFrame: number } | null;
   events: Event[];
 };
 type Report = {
@@ -58,6 +59,7 @@ type Report = {
       suggestedFollowUps: string[];
       competencyScores: Record<string, number>;
       overall: number;
+      attention: number | null;
     } | null;
   } | null;
   events: Event[];
@@ -72,6 +74,8 @@ const kindLabel: Record<string, string> = {
   paste: "Pasted text",
   reconnect: "Reconnected",
   new_device: "Continued on another device",
+  multiple_screens: "Second display connected",
+  terminated: "Interview ended by proctoring",
 };
 const quiet = new Set(["reconnect", "new_device"]);
 const length = (ms: number | null) =>
@@ -162,6 +166,15 @@ export function CandidateReport({
           >
             <b>{report.overall}</b>
             <span>AI estimate</span>
+          </div>
+        )}
+        {report?.attention != null && (
+          <div
+            className="co-bigscore"
+            aria-label={`Eye contact ${report.attention} percent`}
+          >
+            <b>{report.attention}%</b>
+            <span>Eye contact</span>
           </div>
         )}
       </div>
@@ -365,6 +378,12 @@ export function CandidateReport({
             </div>
           ))}
           <blockquote className="prewrap">{turn.answer}</blockquote>
+          {turn.attention && (
+            <p className="muted">
+              Eye contact {turn.attention.eyeContact}% · face in frame{" "}
+              {turn.attention.inFrame}% while answering
+            </p>
+          )}
           {turn.evaluation ? (
             <>
               <div className="co-competencies">

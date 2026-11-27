@@ -20,6 +20,9 @@ const cases = [
   ["ask example", "Can you give me an example of what you are looking for?", "conversation"],
   ["need time", "Hmm, give me a second to think about it.", "conversation"],
   ["think aloud", "Okay so, let me think, the payment, hmm, maybe", "conversation"],
+  ["off-topic", "I went hiking last weekend with my friends and the weather was amazing, we cooked food outside.", "redirect"],
+  ["off-topic hinglish", "Mera project ek e-commerce website tha jisme maine React use kiya aur UI banaya tha, bahut accha experience tha.", "redirect"],
+  ["wrong but relevant", "I would just charge the card again if the first request fails, the bank will refund duplicates anyway.", "answer"],
   ["answer with ask", "I would check the database before charging, is that what you mean?", "answer"],
 ];
 const out = [];
@@ -27,7 +30,7 @@ for (const [name, said, want] of cases)
   for (let i = 0; i < runs; i++) {
     const s = base(); const t0 = Date.now();
     const r = await decideTurn(ai, s, said);
-    const got = r.answered ? "answer" : "conversation";
+    const got = r.redirect ? "redirect" : r.answered ? "answer" : "conversation";
     out.push(got === want);
     console.log(`${got === want ? "OK  " : "MISS"} ${name} [${Date.now() - t0}ms] ${got}\n     ${r.answered ? `lead: ${r.nextQuestion.lead}\n     q: ${r.nextQuestion.question}` : `reply: ${r.reply}`}`);
   }

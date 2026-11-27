@@ -12,6 +12,7 @@ type Stage =
   | "declined"
   | "room"
   | "paused"
+  | "notyet"
   | "submitted";
 
 // The page a candidate opens from an invite link. No account, no navigation: notice, interview, done.
@@ -28,9 +29,11 @@ export default function CandidateApp() {
     if (info.state === "complete" || info.status === "completed")
       return setStage("submitted");
     if (!info.consented) return setStage("notice");
-    await openInterview();
+    await openInterview(info);
   }
-  async function openInterview() {
+  async function openInterview(info: CandidateSummary) {
+    // The server enforces the window too; this only avoids a confusing error.
+    if (info.opensAt > Date.now()) return setStage("notyet");
     setError("");
     try {
       setSession(
@@ -75,6 +78,7 @@ export default function CandidateApp() {
     return (
       <Room
         mode="screening"
+        strict={summary.proctoring === "strict"}
         key={session.id}
         session={session}
         transcriptionReady={Boolean(health?.transcription.ready)}
@@ -125,7 +129,7 @@ export default function CandidateApp() {
                 }),
               });
               setSummary(next);
-              await openInterview();
+              await openInterview(next);
             } catch (reason) {
               setError((reason as Error).message);
             }
@@ -177,10 +181,32 @@ export default function CandidateApp() {
           </p>
         </section>
       )}
+      {stage === "notyet" && summary && (
+        <section className="cand-card">
+          <h1>Your interview opens at {opensAt(summary.opensAt)}</h1>
+          <p>
+            You’ve accepted the notice. Come back to this page at the start
+            time; the link works until{" "}
+            {opensAt(summary.expires)}.
+          </p>
+          <button className="primary" onClick={() => void openInterview(summary)}>
+            Check again
+          </button>
+        </section>
+      )}
       {stage === "submitted" && summary && <Submitted summary={summary} />}
     </main>
   );
 }
+
+const opensAt = (ms: number) =>
+  new Date(ms).toLocaleString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "long",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 
 function Notice({
   summary,
@@ -226,7 +252,8 @@ function Notice({
           <h2>What is collected</h2>
           <p>
             Your answers as text, the AI’s score estimates with quotes from what
-            you said, and the focus notes below. Audio is sent to a speech
+            you said, the focus notes below, and the share of your answering
+            time you looked at the screen (eye contact, as a percentage). Audio is sent to a speech
             service to become text and is not stored by InterviewAce.{" "}
             <strong>No video is recorded or sent.</strong> Your camera is
             checked on your device only.
@@ -234,7 +261,19 @@ function Notice({
         </div>
         <div>
           <h2>Focus notes</h2>
+          {summary.proctoring === "strict" && (
+            <p>
+              <strong>
+                This interview runs in full screen on one display. If you
+                leave full screen or this tab, or connect a second display,
+                you have 10 seconds to return or the interview ends and your
+                answers so far are submitted.
+              </strong>
+            </p>
+          )}
           <ul>
+            <li>A second display connected</li>
+            <li>No face in view for 10 seconds, or more than one face</li>
             <li>Leaving this tab for 3 seconds or more</li>
             <li>Leaving full screen</li>
             <li>Your camera stopping</li>
@@ -242,8 +281,9 @@ function Notice({
           </ul>
           <p className="muted">
             These can have ordinary causes, like a notification. They are shown
-            to you when they happen and go to the reviewer as notes, never as
-            automatic penalties.
+            to you when they happen and go to the reviewer as notes. Apart from
+            the full-screen rule above, nothing ends your interview
+            automatically, and a person makes every decision.
           </p>
         </div>
         <div>
@@ -321,6 +361,14 @@ function Submitted({ summary }: { summary: CandidateSummary }) {
         <Check size={26} aria-hidden="true" />
       </span>
       <h1>Your interview was submitted to {summary.company}</h1>
+      {summary.ended && (
+        <p className="notice">
+          The interview ended early because it left full screen, the tab, or a
+          single display for too long. Your answers up to then were sent. If
+          this was a technical problem, write to {summary.company}
+          {summary.contactEmail ? ` at ${summary.contactEmail}` : ""}.
+        </p>
+      )}
       <p className="lead">
         Thank you. A person at {summary.company} will review it and contact you
         about next steps. You don’t need to do anything else.

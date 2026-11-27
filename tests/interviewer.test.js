@@ -329,3 +329,39 @@ test("intent is decided by the server, not the model", () => {
   assert.equal(intentOf("what do you mean?", [{}, {}, {}]), "answer");
   assert.equal(tidyReply("Good instinct. Take your time."), "Take your time.");
 });
+
+test("an answer that ignores the question is pointed back to it once", async () => {
+  const { decideTurn } = await import("../server/turn.js");
+  const ai = {
+    generate: async () => ({
+      value: {
+        kind: "answer",
+        relevant: false,
+        reply: "Okay, that is about your weekend.",
+        nextQuestion: null,
+      },
+      usage: { input: 1, output: 1 },
+    }),
+  };
+  const session = {
+    setup: { questionCount: 3, difficulty: "Intermediate" },
+    turns: [],
+    currentQuestion: {
+      question: "How do you avoid charging a customer twice?",
+    },
+    exchanges: [],
+  };
+  const said =
+    "I went hiking last weekend with my friends and it was really fun to be outside.";
+  const first = await decideTurn(ai, session, said);
+  assert.equal(first.answered, false);
+  assert.equal(first.redirect, true);
+  assert.match(
+    first.reply,
+    /^Okay, that is about your weekend\. Let me repeat the question\. How do you avoid/,
+  );
+  session.exchanges = [{ said, reply: first.reply, redirect: true }];
+  const second = await decideTurn(ai, session, said);
+  assert.equal(second.answered, true);
+  assert.equal(answerOf(session.exchanges, "final words"), "final words");
+});
