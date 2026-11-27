@@ -6,7 +6,7 @@
 
 InterviewAce is a voice-first AI interview coaching application for students and job seekers. Maya, the AI interviewer, asks questions aloud, listens to spoken answers, and generates adaptive follow-ups. After the interview, an evidence-based report and the spoken **Answer Lab** turn feedback into focused practice.
 
-[Open the Azure pilot](https://interviewace-anush.indiasouthcentral.cloudapp.azure.com) · [Deployment guide](DEPLOYMENT.md) · [Answer Lab](docs/ANSWER-LAB.md) · [Roadmap](docs/ROADMAP.md)
+[Open the Azure pilot](https://anvaya.indiasouthcentral.cloudapp.azure.com/interviewace/) · [Deployment guide](DEPLOYMENT.md) · [Answer Lab](docs/ANSWER-LAB.md) · [Roadmap](docs/ROADMAP.md)
 
 This repository contains the full React application and Node API. It is a working coaching pilot; university administration, recruiter screening, ATS integrations, and billing are not implemented.
 

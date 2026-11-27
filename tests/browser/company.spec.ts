@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { reviewPageLayout } from "../ui-layout";
 
 // The company console against fixture API responses: roles, ranked candidates, report, human decision.
 const rubric = [
@@ -151,6 +152,7 @@ const report = {
 test("a reviewer sees a ranked list, evidence and flags, and records a human decision", async ({
   page,
 }) => {
+  test.setTimeout(90000);
   const calls: { path: string; body: unknown }[] = [];
   await page.route("**/api/health", (route) =>
     route.fulfill({
@@ -274,6 +276,7 @@ test("a reviewer sees a ranked list, evidence and flags, and records a human dec
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
   // Anyone who stepped away shows up in the activity feed instead of looking like they are still answering.
   await expect(page.getByText("left after 0 of 3 answers")).toBeVisible();
+  await reviewPageLayout(page, "hiring-populated-overview");
   await expect(page.getByRole("button", { name: "My interviews" })).toHaveCount(
     0,
   );
@@ -310,6 +313,14 @@ test("a reviewer sees a ranked list, evidence and flags, and records a human dec
   await expect(rows.nth(0)).toContainText("1 to review");
   await expect(rows.nth(1)).toContainText("Ended early · 1 of 3 answered");
   await expect(rows.nth(2)).toContainText("1 of 3 answered");
+  await expect(page.locator(".co-table")).not.toContainText("undefined%");
+  await reviewPageLayout(page, "hiring-candidate-list");
+  await page
+    .getByRole("button", { name: "Invite candidates", exact: true })
+    .first()
+    .click();
+  await reviewPageLayout(page, "hiring-invite-form");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
 
   await rows.nth(0).click();
   await expect(page.getByRole("heading", { name: "Asha Rao" })).toBeVisible();
@@ -327,6 +338,7 @@ test("a reviewer sees a ranked list, evidence and flags, and records a human dec
   await expect(page.getByText("My connection dropped once.")).toBeVisible();
   await expect(page.getByText("“use an idempotency key”")).toBeVisible();
   await expect(page.getByText("Left the tab · 14s")).toBeVisible();
+  await reviewPageLayout(page, "hiring-candidate-report");
 
   await page
     .getByRole("button", { name: "No concern", exact: true })
@@ -388,6 +400,7 @@ test("people without company access can request it from Hiring", async ({
     page.getByRole("heading", { name: "Request access" }),
   ).toBeVisible();
   await page.getByLabel("Company name").fill("Acme");
+  await reviewPageLayout(page, "hiring-request-access");
   await page.getByRole("button", { name: "Request access" }).click();
   await expect
     .poll(() => asked)

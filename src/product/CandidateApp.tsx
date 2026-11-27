@@ -445,17 +445,19 @@ function Notice({
           type="checkbox"
           checked={ai}
           onChange={(e) => setAi(e.target.checked)}
-        />{" "}
-        I understand an AI conducts and scores this interview and a person
-        reviews it.
+        />
+        <span>
+          I understand an AI conducts and scores this interview and a person
+          reviews it.
+        </span>
       </label>
       <label className="check">
         <input
           type="checkbox"
           checked={data}
           onChange={(e) => setData(e.target.checked)}
-        />{" "}
-        I agree to the processing described above.
+        />
+        <span>I agree to the processing described above.</span>
       </label>
       {error && (
         <p className="error" role="alert">

@@ -1183,7 +1183,7 @@ function Candidates({
                       "—"
                     )}
                   </td>
-                  <td>{c.attention !== null ? `${c.attention}%` : "—"}</td>
+                  <td>{c.attention != null ? `${c.attention}%` : "—"}</td>
                   <td>
                     {c.delivery?.cameraAnswers
                       ? `${c.delivery.awayEpisodes}×`

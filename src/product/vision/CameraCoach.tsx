@@ -359,7 +359,7 @@ export function CameraCoach({
             checked={overlay}
             onChange={(e) => setOverlay(e.target.checked)}
           />
-          Tracking overlay
+          <span>Tracking overlay</span>
         </label>
       </div>
       {status === "active" && (

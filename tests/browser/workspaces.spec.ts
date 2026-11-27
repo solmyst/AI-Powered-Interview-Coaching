@@ -1,5 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { assertControlLayout } from "../ui-layout";
+import { readFileSync } from "node:fs";
 
 async function account(page: Page, company = true) {
   await page.route("**/api/health", (route) =>
@@ -59,8 +61,9 @@ async function account(page: Page, company = true) {
   await page.route("**/api/bookmarks", (route) => route.fulfill({ json: [] }));
 }
 async function inspect(page: Page, name: string) {
-  for (const width of [320, 768, 1440]) {
+  for (const width of [320, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
+    await assertControlLayout(page);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
@@ -134,6 +137,13 @@ test("practice remains practice even for company members, with separate history,
     page.getByRole("navigation", { name: "Hiring navigation" }),
   ).toHaveCount(0);
   await inspect(page, "practice-dashboard");
+  await page
+    .getByRole("button", { name: "New interview", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Begin interview" }),
+  ).toBeVisible();
+  await inspect(page, "practice-setup");
   for (const [button, title, image] of [
     ["My interviews", "Your interview history.", "history"],
     ["Revision library", "Your revision library.", "library"],
@@ -179,6 +189,10 @@ test("hiring has its own overview, role form and company settings without practi
   ).toBeVisible();
   await inspect(page, "hiring-role-form");
   await page
+    .getByRole("button", { name: "Add a question", exact: true })
+    .click();
+  await inspect(page, "hiring-question-form");
+  await page
     .getByRole("navigation", { name: "Hiring navigation" })
     .getByRole("button", { name: "Settings", exact: true })
     .click();
@@ -203,6 +217,60 @@ test("new company setup remains in the hiring shell", async ({ page }) => {
     page.getByRole("navigation", { name: "Main navigation" }),
   ).toHaveCount(0);
   await inspect(page, "company-setup");
+});
+
+test("populated history and revision notes keep long content and actions aligned", async ({
+  page,
+}) => {
+  test.setTimeout(60000);
+  await account(page);
+  const sample = JSON.parse(
+    readFileSync("docs/live-smoke-result.json", "utf8"),
+  ).session;
+  const role = "Backend engineering and distributed systems";
+  await page.route("**/api/interviews", (route) =>
+    route.fulfill({
+      json: {
+        sessions: [
+          {
+            id: sample.id,
+            role,
+            track: "Technical",
+            state: "complete",
+            created: sample.created,
+            score: 72,
+            answered: 3,
+            total: 3,
+          },
+        ],
+        usage: { used: 1, limit: 5 },
+      },
+    }),
+  );
+  await page.route("**/api/bookmarks", (route) =>
+    route.fulfill({
+      json: [{ ...sample.turns[0], interviewId: sample.id, turn: 0 }],
+    }),
+  );
+  await page.goto("/practice");
+  await page
+    .getByRole("button", { name: "My interviews", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: `Delete ${role} interview` }),
+  ).toBeVisible();
+  await inspect(page, "populated-history");
+  await page.getByRole("button", { name: `Delete ${role} interview` }).click();
+  await inspect(page, "history-delete-confirmation");
+  await page
+    .getByRole("button", { name: "Keep interview", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Revision library", exact: true })
+    .click();
+  await page.locator("details.panel > summary").click();
+  await page.getByText("Reveal example answer", { exact: true }).click();
+  await inspect(page, "populated-revision-library");
 });
 
 test("candidate notice, submitted and invalid-link pages remain isolated and accessible", async ({

@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { assertControlLayout, reviewPageLayout } from "../ui-layout";
 test.afterEach(async ({ page }) => {
   const response = await page.request.get("/api/auth/session");
   const data = await response.json();
@@ -19,6 +20,7 @@ test("landing is accessible and responsive at mobile, tablet and desktop widths"
   );
   for (const width of [320, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
+    await assertControlLayout(page);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -49,7 +51,9 @@ test("account onboarding, dashboard, setup, history, library and profile", async
     .click();
   await page.getByLabel("Your name").fill("Browser Test");
   await page.getByLabel("Email address").fill(`e2e-${Date.now()}@example.test`);
-  await page.getByLabel("Password", { exact: true }).fill("automated-test-password");
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill("automated-test-password");
   const password = page.getByLabel("Password", { exact: true });
   await expect(password).toHaveAttribute("type", "password");
   await page.getByRole("button", { name: "Show password" }).click();
@@ -64,6 +68,7 @@ test("account onboarding, dashboard, setup, history, library and profile", async
   );
   for (const width of [320, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
+    await assertControlLayout(page);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -228,6 +233,9 @@ test("report and voice-first interview preflight layouts (test fixtures)", async
     path: "test-results/report-desktop.png",
     fullPage: true,
   });
+  await reviewPageLayout(page, "practice-report");
+  await page.locator(".answer-review summary").first().click();
+  await reviewPageLayout(page, "practice-answer-review");
   await page.getByRole("button", { name: "Overview", exact: true }).click();
   room = true;
   await page
@@ -260,4 +268,5 @@ test("report and voice-first interview preflight layouts (test fixtures)", async
     path: "test-results/room-desktop.png",
     fullPage: true,
   });
+  await reviewPageLayout(page, "practice-preflight");
 });

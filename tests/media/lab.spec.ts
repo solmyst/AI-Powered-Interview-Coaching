@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { reviewPageLayout } from "../ui-layout";
 import AxeBuilder from "@axe-core/playwright";
 import { readFileSync } from "node:fs";
 
@@ -66,6 +67,7 @@ test("Answer Lab captures spoken retry and transfer, restores progress and stays
   }
   const accessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
   expect(accessibility.violations).toEqual([]);
+  await reviewPageLayout(page, "answer-lab");
   await page.locator(".answer-lab").screenshot({ path: "test-results/answer-lab.png" });
   await page.reload();
   await page.getByRole("button", { name: `Open ${session.setup.role} interview` }).click();

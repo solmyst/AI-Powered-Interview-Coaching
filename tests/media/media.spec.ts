@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { assertControlLayout } from "../ui-layout";
 
 test("camera renders real frames before and after joining the interview", async ({ page }) => {
   const id = "camera-acceptance";
@@ -121,6 +122,7 @@ test("camera renders real frames before and after joining the interview", async 
     (video: HTMLVideoElement) => ({ width: video.videoWidth, readyState: video.readyState }),
   )).toMatchObject({ width: 640, readyState: 4 });
   await page.screenshot({ path: "test-results/camera-preflight-fixture.png", fullPage: true });
+  await assertControlLayout(page);
 
   await page.getByRole("button", { name: "Join interview" }).click();
   await expect.poll(() => page.evaluate(
@@ -138,6 +140,7 @@ test("camera renders real frames before and after joining the interview", async 
   expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze()).violations).toEqual([]);
   for (const [width, height] of [[320, 480], [320, 568], [320, 740], [390, 844], [768, 650], [1024, 600], [844, 390]]) {
     await page.setViewportSize({ width, height });
+    await assertControlLayout(page);
     const layout = await page.evaluate(() => {
       const tile = document.querySelector(".interviewer-tile")!.getBoundingClientRect();
       const question = document.querySelector(".question-caption")!.getBoundingClientRect();
