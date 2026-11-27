@@ -46,7 +46,7 @@ test("Answer Lab captures spoken retry and transfer, restores progress and stays
     if (lab.attempts.length === 1) return route.fulfill({ status: 503, json: { error: "Response interrupted after save" } });
     return route.fulfill({ json: session });
   });
-  await page.goto("/");
+  await page.goto("/practice");
   await page.getByRole("button", { name: `Open ${session.setup.role} interview` }).click();
   await page.getByRole("button", { name: "Coach this answer" }).click();
   await expect(page.getByText(plan.focus, { exact: true })).toBeVisible();

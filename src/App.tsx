@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Brain,
   ArrowUpRight,
@@ -28,16 +28,21 @@ import type {
   Page,
 } from "./product/types";
 import "./product/product.css";
+import { PublicHome } from "./product/PublicHome";
+import { homePath } from "./lib/paths";
 function App() {
-  const [page, setPage] = useState<Page>("home");
-  const [auth, setAuth] = useState(false);
-  // Which door the visitor came through, so sign-up speaks to them and lands them in the right place.
-  const [intent, setIntent] = useState<"practice" | "hiring">("practice");
-  // Company members work in their own hiring workspace; practice is one click away, not mixed in.
-  const [workspace, setWorkspace] = useState<"practice" | "company">(
-    "practice",
+  const path = window.location.pathname.replace(/\/$/, "");
+  if (!path.endsWith("/practice") && !path.endsWith("/hiring"))
+    return <PublicHome />;
+  return (
+    <WorkspaceApp mode={path.endsWith("/hiring") ? "hiring" : "practice"} />
   );
-  const routed = useRef(false);
+}
+function WorkspaceApp({ mode }: { mode: "practice" | "hiring" }) {
+  const [page, setPage] = useState<Page>("home");
+  const [auth, setAuth] = useState(true);
+  // Which door the visitor came through, so sign-up speaks to them and lands them in the right place.
+  const intent = mode;
   const [authExpired, setAuthExpired] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [usage, setUsage] = useState<Usage>({
@@ -108,13 +113,15 @@ function App() {
       setAuth(true);
       setAuthExpired(true);
       setError(
-        "Your session has expired. Sign in again to reopen your saved interviews.",
+        mode === "hiring"
+          ? "Your session has expired. Sign in again to reopen your hiring workspace."
+          : "Your session has expired. Sign in again to reopen your saved interviews.",
       );
     };
     window.addEventListener("interviewace:session-expired", expired);
     return () =>
       window.removeEventListener("interviewace:session-expired", expired);
-  }, []);
+  }, [mode]);
   useEffect(() => {
     refreshHealth();
     void api<{ user: User | null; usage: Usage | null }>("/auth/session")
@@ -122,7 +129,7 @@ function App() {
         if (result.user && result.usage) {
           setUser(result.user);
           setUsage(result.usage);
-          setPage("dashboard");
+          setPage(mode === "hiring" ? "company" : "dashboard");
         }
       })
       .catch((reason) => setError((reason as Error).message))
@@ -133,26 +140,16 @@ function App() {
     } catch {
       // Privacy settings may disable localStorage; account access uses cookies.
     }
-  }, [refreshHealth]);
+  }, [refreshHealth, mode]);
   useEffect(() => {
     if (user) {
-      void refresh().catch((err) => setError(err.message));
-      loadHiring();
+      if (mode === "practice")
+        void refresh().catch((err) => setError(err.message));
+      else loadHiring();
     } else {
       setHiring(null);
-      setWorkspace("practice");
-      routed.current = false;
     }
-  }, [user, refresh, loadHiring]);
-  // Once, after sign-in: people who belong to a company land in the hiring workspace.
-  useEffect(() => {
-    if (!hiring || routed.current) return;
-    routed.current = true;
-    if (hiring.orgs.length) {
-      setWorkspace("company");
-      setPage("company");
-    }
-  }, [hiring]);
+  }, [user, refresh, loadHiring, mode]);
   function navigate(next: Page) {
     setPage(next);
     setError("");
@@ -188,7 +185,7 @@ function App() {
       setSession(null);
       setSessions([]);
       setBookmarks([]);
-      navigate("home");
+      window.location.assign(homePath());
     } catch (err) {
       setError((err as Error).message);
     }
@@ -196,7 +193,6 @@ function App() {
   const start = () => {
     if (user) navigate("setup");
     else {
-      setIntent("practice");
       setAuthExpired(false);
       setAuth(true);
       window.scrollTo({ top: 0 });
@@ -205,7 +201,6 @@ function App() {
   const hire = () => {
     if (user) navigate("company");
     else {
-      setIntent("hiring");
       setAuthExpired(false);
       setAuth(true);
       window.scrollTo({ top: 0 });
@@ -215,17 +210,18 @@ function App() {
     return (
       <main className="loading-screen" aria-busy="true">
         <Brain size={32} />
-        <p>Opening your practice space…</p>
+        <p>
+          {mode === "hiring"
+            ? "Opening your hiring workspace…"
+            : "Opening your practice space…"}
+        </p>
       </main>
     );
-  const inCompany = Boolean(
-    user && workspace === "company" && hiring?.orgs.length,
-  );
+  const inCompany = mode === "hiring";
   const nav = [
     ["dashboard", LayoutDashboard, "Overview"],
     ["history", History, "My interviews"],
     ["library", BookOpen, "Revision library"],
-    ...(hiring ? ([["company", Briefcase, "Hiring"]] as const) : []),
     ["profile", UserRound, "Profile"],
   ] as const;
   return (
@@ -239,8 +235,8 @@ function App() {
             <button
               className="brand"
               onClick={() => {
-                setAuth(false);
-                navigate(user ? (inCompany ? "company" : "dashboard") : "home");
+                if (!user) window.location.assign(homePath());
+                else navigate(inCompany ? "company" : "dashboard");
               }}
               aria-label="InterviewAce home"
             >
@@ -249,22 +245,16 @@ function App() {
               </span>
               InterviewAce<span className="brand-period">.</span>
             </button>
-            {inCompany ? (
+            {user && inCompany ? (
               <>
                 <span className="header-org">
                   <Briefcase size={15} aria-hidden="true" />{" "}
-                  {hiring?.orgs[0].name} · Hiring
+                  {hiring?.orgs[0]?.name || "Hiring workspace"}
                 </span>
                 <span className="header-tools">
-                  <button
-                    className="text-button"
-                    onClick={() => {
-                      setWorkspace("practice");
-                      navigate("dashboard");
-                    }}
-                  >
-                    Practice interviews
-                  </button>
+                  <span className="workspace-identity">
+                    {user?.name || "For hiring teams"}
+                  </span>
                   <button
                     className="icon-button"
                     onClick={logout}
@@ -283,8 +273,6 @@ function App() {
                       className={page === p ? "active" : ""}
                       aria-current={page === p ? "page" : undefined}
                       onClick={() => {
-                        if (p === "company" && hiring?.orgs.length)
-                          setWorkspace("company");
                         navigate(p);
                       }}
                     >
@@ -302,25 +290,9 @@ function App() {
                 </button>
               </>
             ) : (
-              <nav>
-                <a
-                  className="how-link"
-                  href="#how-it-works"
-                  onClick={() => setAuth(false)}
-                >
-                  How it works
-                </a>
-                <a
-                  className="how-link"
-                  href="#hiring"
-                  onClick={() => setAuth(false)}
-                >
-                  For hiring teams
-                </a>
-                <button className="primary small" onClick={start}>
-                  Start practicing <ArrowUpRight size={16} />
-                </button>
-              </nav>
+              <span className="workspace-label">
+                {inCompany ? "Hiring workspace" : "Interview practice"}
+              </span>
             )}
           </div>
         </header>
@@ -334,7 +306,8 @@ function App() {
                 className="text-button"
                 onClick={() => {
                   setError("");
-                  void refresh().catch((err) => setError(err.message));
+                  if (mode === "hiring") loadHiring();
+                  else void refresh().catch((err) => setError(err.message));
                 }}
               >
                 Retry
@@ -353,9 +326,13 @@ function App() {
         {!user ? (
           auth ? (
             <Auth
-              initialRegister={!authExpired}
+              initialRegister={
+                !authExpired &&
+                new URLSearchParams(window.location.search).get("auth") !==
+                  "signin"
+              }
               hiring={intent === "hiring"}
-              back={() => setAuth(false)}
+              back={() => window.location.assign(homePath())}
               done={(u, used) => {
                 setUser(u);
                 setUsage(used);
@@ -531,6 +508,14 @@ function App() {
                 )}
               </div>
             )}
+            {page === "company" && !hiring && (
+              <div className="wrap workspace">
+                <p role="status">Opening your hiring workspace…</p>
+                <button className="secondary" onClick={loadHiring}>
+                  Retry connection
+                </button>
+              </div>
+            )}
             {page === "company" && hiring && (
               <Company
                 canCreate={hiring.canCreate}
@@ -550,7 +535,7 @@ function App() {
                   setSession(null);
                   setSessions([]);
                   setBookmarks([]);
-                  navigate("home");
+                  window.location.assign(homePath());
                 }}
               />
             )}

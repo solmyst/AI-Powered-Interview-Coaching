@@ -14,7 +14,7 @@ async function room(page: Page, cloud = false) {
   await page.route("**/api/bookmarks", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/interviews", (route) => route.fulfill({ json: { sessions: [{ id: session.id, role: sample.setup.role, track: sample.setup.track, state: "active", created: sample.created, answered: 1, total: 3, score: null }], usage: { used: 1, limit: 5 } } }));
   await page.route(`**/api/interviews/${session.id}`, (route) => route.fulfill({ json: session }));
-  await page.goto("/");
+  await page.goto("/practice");
   await page.getByRole("button", { name: `Open ${session.setup.role} interview` }).click();
 }
 

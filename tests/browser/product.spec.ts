@@ -205,7 +205,7 @@ test("report and voice-first interview preflight layouts (test fixtures)", async
         : sample,
     }),
   );
-  await page.goto("/");
+  await page.goto("/practice");
   await page
     .getByRole("button", { name: `Open ${sample.setup.role} interview` })
     .click();

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ArrowRight, Eye, EyeOff, LockKeyhole } from "lucide-react";
 import { api } from "./api";
 import type { User, Usage } from "./types";
@@ -106,7 +108,7 @@ export function Auth({
         {register && (
           <label>
             Your name
-            <input
+            <Input
               name="name"
               disabled={busy}
               autoComplete="name"
@@ -117,7 +119,7 @@ export function Auth({
         )}
         <label>
           Email address
-          <input
+          <Input
             name="email"
             disabled={busy}
             type="email"
@@ -129,7 +131,7 @@ export function Auth({
         <div className="password-group">
           <label htmlFor="account-password">Password</label>
           <span className="password-field">
-            <input
+            <Input
               id="account-password"
               name="password"
               disabled={busy}
@@ -156,10 +158,10 @@ export function Auth({
             {error}
           </p>
         )}
-        <button className="primary" disabled={busy}>
+        <Button disabled={busy}>
           {busy ? "Please wait…" : register ? "Create account" : "Sign in"}
           <ArrowRight size={18} />
-        </button>
+        </Button>
         <button
           type="button"
           className="text-button"

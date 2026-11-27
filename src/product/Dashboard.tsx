@@ -8,6 +8,11 @@ import {
   Trash2,
 } from "lucide-react";
 import type { Summary, User, Usage } from "./types";
+import { lazy, Suspense } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { ShineBorder } from "@/components/magicui/shine-border";
+const ProgressChart = lazy(() => import("./ProgressChart"));
 export function SessionList({
   sessions,
   open,
@@ -106,11 +111,12 @@ export function Dashboard({
           <h1>Good to see you, {user.name.split(" ")[0]}.</h1>
           <p>A little more prepared than yesterday. That’s the goal.</p>
         </div>
-        <button className="primary" onClick={start}>
+        <Button onClick={start}>
           New interview <ArrowUpRight size={18} />
-        </button>
+        </Button>
       </div>
       <section className="dashboard-feature">
+        <ShineBorder />
         <div>
           <span className="pill">MAKE YOUR NEXT ANSWER COUNT</span>
           <h2>
@@ -218,29 +224,20 @@ export function Dashboard({
         <SessionList sessions={sessions.slice(0, 5)} open={open} />
       </section>
       {completed.length > 1 && (
-        <section className="panel">
+        <Card className="progress-card">
+          <CardHeader>
           <h2>Your practice timeline</h2>
           <p>
             Last ten completed sessions. Different rounds and model judgments
             are not directly comparable.
           </p>
-          <div className="timeline">
-            {completed
-              .slice(0, 10)
-              .reverse()
-              .map((s, i) => (
-                <button
-                  key={s.id}
-                  onClick={() => open(s.id)}
-                  aria-label={`Session ${i + 1}, score ${s.score}, ${s.role}`}
-                >
-                  <span>{s.score}</span>
-                  <i style={{ height: `${s.score! + 8}px` }} />
-                  <small>{i + 1}</small>
-                </button>
-              ))}
-          </div>
-        </section>
+          </CardHeader>
+          <CardContent>
+            <Suspense fallback={<div className="progress-chart chart-loading" role="status">Loading practice chart…</div>}>
+              <ProgressChart sessions={completed} open={open} />
+            </Suspense>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

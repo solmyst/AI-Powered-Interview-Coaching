@@ -269,7 +269,7 @@ test("a reviewer sees a ranked list, evidence and flags, and records a human dec
     return route.fulfill({ json: { ok: true } });
   });
 
-  await page.goto("/");
+  await page.goto("/hiring");
   // Company members land in their own workspace: no practice navigation.
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
   // Anyone who stepped away shows up in the activity feed instead of looking like they are still answering.
@@ -279,7 +279,7 @@ test("a reviewer sees a ranked list, evidence and flags, and records a human dec
   );
   await expect(
     page.getByRole("button", { name: "Practice interviews" }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await page
     .getByRole("navigation", { name: "Hiring navigation" })
     .getByRole("button", { name: /Backend engineer/ })
@@ -383,11 +383,7 @@ test("people without company access can request it from Hiring", async ({
     asked = route.request().postDataJSON();
     return route.fulfill({ status: 201, json: { requested: true } });
   });
-  await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "Good to see you",
-  );
-  await page.getByRole("button", { name: "Hiring" }).click();
+  await page.goto("/hiring");
   await expect(
     page.getByRole("heading", { name: "Request access" }),
   ).toBeVisible();

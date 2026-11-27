@@ -1,0 +1,218 @@
+/* App-owned theme for shadcn primitives; scoped so existing interview controls keep their layout. */
+[data-slot="button"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  border: 1px solid transparent;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+[data-slot="button"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+[data-slot="button"]:disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+.ui-button-primary {
+  background: var(--teal);
+  color: var(--ink);
+}
+.ui-button-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.ui-button-outline {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+.ui-button-outline:hover:not(:disabled),
+.ui-button-ghost:hover:not(:disabled) {
+  background: var(--surface-tint);
+}
+.ui-button-ghost {
+  background: transparent;
+  color: var(--ink);
+}
+.ui-button-destructive {
+  background: #9d342d;
+  color: white;
+}
+.ui-button-md {
+  min-height: 46px;
+  padding: 12px 20px;
+}
+.ui-button-sm {
+  min-height: 40px;
+  padding: 8px 12px;
+}
+.ui-button-lg {
+  min-height: 54px;
+  padding: 16px 24px;
+  font-size: 15px;
+}
+.ui-button-icon {
+  min-height: 44px;
+  width: 44px;
+  padding: 10px;
+}
+.ui-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.ui-card-header {
+  padding: 28px 28px 0;
+  display: grid;
+  gap: 10px;
+}
+.ui-card-content {
+  padding: 24px 28px 28px;
+}
+input[data-slot="input"] {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 12px 14px;
+  font: inherit;
+  transition: border-color 150ms ease;
+}
+input[data-slot="input"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-color: var(--accent);
+}
+input[data-slot="input"]:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.auth-panel > [data-slot="button"] {
+  width: 100%;
+  margin-top: 10px;
+}
+.password-field input[data-slot="input"] {
+  padding-right: 52px;
+}
+.progress-card {
+  margin-top: 28px;
+}
+.progress-card h2 {
+  font-size: clamp(24px, 3vw, 30px);
+}
+.progress-card p {
+  font-size: 14px;
+  max-width: 72ch;
+}
+.progress-chart {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: 260px;
+  overflow: hidden;
+}
+.chart-loading {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.chart-session-links {
+  list-style: none;
+  padding: 16px 0 0;
+  margin: 12px 0 0;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.chart-session-links li {
+  min-width: 0;
+}
+.chart-session-links button > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.chart-session-links strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.dashboard-feature {
+  position: relative;
+  isolation: isolate;
+}
+.dashboard-feature > .shine-border {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  pointer-events: none;
+  padding: 1px;
+  background-image: radial-gradient(
+    transparent,
+    transparent,
+    #00aebb,
+    #e8e4d3,
+    transparent,
+    transparent
+  );
+  background-size: 300% 300%;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .shine-border {
+    animation: ui-shine 16s linear 1;
+  }
+}
+@keyframes ui-shine {
+  from {
+    background-position: 0% 0%;
+  }
+  to {
+    background-position: 100% 100%;
+  }
+}
+@media (max-width: 600px) {
+  input[data-slot="input"] {
+    font-size: 16px;
+  }
+  .ui-card-header {
+    padding: 20px 20px 0;
+  }
+  .ui-card-content {
+    padding: 20px;
+  }
+  .progress-chart {
+    height: 220px;
+  }
+  .chart-session-links {
+    gap: 4px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="button"],
+  input[data-slot="input"] {
+    transition: none;
+  }
+  .shine-border {
+    animation: none;
+  }
+}

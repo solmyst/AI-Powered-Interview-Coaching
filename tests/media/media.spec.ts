@@ -113,7 +113,7 @@ test("camera renders real frames before and after joining the interview", async 
     body: JSON.stringify({ text: "I built an accessible interface.", confidence: 0.98, durationMs: 6200 }),
   }));
 
-  await page.goto("/");
+  await page.goto("/practice");
   await page.getByRole("button", { name: "Open Frontend interview" }).click();
   await page.getByRole("button", { name: "Allow camera & microphone" }).click();
   await expect(page.getByText("Camera and microphone ready")).toBeVisible({ timeout: 30000 });

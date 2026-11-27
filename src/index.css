@@ -1,4 +1,31 @@
 @import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap");
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "./components/ui/ui.css";
+
+@theme inline {
+  --color-background: #e8e4d3;
+  --color-foreground: #031211;
+  --color-primary: #00aebb;
+  --color-primary-foreground: #031211;
+  --color-card: #f4f1e5;
+  --color-card-foreground: #031211;
+  --color-muted-foreground: #4f625f;
+  --color-border: #bac6bc;
+  --color-ring: #00666e;
+  --color-secondary: #d2e5df;
+  --color-secondary-foreground: #031211;
+  --color-muted: #e0e3d6;
+  --color-accent: #d2e5df;
+  --color-accent-foreground: #031211;
+  --color-input: #bac6bc;
+  --color-destructive: #9d342d;
+  --color-destructive-foreground: #ffffff;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+}
 
 *,
 ::before,

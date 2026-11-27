@@ -6,7 +6,7 @@ async function workspace(page: Page) {
   await page.route("**/api/auth/session", (route) => route.fulfill({ json: { user: { id: "recovery", name: "Browser Test", email: "fixture@example.test" }, usage: { used: 1, limit: 5 } } }));
   await page.route("**/api/bookmarks", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/interviews", (route) => route.fulfill({ json: { sessions: [{ id: "expired", role: "Backend", track: "Technical", state: "active", created: new Date().toISOString(), answered: 1, total: 3, score: null }], usage: { used: 1, limit: 5 } } }));
-  await page.goto("/");
+  await page.goto("/practice");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Good to see you");
 }
 
