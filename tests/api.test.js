@@ -48,18 +48,61 @@ const ai = {
     const shape = schema.shape;
     return {
       value: shape.checkpoints
-        ? { focus: "Consistency trade-offs", coaching: "Explain how a write invalidates stale data.",
-            checkpoints: ["Expiry", "Write handling", "Trade-offs"].map((criterion) => ({ criterion, baseline: { status: "partial", evidence: "TTL", reason: "Expiry mentioned." } })),
-            transferQuestion: "What changes when two regions write at once?" }
+        ? {
+            focus: "Consistency trade-offs",
+            coaching: "Explain how a write invalidates stale data.",
+            checkpoints: ["Expiry", "Write handling", "Trade-offs"].map(
+              (criterion) => ({
+                criterion,
+                baseline: {
+                  status: "partial",
+                  evidence: "TTL",
+                  reason: "Expiry mentioned.",
+                },
+              }),
+            ),
+            transferQuestion: "What changes when two regions write at once?",
+          }
         : shape.checks
-        ? { summary: "Write handling is now explicit.", checks: [0, 1, 2].map(() => ({ status: "demonstrated", evidence: "invalidate", reason: "Names write invalidation." })), nextStep: "Explain a concurrent write." }
-        : shape.kind
-        ? { kind: "answer", reply: "", nextQuestion: question }
-        : shape.scores
-          ? evaluation
-          : shape.summary
-            ? report
-            : question,
+          ? {
+              summary: "Write handling is now explicit.",
+              checks: [0, 1, 2].map(() => ({
+                status: "demonstrated",
+                evidence: "invalidate",
+                reason: "Names write invalidation.",
+              })),
+              nextStep: "Explain a concurrent write.",
+            }
+          : shape.kind
+            ? { kind: "answer", reply: "", nextQuestion: question }
+            : shape.points
+              ? {
+                  points: [
+                    "Invalidate on write",
+                    "Bound staleness with a TTL",
+                    "Handle races",
+                  ],
+                }
+              : shape.levels
+                ? {
+                    relevant: true,
+                    substantive: true,
+                    levels: Object.fromEntries(
+                      Object.keys(shape.levels.shape).map((k) => [k, 3]),
+                    ),
+                    evidence: Object.keys(shape.levels.shape).map((k) => ({
+                      competency: k,
+                      quote: "a TTL to expire stale entries",
+                      supports: "strength",
+                    })),
+                    rationale:
+                      "The TTL example explains staleness but omits consistency trade-offs.",
+                  }
+                : shape.modelAnswer
+                  ? evaluation
+                  : shape.summary
+                    ? report
+                    : question,
       usage: { input: 10, output: 5 },
     };
   },
@@ -72,7 +115,11 @@ const transcriber = {
   }),
   transcribe: async (audio) => {
     transcribedBytes = audio.length;
-    return { text: "मैंने a cache service बनाई.", confidence: 0.96, durationMs: 2300 };
+    return {
+      text: "मैंने a cache service बनाई.",
+      confidence: 0.96,
+      durationMs: 2300,
+    };
   },
 };
 const speech = {
@@ -82,7 +129,10 @@ const speech = {
     voiceId: "fixture-voice",
     ready: true,
   }),
-  synthesize: async () => ({ audio: new Uint8Array([1, 2, 3]), contentType: "audio/mpeg" }),
+  synthesize: async () => ({
+    audio: new Uint8Array([1, 2, 3]),
+    contentType: "audio/mpeg",
+  }),
 };
 before(async () => {
   const result = createApp({
@@ -152,42 +202,141 @@ const create = (cookie, id = crypto.randomUUID()) =>
     headers: { "Idempotency-Key": id },
   });
 test("Answer Lab persists retry and transfer, enforces ownership, deduplicates and preserves interview scores", async () => {
-  const a = await account("lab@example.test"), b = await account("lab-other@example.test");
+  const a = await account("lab@example.test"),
+    b = await account("lab-other@example.test");
   const created = await create(a.cookie);
   const id = created.body.id;
   const path = `/interviews/${id}/rehearsal/0`;
   const clarifyPath = `/interviews/${id}/clarify`;
-  assert.equal((await request(clarifyPath, { method: "POST", cookie: b.cookie, body: { expectedTurn: 0 } })).status, 404);
-  for (let i = 0; i < 2; i++) assert.equal((await request(clarifyPath, { method: "POST", cookie: a.cookie, body: { expectedTurn: 0 } })).status, 200);
-  assert.equal((await request(clarifyPath, { method: "POST", cookie: a.cookie, body: { expectedTurn: 0 } })).status, 429);
-  assert.equal((await request(`/interviews/${id}`, { cookie: a.cookie })).body.turns.length, 0);
-  assert.equal((await request(clarifyPath, { method: "POST", cookie: a.cookie, body: { expectedTurn: 1 } })).status, 409);
-  assert.equal((await request(path, { method: "POST", cookie: a.cookie, body: {} })).status, 409);
-  for (let i = 0; i < 3; i++) await request(`/interviews/${id}/answers`, {
-    method: "POST", cookie: a.cookie, body: { answer: "Use a TTL to expire stale entries.", expectedTurn: i },
+  assert.equal(
+    (
+      await request(clarifyPath, {
+        method: "POST",
+        cookie: b.cookie,
+        body: { expectedTurn: 0 },
+      })
+    ).status,
+    404,
+  );
+  for (let i = 0; i < 2; i++)
+    assert.equal(
+      (
+        await request(clarifyPath, {
+          method: "POST",
+          cookie: a.cookie,
+          body: { expectedTurn: 0 },
+        })
+      ).status,
+      200,
+    );
+  assert.equal(
+    (
+      await request(clarifyPath, {
+        method: "POST",
+        cookie: a.cookie,
+        body: { expectedTurn: 0 },
+      })
+    ).status,
+    429,
+  );
+  assert.equal(
+    (await request(`/interviews/${id}`, { cookie: a.cookie })).body.turns
+      .length,
+    0,
+  );
+  assert.equal(
+    (
+      await request(clarifyPath, {
+        method: "POST",
+        cookie: a.cookie,
+        body: { expectedTurn: 1 },
+      })
+    ).status,
+    409,
+  );
+  assert.equal(
+    (await request(path, { method: "POST", cookie: a.cookie, body: {} }))
+      .status,
+    409,
+  );
+  for (let i = 0; i < 3; i++)
+    await request(`/interviews/${id}/answers`, {
+      method: "POST",
+      cookie: a.cookie,
+      body: { answer: "Use a TTL to expire stale entries.", expectedTurn: i },
+    });
+  await request(`/interviews/${id}/report`, {
+    method: "POST",
+    cookie: a.cookie,
+    body: {},
   });
-  await request(`/interviews/${id}/report`, { method: "POST", cookie: a.cookie, body: {} });
-  assert.equal((await request(path, { method: "POST", cookie: b.cookie, body: {} })).status, 404);
+  assert.equal(
+    (await request(path, { method: "POST", cookie: b.cookie, body: {} }))
+      .status,
+    404,
+  );
   assert.equal((await request(path, { method: "POST", body: {} })).status, 401);
-  const plan = await request(path, { method: "POST", cookie: a.cookie, body: {} });
+  const plan = await request(path, {
+    method: "POST",
+    cookie: a.cookie,
+    body: {},
+  });
   assert.equal(plan.status, 200);
   assert.equal(plan.body.rehearsals[0].plan.checkpoints.length, 3);
   const previousCalls = calls;
   await request(path, { method: "POST", cookie: a.cookie, body: {} });
   assert.equal(calls, previousCalls);
   badAI = true;
-  const failed = await request(path + "/answers", { method: "POST", cookie: a.cookie, body: { answer: "I invalidate on write.", expectedAttempt: 0 } });
+  const failed = await request(path + "/answers", {
+    method: "POST",
+    cookie: a.cookie,
+    body: { answer: "I invalidate on write.", expectedAttempt: 0 },
+  });
   badAI = false;
   assert.equal(failed.status, 503);
-  assert.equal((await request(`/interviews/${id}`, { cookie: a.cookie })).body.rehearsals[0].attempts.length, 0);
+  assert.equal(
+    (await request(`/interviews/${id}`, { cookie: a.cookie })).body
+      .rehearsals[0].attempts.length,
+    0,
+  );
   for (const expectedAttempt of [0, 1]) {
-    const result = await request(path + "/answers", { method: "POST", cookie: a.cookie, body: { answer: "I invalidate on write.", expectedAttempt } });
+    const result = await request(path + "/answers", {
+      method: "POST",
+      cookie: a.cookie,
+      body: { answer: "I invalidate on write.", expectedAttempt },
+    });
     assert.equal(result.status, 200);
-    assert.equal(result.body.rehearsals[0].attempts[expectedAttempt].stage, expectedAttempt ? "transfer" : "retry");
-    assert.equal(result.body.report.overall, 65);
+    assert.equal(
+      result.body.rehearsals[0].attempts[expectedAttempt].stage,
+      expectedAttempt ? "transfer" : "retry",
+    );
+    // Level 3 everywhere is 75; questions not yet answered count as 0.
+    const { answered, total } = result.body.report.coverage;
+    assert.equal(
+      result.body.report.overall,
+      Math.round((75 * answered) / total),
+    );
   }
-  assert.equal((await request(path + "/answers", { method: "POST", cookie: a.cookie, body: { answer: "duplicate", expectedAttempt: 1 } })).status, 409);
-  assert.equal((await request(`/interviews/${id}/rehearsal/7`, { method: "POST", cookie: a.cookie, body: {} })).status, 404);
+  assert.equal(
+    (
+      await request(path + "/answers", {
+        method: "POST",
+        cookie: a.cookie,
+        body: { answer: "duplicate", expectedAttempt: 1 },
+      })
+    ).status,
+    409,
+  );
+  assert.equal(
+    (
+      await request(`/interviews/${id}/rehearsal/7`, {
+        method: "POST",
+        cookie: a.cookie,
+        body: {},
+      })
+    ).status,
+    404,
+  );
   assert.equal((await request("/me", { cookie: a.cookie })).body.usage.used, 1);
 });
 test("production trusts exactly one reverse proxy hop", () => {
@@ -206,7 +355,10 @@ test("production trusts exactly one reverse proxy hop", () => {
 });
 test("security policy permits generated audio blob playback without broad media origins", async () => {
   const result = await request("/health");
-  assert.match(result.headers.get("content-security-policy"), /(?:^|;)media-src 'self' blob:(?:;|$)/);
+  assert.match(
+    result.headers.get("content-security-policy"),
+    /(?:^|;)media-src 'self' blob:(?:;|$)/,
+  );
 });
 test("authentication, session cookies, invalid credentials and CSRF", async () => {
   assert.equal((await request("/interviews")).status, 401);
@@ -298,7 +450,10 @@ test("authenticated interviewer speech returns audio without exposing provider c
   });
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-type"), "audio/mpeg");
-  assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [1, 2, 3]);
+  assert.deepEqual(
+    [...new Uint8Array(await response.arrayBuffer())],
+    [1, 2, 3],
+  );
 });
 test("complete interview, grounded evaluations, report, bookmarks, ownership and deletion", async () => {
   const a = await account("flow@example.test"),
@@ -357,7 +512,8 @@ test("complete interview, grounded evaluations, report, bookmarks, ownership and
     cookie: a.cookie,
     body: {},
   });
-  assert.equal(result.body.report.overall, 65);
+  const { answered, total } = result.body.report.coverage;
+  assert.equal(result.body.report.overall, Math.round((75 * answered) / total));
   assert.equal(result.body.setup.resume, "");
   assert.equal(result.body.state, "complete");
   const beforeCalls = calls;
@@ -470,7 +626,16 @@ test("history summaries come from SQL and stale unfinished interviews drop resum
   const list = await request("/interviews", { cookie: a.cookie });
   assert.deepEqual(
     list.body.sessions.find((s) => s.id === fresh),
-    { id: fresh, created: list.body.sessions.find((s) => s.id === fresh).created, state: "active", role: "Backend", track: "Technical", answered: 0, total: 3, score: null },
+    {
+      id: fresh,
+      created: list.body.sessions.find((s) => s.id === fresh).created,
+      state: "active",
+      role: "Backend",
+      track: "Technical",
+      answered: 0,
+      total: 3,
+      score: null,
+    },
   );
   db.prepare("UPDATE interviews SET created=? WHERE id=?").run(
     new Date(Date.now() - 8 * 86400000).toISOString(),
@@ -491,7 +656,11 @@ test("paid speech calls stop at the daily cap and invalid input is not charged",
   const speak = (text) =>
     fetch(base + "/api/speech", {
       method: "POST",
-      headers: { Origin: origin, Cookie: a.cookie, "Content-Type": "application/json" },
+      headers: {
+        Origin: origin,
+        Cookie: a.cookie,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ text }),
     });
   assert.equal((await speak("")).status, 400);
@@ -501,7 +670,11 @@ test("paid speech calls stop at the daily cap and invalid input is not charged",
   const transcribe = (body) =>
     fetch(base + "/api/transcribe", {
       method: "POST",
-      headers: { Origin: origin, Cookie: a.cookie, "Content-Type": "audio/wav" },
+      headers: {
+        Origin: origin,
+        Cookie: a.cookie,
+        "Content-Type": "audio/wav",
+      },
       body,
     });
   assert.equal((await transcribe(Buffer.alloc(44))).status, 415);

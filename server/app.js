@@ -18,15 +18,16 @@ import { createTranscriber } from "./transcription.js";
 import { createSpeech } from "./speech.js";
 import { registerRehearsal } from "./rehearsal.js";
 import { answerOf, decideTurn, tidyQuestion } from "./turn.js";
+import { aggregate, evaluate } from "./scoring.js";
 import { registerScreening } from "./screening.js";
 export { tidyQuestion, repeats } from "./turn.js";
 import {
   setupSchema,
   answerSchema,
   questionSchema,
-  evaluationSchema,
+  coachingSchema,
+  PRACTICE_RUBRIC,
   reportSchema,
-  dimensions,
 } from "./schemas.js";
 const derive = promisify(scrypt);
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -601,20 +602,40 @@ export function createApp({
       const session = read();
       const turn = session?.turns[index];
       if (!turn || turn.evaluation) return;
-      const generated = await ai.generate(
-        evaluationSchema,
-        "Evaluate the candidate's answer to this interview question with concrete evidence from what they said. Consider any conversation they had about the question before answering.",
-        {
-          setup: session.setup,
-          earlierAnswers: session.turns.slice(0, index).map((t) => ({
-            question: t.question.question,
-            answer: t.answer.slice(0, 800),
-          })),
+      // Scores follow the same method as company screening (see scoring.js); the coaching text is written alongside.
+      const [graded, coaching] = await Promise.all([
+        evaluate(ai, {
+          rubric: PRACTICE_RUBRIC,
           question: turn.question,
-          conversationBeforeAnswer: turn.exchanges || [],
           answer: turn.answer,
+          exchanges: turn.exchanges || [],
+          company: "",
+          role: `${session.setup.role}, ${session.setup.track} round, ${session.setup.experience}`,
+          mode: "practice",
+        }),
+        ai.generate(
+          coachingSchema,
+          "Coach the candidate on this answer with concrete evidence from what they said: strengths, improvements, concepts they missed, and a model answer. Consider any conversation they had about the question before answering. If the answer gave no real content, say what a first attempt should include instead of praising it. Scores are decided elsewhere.",
+          {
+            setup: session.setup,
+            earlierAnswers: session.turns.slice(0, index).map((t) => ({
+              question: t.question.question,
+              answer: t.answer.slice(0, 800),
+            })),
+            question: turn.question,
+            conversationBeforeAnswer: turn.exchanges || [],
+            answer: turn.answer,
+          },
+          { priority: "background" },
+        ),
+      ]);
+      const generated = {
+        value: { ...coaching.value, ...graded.value },
+        usage: {
+          input: graded.usage.input + coaching.usage.input,
+          output: graded.usage.output + coaching.usage.output,
         },
-      );
+      };
       const fresh = read();
       if (!fresh?.turns[index] || fresh.turns[index].evaluation) return;
       fresh.turns[index].evaluation = generated.value;
@@ -645,21 +666,19 @@ export function createApp({
         "Create an evidence-based coaching summary and a concrete study plan, with practice questions. Consider only answered questions. Never invent performance or hiring outcomes.",
         context(session),
       );
-      const scores = Object.fromEntries(
-        dimensions.map((key) => [
-          key,
-          Math.round(
-            session.turns.reduce((n, t) => n + t.evaluation.scores[key], 0) /
-              session.turns.length,
-          ),
-        ]),
+      const result = aggregate(
+        PRACTICE_RUBRIC,
+        session.turns,
+        session.setup.questionCount,
       );
       session.report = {
         ...generated.value,
-        scores,
-        overall: Math.round(
-          Object.values(scores).reduce((a, b) => a + b, 0) / dimensions.length,
-        ),
+        scores: result.competencyScores,
+        overall: result.overall,
+        answeredAverage: result.answeredAverage,
+        band: result.band,
+        coverage: result.coverage,
+        confidence: result.confidence,
         answered: session.turns.length,
       };
       session.state = "complete";

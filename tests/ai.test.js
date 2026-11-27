@@ -138,25 +138,87 @@ test("only local Ollama limits concurrent generations", async () => {
   globalThis.fetch = () =>
     new Promise((resolve) =>
       release.push(() =>
-        resolve(new Response(JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }] }))),
+        resolve(
+          new Response(
+            JSON.stringify({
+              choices: [{ message: { content: '{"ok":true}' } }],
+            }),
+          ),
+        ),
       ),
     );
   try {
     const schema = z.object({ ok: z.boolean() });
     for (const [env, busy] of [
       [{ AI_PROVIDER: "ollama" }, true],
-      [{ AI_PROVIDER: "nvidia", NVIDIA_API_KEY: "k", NVIDIA_MODEL: "m" }, false],
+      [
+        { AI_PROVIDER: "nvidia", NVIDIA_API_KEY: "k", NVIDIA_MODEL: "m" },
+        false,
+      ],
     ]) {
       const ai = createAI(env);
-      const pending = [ai.generate(schema, "t", {}), ai.generate(schema, "t", {})];
+      const pending = [
+        ai.generate(schema, "t", {}),
+        ai.generate(schema, "t", {}),
+      ];
       const third = ai.generate(schema, "t", {});
       if (busy) await assert.rejects(third, /busy/);
       else pending.push(third);
       await new Promise((r) => setTimeout(r, 0));
       release.splice(0).forEach((done) => done());
       const results = await Promise.allSettled(pending);
-      if (!busy) assert.deepEqual(results.map((r) => r.status), ["fulfilled", "fulfilled", "fulfilled"]);
+      if (!busy)
+        assert.deepEqual(
+          results.map((r) => r.status),
+          ["fulfilled", "fulfilled", "fulfilled"],
+        );
     }
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("hosted calls wait for a free slot instead of failing, and replies go before background scoring", async () => {
+  const { z } = await import("zod");
+  const { createAI } = await import("../server/ai.js");
+  const started = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, init) => {
+    started.push({
+      at: Date.now(),
+      tag: JSON.parse(init.body).messages[1].content,
+    });
+    return Response.json({
+      choices: [{ message: { content: JSON.stringify({ ok: true }) } }],
+      usage: { prompt_tokens: 1, completion_tokens: 1 },
+    });
+  };
+  try {
+    const ai = createAI({
+      AI_PROVIDER: "nvidia",
+      NVIDIA_API_KEY: "k",
+      NVIDIA_MODEL: "m",
+      AI_RPM: "2",
+      AI_RATE_WINDOW_MS: "400",
+    });
+    const schema = z.object({ ok: z.boolean() });
+    const t0 = Date.now();
+    const run = (tag, priority) => ai.generate(schema, "t", tag, { priority });
+    // Two take the budget; a background call and then a reply queue behind them.
+    await Promise.all([
+      run("a", "interactive"),
+      run("b", "interactive"),
+      run("scoring", "background"),
+      run("reply", "interactive"),
+    ]);
+    assert.equal(started.length, 4);
+    assert.ok(started[1].at - t0 < 200, "the first two start at once");
+    const order = started.map((s) => JSON.parse(s.tag));
+    assert.ok(
+      order.indexOf("reply") < order.indexOf("scoring"),
+      "a waiting reply goes first",
+    );
+    assert.ok(started[2].at - t0 >= 380, "the third waits for the window");
   } finally {
     globalThis.fetch = realFetch;
   }

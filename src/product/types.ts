@@ -40,7 +40,12 @@ export type Setup = {
   jobDescription: string;
   questionCount: number;
 };
-export type Question = { lead?: string; question: string; focus: string; difficulty: string };
+export type Question = {
+  lead?: string;
+  question: string;
+  focus: string;
+  difficulty: string;
+};
 export type Evaluation = {
   scores: Record<string, number>;
   rationale: string;
@@ -60,6 +65,9 @@ export type Report = {
   scores: Record<string, number>;
   overall: number;
   answered: number;
+  answeredAverage?: number;
+  band?: "strong" | "promising" | "mixed" | "weak" | "insufficient";
+  coverage?: { answered: number; total: number; noContent: number };
   strengths: string[];
   improvements: string[];
   studyPlan: {
@@ -113,7 +121,10 @@ export type Summary = {
 export type Bookmark = Turn & { interviewId: string; turn: number };
 // What the call screen needs. Practice sessions and company screenings both satisfy it;
 // a screening never carries scores, rubric or reports.
-export type RoomSession = Pick<Session, "id" | "state" | "setup" | "currentQuestion"> & {
+export type RoomSession = Pick<
+  Session,
+  "id" | "state" | "setup" | "currentQuestion"
+> & {
   turns: { question: Question; answer: string }[];
 };
 export type Page =
@@ -147,7 +158,12 @@ export type CandidateSummary = {
   ended: boolean;
   noteSent: boolean;
 };
-export type RubricItem = { key: string; label: string; description: string; weight: number };
+export type RubricItem = {
+  key: string;
+  label: string;
+  description: string;
+  weight: number;
+};
 export type RoleConfig = {
   title: string;
   role: string;

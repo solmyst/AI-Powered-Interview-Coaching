@@ -130,6 +130,27 @@ export const evaluationSchema = z.object({
   missingConcepts: z.array(text).max(4),
   modelAnswer: text,
 });
+// Practice coaching text for one answer. The scores come from scoring.js, not from this call.
+export const coachingSchema = evaluationSchema.omit({ scores: true });
+// The eight practice dimensions as a rubric (equal weights), so practice answers are scored by the same method.
+export const PRACTICE_RUBRIC = [
+  ["correctness", "Facts and technical claims are right."],
+  ["depth", "Goes beyond the surface to how and why."],
+  ["clarity", "Easy to follow, in plain language."],
+  [
+    "structure",
+    "Organised in a clear order, such as context, approach, result.",
+  ],
+  ["relevance", "Answers the question that was asked."],
+  ["reasoning", "Explains why, weighing options and trade-offs."],
+  ["evidence", "Backs claims with specifics, examples or numbers."],
+  ["practicality", "Would work in a real situation, with sensible steps."],
+].map(([key, description]) => ({
+  key,
+  label: key[0].toUpperCase() + key.slice(1),
+  description,
+  weight: 1,
+}));
 export const questionSchema = z.object({
   // Spoken before the question: a greeting, a reaction to the last answer, or a transition.
   lead: z.string().trim().max(300),

@@ -7,7 +7,8 @@ import { screeningJudgeSchema, referenceSchema } from "./schemas.js";
 
 // Level 0-4 to a score. Level 1 is "touches the topic, nothing more", so it earns little.
 export const LEVEL_SCORE = [0, 20, 45, 75, 95];
-export const SAMPLES = 3;
+// Independent judgements per answer. 3 is the tested setting; 2 saves a third of the model calls under load.
+export const SAMPLES = Number(process.env.SCORING_SAMPLES || 3);
 
 export const normalize = (text) =>
   text
@@ -36,11 +37,17 @@ const content = (text) =>
 // flag is the second gate.
 export function substanceGate(answer, question) {
   const asked = content(question);
-  const novel = [...content(answer)].filter((w) => !asked.has(w));
+  const mine = [...content(answer)];
+  const novel = mine.filter((w) => !asked.has(w));
   const words = answer.trim().split(/\s+/).length;
   if (words < 25 && GAVE_UP.test(answer))
     return "They said they did not know or could not answer.";
-  if (novel.length < 8)
+  // Mostly the question's own words with little added: a restatement, not an answer.
+  const restates =
+    mine.length > 0 &&
+    (mine.length - novel.length) / mine.length >= 0.5 &&
+    novel.length < 10;
+  if (novel.length < 3 || restates)
     return "The answer added nothing meaningful beyond the question (it restated it, was too short, or was only filler).";
   return null;
 }
@@ -84,7 +91,7 @@ async function referencePoints(ai, ctx) {
         question: ctx.question,
         rubric: ctx.rubric,
       },
-      { mode: "screening" },
+      { mode: ctx.mode || "screening", priority: "background" },
     );
     points = out.value.points;
     usage = out.usage;
@@ -100,7 +107,7 @@ const median = (values) => {
   return sorted[Math.floor((sorted.length - 1) / 2)];
 };
 const isCommunication = (r) =>
-  /communicat|clarity|articulat/i.test(`${r.key} ${r.label}`);
+  /communicat|clarity|articulat|structure/i.test(`${r.key} ${r.label}`);
 
 const zeros = (rubric) => Object.fromEntries(rubric.map((r) => [r.key, 0]));
 function failed(rubric, why, extra = {}) {
@@ -215,7 +222,8 @@ export async function evaluate(ai, ctx) {
   const results = await Promise.allSettled(
     Array.from({ length: SAMPLES }, () =>
       ai.generate(screeningJudgeSchema(rubric), task, context, {
-        mode: "screening",
+        mode: ctx.mode || "screening",
+        priority: "background",
       }),
     ),
   );

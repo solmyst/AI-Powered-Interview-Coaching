@@ -56,9 +56,27 @@ before(async () => {
                       : `Sure. ${first}`,
                   ),
                 }
-          : schema.shape.scores
-            ? evaluation
-            : ask(first);
+          : schema.shape.points
+            ? {
+                points: [
+                  "Say what you mean",
+                  "Give an example",
+                  "Explain the result",
+                ],
+              }
+            : schema.shape.levels
+              ? {
+                  relevant: false,
+                  substantive: false,
+                  levels: Object.fromEntries(
+                    Object.keys(schema.shape.levels.shape).map((k) => [k, 0]),
+                  ),
+                  evidence: [],
+                  rationale: "No answer was given.",
+                }
+              : schema.shape.modelAnswer
+                ? evaluation
+                : ask(first);
         return { value, usage: { input: 1, output: 1 } };
       },
     },
@@ -223,7 +241,12 @@ test("questions back to Maya get a reply and keep the same question; scoring hap
     await post(`/interviews/${session.id}/report`, cookie, {})
   ).json();
   assert.equal(report.state, "complete");
-  assert.equal(report.turns[0].evaluation.rationale, evaluation.rationale);
+  // "I would check the logs first." adds almost nothing beyond the question, so it earns no credit.
+  assert.match(
+    report.turns[0].evaluation.rationale,
+    /did not address/,
+  );
+  assert.equal(report.report.overall, 0);
 });
 
 test("an almost empty answer skips the retry and moves to a fresh scenario straight away", async () => {

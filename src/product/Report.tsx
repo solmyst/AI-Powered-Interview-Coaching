@@ -53,11 +53,33 @@ export function Report({
       </section>
       <p className="notice">
         AI coaching estimate, not an objective hiring decision. Each dimension
-        has equal weight; the overall score averages the eight dimensions across
-        answered questions. Evidence measures support for claims, not personal
-        confidence. Code was reviewed, not executed.
+        has equal weight and is judged on a 0 to 4 scale from the quotes in your
+        answer. An answer that only repeats the question, says “I don’t know” or
+        is filler scores 0, and questions you did not answer count as 0, so the
+        overall reflects the whole interview
+        {report.answeredAverage !== undefined
+          ? ` (the average of the answers you gave is ${report.answeredAverage}).`
+          : "."}{" "}
+        Evidence measures support for claims, not personal confidence. Code was
+        reviewed, not executed.
       </p>
-      <RehearsalLab key={session.id} session={session} update={update} speechReady={speechReady} transcriptionReady={transcriptionReady} />
+      {report.band === "insufficient" && (
+        <p className="notice" role="note">
+          Not enough to judge yet: you answered {report.coverage?.answered ?? 0}{" "}
+          of {report.coverage?.total ?? 0} questions
+          {report.coverage?.noContent
+            ? `, and ${report.coverage.noContent} had no real content`
+            : ""}
+          . Try a longer attempt at each question for a fuller score.
+        </p>
+      )}
+      <RehearsalLab
+        key={session.id}
+        session={session}
+        update={update}
+        speechReady={speechReady}
+        transcriptionReady={transcriptionReady}
+      />
       <DeliveryReport turns={session.turns} />
       <section className="panel">
         <h2>Your answer profile</h2>

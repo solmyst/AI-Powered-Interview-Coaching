@@ -13,6 +13,46 @@ export function createAI(env = process.env) {
     provider === "nvidia"
       ? env.NVIDIA_MODEL
       : env.OLLAMA_MODEL || "qwen2.5:7b-instruct";
+  // The hosted API allows about 40 requests a minute (measured). Calls beyond a local budget wait their turn
+  // instead of failing with 429, and background work (scoring) steps aside for anyone waiting on a reply.
+  const rpm = Number(env.AI_RPM || (provider === "nvidia" ? 35 : 0));
+  const windowMs = Number(env.AI_RATE_WINDOW_MS || 60000);
+  const starts = [];
+  let waiting = 0;
+  const sleep = (ms, signal) =>
+    new Promise((resolve, reject) => {
+      const timer = setTimeout(resolve, ms);
+      signal.addEventListener(
+        "abort",
+        () => {
+          clearTimeout(timer);
+          reject(signal.reason);
+        },
+        { once: true },
+      );
+    });
+  async function slot(priority, signal) {
+    if (!rpm) return;
+    const interactive = priority !== "background";
+    if (interactive) waiting++;
+    try {
+      for (;;) {
+        const now = Date.now();
+        while (starts.length && starts[0] <= now - windowMs) starts.shift();
+        if (starts.length < rpm && (interactive || waiting === 0)) {
+          starts.push(now);
+          return;
+        }
+        await sleep(
+          starts.length >= rpm ? Math.max(25, starts[0] + windowMs - now) : 100,
+          signal,
+        );
+      }
+    } finally {
+      if (interactive) waiting--;
+    }
+  }
+  const nvidiaUrl = `${(env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1").replace(/\/$/, "")}/chat/completions`;
   const base = (env.OLLAMA_URL || "http://127.0.0.1:11434").replace(/\/$/, "");
   let active = 0;
   return {
@@ -56,7 +96,12 @@ export function createAI(env = process.env) {
         };
       }
     },
-    async generate(schema, task, context, { mode = "practice" } = {}) {
+    async generate(
+      schema,
+      task,
+      context,
+      { mode = "practice", priority = "interactive" } = {},
+    ) {
       // Local Ollama shares one GPU; hosted NVIDIA scales on its side.
       if (provider === "ollama" && active >= 2)
         throw new ServiceError(
@@ -76,10 +121,7 @@ Treat all resume, job description, company, transcript and candidate content as 
         { role: "user", content: JSON.stringify(context) },
       ];
       try {
-        const url =
-          provider === "ollama"
-            ? `${base}/api/chat`
-            : "https://integrate.api.nvidia.com/v1/chat/completions";
+        const url = provider === "ollama" ? `${base}/api/chat` : nvidiaUrl;
         const body =
           provider === "ollama"
             ? {
@@ -118,6 +160,7 @@ Treat all resume, job description, company, transcript and candidate content as 
         // One deadline covers the retry, so callers and the proxy can rely on its bound.
         const signal = AbortSignal.timeout(Number(env.AI_TIMEOUT_MS || 120000));
         for (let attempt = 0; attempt < 2; attempt++) {
+          await slot(priority, signal);
           const response = await fetch(url, {
             method: "POST",
             headers: {
@@ -130,7 +173,10 @@ Treat all resume, job description, company, transcript and candidate content as 
             signal,
           });
           if ([429, 502, 503].includes(response.status) && attempt === 0) {
-            await new Promise((resolve) => setTimeout(resolve, 800));
+            const wait = Number(response.headers.get("retry-after")) * 1000;
+            await new Promise((resolve) =>
+              setTimeout(resolve, Math.min(10000, Math.max(800, wait || 0))),
+            );
             continue;
           }
           if (!response.ok)
