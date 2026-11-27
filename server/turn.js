@@ -8,7 +8,7 @@ export const talkTask =
   "Their latest words (candidateSaid) are not an answer yet: they ask something about the question, want it repeated, ask for a moment, or think aloud. Set kind to 'conversation' and nextQuestion to null. reply is one to three short spoken sentences, like a human interviewer: answer what they asked about the question, restate it more simply using only what currentQuestion already says (never add detail about the problem or hint at what could go wrong), or reassure them if they need time. Never praise, grade or react to the quality of anything they said, never confirm or hint that an approach is right or wrong, and never give away any part of the solution. If they ask for an example, give one from everyday non-technical life (a cafe, a library, a bus queue), never from the candidate's field, and never describe how the real problem is solved. If they ask whether their idea is right, say you would like to hear their full answer first. End by inviting them to go ahead.";
 export const answerTask =
   midInterview +
-  "The candidate's latest words (candidateSaid) are meant as their answer to currentQuestion. Set kind to 'answer'. relevant is false only when candidateSaid does not try to answer currentQuestion at all: it talks about something unrelated, or answers a different question. A weak, wrong, partial or 'I don't know' answer is still relevant true. When relevant is false: nextQuestion is null and reply is one or two short spoken sentences, in the language the candidate used, that briefly acknowledge what they said without praising or agreeing with it, then say plainly that it does not answer what you asked; do not repeat the question itself, it is added after your reply. When relevant is true: reply is an empty string and nextQuestion follows these rules: ";
+  "The candidate's latest words (candidateSaid) are meant as their answer to currentQuestion. Set kind to 'answer'. relevant is false only when candidateSaid is clearly about something else entirely, with no connection to currentQuestion (for example weekend plans when asked about a payment bug). Hesitant, partial, rambling, mixed-language or weak starts at an answer are relevant true. A weak, wrong, partial or 'I don't know' answer is still relevant true. When relevant is false: nextQuestion is null and reply is one or two short spoken sentences, in the language the candidate used, that briefly acknowledge what they said without praising or agreeing with it, then say plainly that it does not answer what you asked; do not repeat the question itself, it is added after your reply. When relevant is true: reply is an empty string and nextQuestion follows these rules: ";
 export const nextQuestionTask =
   "ONE nextQuestion, written the way a thoughtful human interviewer talks. nextQuestion.lead: one short spoken sentence reacting to what the candidate actually said (when they said something concrete, name that exact detail in your own words; when the answer was empty or 'I don't know', reassure them briefly and kindly without judging; never reuse a stock phrase, vary the wording every turn and never say 'let's look at something different' after a real answer). nextQuestion.question: never repeat or reword anything in alreadyAsked, and do not stay on the same scenario. Use a concrete situational question ('Imagine…', 'Suppose…', 'Tell me about a time…') answerable in about two minutes of speech. Prefer realistic workplace scenarios over résumé recaps. The lead never asks anything and never suggests an approach, technique, tool or hint toward the answer; it only reacts. The question is one or two sentences, at most 45 words, with exactly one question mark.";
 // Small models sometimes leak CJK characters into English text; Hindi uses Devanagari and is unaffected.
@@ -65,6 +65,17 @@ export function repeats(question, asked) {
 }
 
 const SUBSTANTIAL = 15;
+const filler = new Set(
+  "that with this have what your them they then were from about would could should there their which when will into more also just like very some been only over make sure need want know think because".split(
+    " ",
+  ),
+);
+// True when the answer shares a meaningful word with the question: a mixed Hindi and English answer such as
+// "I will pick finding a spot" is on topic even if the model cannot tell.
+export function sharesTopic(answer, question) {
+  const asked = words(question);
+  return [...words(answer)].some((w) => !filler.has(w) && asked.has(w));
+}
 const gaveUp =
   /\b(don'?t know|do not know|no idea|no clue|can'?t answer|cannot answer|not sure how|never (done|worked|used|faced|seen)|haven'?t (done|worked|used|faced|seen)|pass|skip|move on|next question)\b/i;
 const chat =
@@ -108,9 +119,12 @@ export async function decideTurn(ai, session, answer, persona = {}) {
   const exchanges = session.exchanges || [];
   const talk = intentOf(answer, exchanges) === "talk";
   // An answer that ignores the question is pointed back to it once; after that it counts as the answer.
-  // "I don't know" is an honest answer, so it is never sent back to the question.
+  // "I don't know" is an honest answer, and anything that mentions the question's own subject is at least a start,
+  // so neither is sent back to the question. Only the first clearly unrelated reply is.
   const redirected =
-    exchanges.some((e) => e.redirect) || gaveUp.test(answer);
+    exchanges.some((e) => e.redirect) ||
+    gaveUp.test(answer) ||
+    sharesTopic(answer, session.currentQuestion.question);
   // The final answer and a company-written next question need no generated question.
   const closing = () =>
     persona.fixedNext && !last

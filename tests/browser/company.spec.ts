@@ -199,6 +199,24 @@ test("a reviewer sees a ranked list, evidence and flags, and records a human dec
       },
     }),
   );
+  await page.route("**/api/orgs/o1/activity", (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: "x",
+          roleId: "r1",
+          roleTitle: "Backend engineer",
+          name: "Anush",
+          status: "started",
+          at: Date.now() - 20 * 60000,
+          leftAt: Date.now() - 20 * 60000,
+          answered: 0,
+          questionCount: 3,
+          score: null,
+        },
+      ],
+    }),
+  );
   await page.route("**/api/roles/r1/open-link", (route) =>
     route.fulfill({
       json: {
@@ -224,6 +242,8 @@ test("a reviewer sees a ranked list, evidence and flags, and records a human dec
   await page.goto("/");
   // Company members land in their own workspace: no practice navigation.
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  // Anyone who stepped away shows up in the activity feed instead of looking like they are still answering.
+  await expect(page.getByText("left after 0 of 3 answers")).toBeVisible();
   await expect(page.getByRole("button", { name: "My interviews" })).toHaveCount(
     0,
   );

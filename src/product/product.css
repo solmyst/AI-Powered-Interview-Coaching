@@ -2997,3 +2997,10 @@ details p {
   .co-share { grid-template-columns: 1fr; }
   .header-org { display: none; }
 }
+.co-activity { margin: 0 0 20px; }
+.co-activity h2 { margin: 0 0 8px; font-size: 18px; }
+.co-activity ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.co-activity li { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--surface-soft); }
+.co-activity li:last-child { border-bottom: 0; }
+.co-activity li button { text-align: left; font-size: 14px; }
+.co-activity small { color: var(--muted); white-space: nowrap; }

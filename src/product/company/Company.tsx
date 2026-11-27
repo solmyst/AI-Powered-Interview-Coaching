@@ -49,7 +49,35 @@ export type CandidateRow = {
   terminated: boolean;
   decision: { status: string; note: string; by: string } | null;
   expires: number;
+  lastSeen: number;
+  leftAt: number;
 };
+type Activity = {
+  id: string;
+  roleId: string;
+  roleTitle: string;
+  name: string;
+  status: string;
+  at: number;
+  leftAt: number;
+  answered: number;
+  questionCount: number;
+  score: number | null;
+};
+const ago = (ms: number) => {
+  const seconds = Math.max(0, Math.round((Date.now() - ms) / 1000));
+  if (seconds < 90) return "just now";
+  if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)} h ago`;
+  return new Date(ms).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+  });
+};
+// "Answering now" needs a sign of life in the last few minutes; otherwise they left, on purpose or not.
+const stepped = (c: { status: string; lastSeen: number; leftAt: number }) =>
+  c.status === "started" &&
+  (c.leftAt > 0 || (c.lastSeen > 0 && Date.now() - c.lastSeen > 5 * 60000));
 type RoleDetail = {
   id: string;
   title: string;
@@ -426,6 +454,7 @@ function Overview({
           )}
         </section>
       )}
+      <ActivityFeed org={org} open={open} />
       <div className="co-roles">
         {roles?.map((role) => (
           <button
@@ -1088,8 +1117,14 @@ function Candidates({
                     <small>{c.email}</small>
                   </td>
                   <td>
-                    <span className={`co-chip ${c.status}`}>
-                      {statusLabel[c.status]}
+                    <span
+                      className={`co-chip ${stepped(c) ? "flag" : c.status}`}
+                    >
+                      {stepped(c)
+                        ? "Left"
+                        : c.status === "started"
+                          ? "Answering now"
+                          : statusLabel[c.status]}
                     </span>
                     {(c.status === "started" ||
                       (c.status === "completed" &&
@@ -1097,6 +1132,9 @@ function Candidates({
                       <small>
                         {c.status === "completed" ? "Ended early · " : ""}
                         {c.answered} of {c.questionCount} answered
+                        {c.status === "started" && c.lastSeen > 0
+                          ? ` · last active ${ago(c.lastSeen)}`
+                          : ""}
                       </small>
                     )}
                   </td>
@@ -1560,6 +1598,57 @@ function ShareLink({
           </p>
         )}
       </div>
+    </section>
+  );
+}
+
+// Who opened a link, who is answering, who left and who finished, newest first. Refreshes while open.
+function ActivityFeed({
+  org,
+  open,
+}: {
+  org: Org;
+  open: (roleId: string) => void;
+}) {
+  const [rows, setRows] = useState<Activity[] | null>(null);
+  useEffect(() => {
+    const load = () =>
+      void api<Activity[]>(`/orgs/${org.id}/activity`)
+        .then(setRows)
+        .catch(() => {});
+    load();
+    const timer = setInterval(load, 20000);
+    return () => clearInterval(timer);
+  }, [org.id]);
+  if (!rows?.length) return null;
+  const describe = (r: Activity) => {
+    if (r.status === "completed")
+      return r.answered < r.questionCount
+        ? `ended early after ${r.answered} of ${r.questionCount} answers`
+        : `finished the interview${r.score !== null ? ` · AI estimate ${r.score}` : ""}`;
+    if (r.status === "started")
+      return stepped({ status: r.status, lastSeen: r.at, leftAt: r.leftAt })
+        ? `left after ${r.answered} of ${r.questionCount} answers`
+        : `is answering · ${r.answered} of ${r.questionCount} done`;
+    if (r.status === "withdrawn") return "declined the notice";
+    if (r.status === "expired") return "never started; the link expired";
+    return "opened the sign-up link";
+  };
+  return (
+    <section className="panel co-activity" aria-label="Recent activity">
+      <h2>Recent activity</h2>
+      <ul>
+        {rows.map((r) => (
+          <li key={r.id}>
+            <button className="text-button" onClick={() => open(r.roleId)}>
+              <strong>{r.name}</strong> {describe(r)}
+            </button>
+            <small>
+              {r.roleTitle} · {ago(r.at)}
+            </small>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

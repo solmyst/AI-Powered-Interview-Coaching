@@ -918,3 +918,59 @@ test("an open link lets testers sign themselves up, within a cap, and the owner 
     "Uma",
   ]);
 });
+
+test("the company can tell a candidate who left from one who is answering, and sees recent activity", async () => {
+  const made = await call(`/orgs/${orgId}/roles`, {
+    method: "POST",
+    cookie: owner,
+    body: roleBody("Activity check"),
+  });
+  const sent = await call(`/roles/${made.body.id}/invites`, {
+    method: "POST",
+    cookie: owner,
+    body: { candidates: [{ name: "Leo", email: "leo@example.test" }] },
+  });
+  const opened = await call("/candidate/session", {
+    method: "POST",
+    body: { token: tokenOf(sent.body.invites[0].link) },
+  });
+  await call("/candidate/consent", {
+    method: "POST",
+    cookie: opened.cookie,
+    body: { accepted: true, version: opened.body.consentVersion },
+  });
+  await call("/candidate/interview", {
+    method: "POST",
+    cookie: opened.cookie,
+    body: {},
+  });
+  const row = async () =>
+    (await call(`/roles/${made.body.id}/candidates`, { cookie: owner })).body
+      .candidates[0];
+  const answering = await row();
+  assert.equal(answering.status, "started");
+  assert.ok(answering.lastSeen > 0);
+  assert.equal(answering.leftAt, 0);
+  await call("/candidate/leave", {
+    method: "POST",
+    cookie: opened.cookie,
+    body: {},
+  });
+  assert.ok((await row()).leftAt > 0);
+  const feed = await call(`/orgs/${orgId}/activity`, { cookie: owner });
+  const mine = feed.body.find((a) => a.name === "Leo");
+  assert.equal(mine.status, "started");
+  assert.ok(mine.leftAt > 0);
+  // Another company cannot read this feed.
+  assert.equal(
+    (await call(`/orgs/${orgId}/activity`, { cookie: other })).status,
+    404,
+  );
+  // Coming back clears the "left" mark.
+  await call("/candidate/interview", {
+    method: "POST",
+    cookie: opened.cookie,
+    body: {},
+  });
+  assert.equal((await row()).leftAt, 0);
+});

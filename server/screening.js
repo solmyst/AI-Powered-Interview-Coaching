@@ -612,7 +612,7 @@ export function registerScreening(
   function candidateRows(role) {
     return db
       .prepare(
-        "SELECT i.id, i.candidate_name AS name, i.candidate_email AS email, i.status, i.expires, i.decision, i.created, s.score, s.state, s.data, (SELECT COUNT(*) FROM integrity_events e WHERE e.invite_id=i.id AND e.reviewed_at IS NULL AND e.kind NOT IN ('reconnect','new_device')) AS unreviewedFlags, (SELECT COUNT(*) FROM integrity_events e WHERE e.invite_id=i.id AND e.kind='terminated') AS terminated FROM invites i LEFT JOIN screenings s ON s.invite_id=i.id WHERE i.role_id=?",
+        "SELECT i.id, i.candidate_name AS name, i.candidate_email AS email, i.status, i.expires, i.decision, i.created, i.last_seen AS lastSeen, i.left_at AS leftAt, s.score, s.state, s.data, (SELECT COUNT(*) FROM integrity_events e WHERE e.invite_id=i.id AND e.reviewed_at IS NULL AND e.kind NOT IN ('reconnect','new_device')) AS unreviewedFlags, (SELECT COUNT(*) FROM integrity_events e WHERE e.invite_id=i.id AND e.kind='terminated') AS terminated FROM invites i LEFT JOIN screenings s ON s.invite_id=i.id WHERE i.role_id=?",
       )
       .all(role.id)
       .map((r) => {
@@ -630,6 +630,8 @@ export function registerScreening(
           terminated: r.terminated > 0,
           answered: session?.turns.length || 0,
           questionCount: role.config.questionCount,
+          lastSeen: r.lastSeen,
+          leftAt: r.leftAt,
           unreviewedFlags: r.unreviewedFlags,
           decision: r.decision ? JSON.parse(r.decision) : null,
         };
@@ -792,6 +794,30 @@ export function registerScreening(
       .type("text/csv")
       .set("Content-Disposition", 'attachment; filename="candidates.csv"')
       .send(lines.join("\r\n"));
+  });
+
+  // What happened lately across a company's roles, newest first: who opened a link, who is answering, who left.
+  app.get("/api/orgs/:orgId/activity", auth, (req, res) => {
+    member(req.user, req.params.orgId);
+    const rows = db
+      .prepare(
+        "SELECT i.id, i.role_id AS roleId, r.title AS roleTitle, r.config, i.candidate_name AS name, i.status, i.created, i.last_seen AS lastSeen, i.left_at AS leftAt, s.score, s.state, json_array_length(s.data,'$.turns') AS answered FROM invites i JOIN roles r ON r.id=i.role_id LEFT JOIN screenings s ON s.invite_id=i.id WHERE r.org_id=? AND (i.status!='pending' OR i.via_open_link=1 OR i.last_seen>0) ORDER BY MAX(i.last_seen, 0) DESC, i.created DESC LIMIT 15",
+      )
+      .all(req.params.orgId);
+    res.json(
+      rows.map((r) => ({
+        id: r.id,
+        roleId: r.roleId,
+        roleTitle: r.roleTitle,
+        name: r.name,
+        status: status(r),
+        at: r.lastSeen || Date.parse(r.created),
+        leftAt: r.leftAt,
+        answered: r.answered || 0,
+        questionCount: JSON.parse(r.config).questionCount,
+        score: r.state === "complete" ? r.score : null,
+      })),
+    );
   });
 
   // ===== Open link: one shareable link per role =====
@@ -957,6 +983,13 @@ export function registerScreening(
         ),
       );
     req.candidate = invite;
+    // Throttled: one write every 20 seconds is enough to tell who is still there.
+    const now = Date.now();
+    if (now - invite.last_seen > 20000)
+      db.prepare("UPDATE invites SET last_seen=? WHERE id=?").run(
+        now,
+        invite.id,
+      );
     next();
   }
   function summary(invite) {
@@ -1111,9 +1144,20 @@ export function registerScreening(
   });
 
   // Create the screening, or resume it. Idempotent per invite.
+  // The candidate chose to step away (ended the call or closed the interview). The company sees "Left".
+  app.post("/api/candidate/leave", candidateAuth, (req, res) => {
+    db.prepare("UPDATE invites SET left_at=?, last_seen=? WHERE id=?").run(
+      Date.now(),
+      Date.now(),
+      req.candidate.id,
+    );
+    res.json({ ok: true });
+  });
+
   app.post("/api/candidate/interview", candidateAuth, async (req, res) =>
     locked(req.candidate.id, async () => {
       const invite = req.candidate;
+      db.prepare("UPDATE invites SET left_at=0 WHERE id=?").run(invite.id);
       if (!summary(invite).consented)
         fail(409, "Please read and accept the interview notice first.");
       const found = readScreening(invite.id);

@@ -84,5 +84,14 @@ export function openDatabase(path) {
       );
       db.pragma("user_version = 7");
     })();
+  // Version 8: when a candidate was last active, and when they stepped away on purpose, so the company can
+  // tell "answering now" from "left before finishing".
+  if (db.pragma("user_version", { simple: true }) < 8)
+    db.transaction(() => {
+      db.exec(
+        "ALTER TABLE invites ADD COLUMN last_seen INTEGER NOT NULL DEFAULT 0; ALTER TABLE invites ADD COLUMN left_at INTEGER NOT NULL DEFAULT 0;",
+      );
+      db.pragma("user_version = 8");
+    })();
   return db;
 }

@@ -2,7 +2,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { createApp, repeats, tidyQuestion } from "../server/app.js";
-import { answerOf, intentOf, tidyReply } from "../server/turn.js";
+import { answerOf, intentOf, sharesTopic, tidyReply } from "../server/turn.js";
 import { dimensions } from "../server/schemas.js";
 const origin = "http://localhost:5173";
 const evaluation = {
@@ -328,7 +328,10 @@ test("intent is decided by the server, not the model", () => {
     assert.equal(intentOf(said), intent, said);
   assert.equal(intentOf("what do you mean?", [{}, {}, {}]), "answer");
   assert.equal(tidyReply("Good instinct. Take your time."), "Take your time.");
-  assert.equal(tidyReply("That approach works. What would you check?"), "What would you check?");
+  assert.equal(
+    tidyReply("That approach works. What would you check?"),
+    "What would you check?",
+  );
 });
 
 test("an answer that ignores the question is pointed back to it once", async () => {
@@ -365,4 +368,24 @@ test("an answer that ignores the question is pointed back to it once", async () 
   const second = await decideTurn(ai, session, said);
   assert.equal(second.answered, true);
   assert.equal(answerOf(session.exchanges, "final words"), "final words");
+});
+
+test("an answer that mentions the question's own subject is never sent back as off-topic", () => {
+  const question =
+    "Park+ helps drivers find, pay for and leave a parking spot. Pick one step in that journey and tell me how you would find out where users get stuck.";
+  // Mixed Hindi and English, hesitant: still a start at an answer.
+  assert.equal(
+    sharesTopic(
+      "Okay, so I will pick like finding a spot. मुझे लगता है कि एक step देखना",
+      question,
+    ),
+    true,
+  );
+  assert.equal(
+    sharesTopic(
+      "I went hiking last weekend with my friends and we cooked food outside.",
+      question,
+    ),
+    false,
+  );
 });

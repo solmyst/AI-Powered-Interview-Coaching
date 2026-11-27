@@ -130,7 +130,13 @@ export default function CandidateApp() {
             setStage("submitted");
           } else setSession(value as RoomSession);
         }}
-        back={() => setStage("paused")}
+        back={() => {
+          // Tell the company the candidate stepped away, so it does not look like they are still answering.
+          void api("/candidate/leave", { method: "POST", body: "{}" }).catch(
+            () => {},
+          );
+          setStage("paused");
+        }}
       />
     );
 
@@ -279,6 +285,13 @@ export default function CandidateApp() {
       {stage === "paused" && summary && (
         <section className="cand-card">
           <h1>Your interview is saved</h1>
+          <p>
+            {summary.company} can see that you stepped away
+            {session?.turns.length
+              ? ` after ${session.turns.length} answer${session.turns.length === 1 ? "" : "s"}`
+              : " before answering"}
+            .
+          </p>
           <p>
             You can reopen your invite link before{" "}
             {new Date(summary.expires).toLocaleDateString(undefined, {
