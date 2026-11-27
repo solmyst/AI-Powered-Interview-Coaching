@@ -29,23 +29,29 @@ const ai = {
         },
         usage,
       };
-    if (schema.shape.scores)
+    if (schema.shape.points)
       return {
         value: {
-          scores: Object.fromEntries(
-            Object.keys(schema.shape.scores.shape).map((k, i) => [
-              k,
-              60 + i * 10,
-            ]),
-          ),
+          points: ["Refund first", "Find the cause", "Prevent a repeat"],
+        },
+        usage,
+      };
+    if (schema.shape.levels) {
+      const keys = Object.keys(schema.shape.levels.shape);
+      return {
+        value: {
+          relevant: true,
+          substantive: true,
+          levels: Object.fromEntries(keys.map((k, i) => [k, i === 0 ? 3 : 2])),
+          // Every criterion above level 1 needs a quote the candidate really said.
           evidence: [
-            {
-              competency: Object.keys(schema.shape.scores.shape)[0],
+            ...keys.map((k) => ({
+              competency: k,
               quote: "cache hot reads with a TTL",
               supports: "strength",
-            },
+            })),
             {
-              competency: Object.keys(schema.shape.scores.shape)[0],
+              competency: keys[0],
               quote: "I rewrote the whole kernel myself",
               supports: "strength",
             },
@@ -54,6 +60,7 @@ const ai = {
         },
         usage,
       };
+    }
     if (schema.shape.suggestedFollowUps)
       return {
         value: {
@@ -375,18 +382,31 @@ test("candidate flow: consent first, candidates never see scores, report verifie
     cookie: owner,
   });
   const { turns, report: summary } = report.body.screening;
-  // The invented quote is dropped; the real one stays.
-  assert.equal(turns[0].evaluation.evidence.length, 1);
-  assert.equal(
-    turns[0].evaluation.evidence[0].quote,
-    "cache hot reads with a TTL",
+  // The invented quote is dropped (once per judgement); the real one stays for each criterion.
+  assert.ok(
+    turns[0].evaluation.evidence.every(
+      (e) => e.quote === "cache hot reads with a TTL",
+    ),
   );
-  assert.equal(turns[0].evaluation.evidenceDropped, 1);
-  // Weighted by the rubric, computed by the server: scores 60,70,80,90 with weights 3,3,2,2.
+  assert.equal(turns[0].evaluation.evidence.length, 4);
+  assert.equal(turns[0].evaluation.evidenceDropped, 3);
+  // Anchored levels (3,2,2,2) become scores 75,45,45,45. Questions never answered count as 0, so ending
+  // early lowers the overall; the average of answered questions is kept separately.
+  assert.deepEqual(turns[0].evaluation.levels, {
+    ...turns[0].evaluation.levels,
+  });
+  assert.deepEqual(summary.coverage, {
+    answered: summary.coverage.total,
+    total: summary.coverage.total,
+    noContent: 0,
+  });
+  assert.equal(summary.competencyScores.problem_solving, 75);
   assert.equal(
     summary.overall,
-    Math.round((60 * 3 + 70 * 3 + 80 * 2 + 90 * 2) / 10),
+    Math.round((75 * 3 + 45 * 3 + 45 * 2 + 45 * 2) / 10),
   );
+  assert.equal(summary.answeredAverage, summary.overall);
+  assert.equal(summary.band, "mixed");
   assert.equal(report.body.invite.status, "completed");
 });
 

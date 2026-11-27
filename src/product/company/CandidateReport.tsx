@@ -3,6 +3,7 @@ import { ArrowLeft, Link2, Trash2 } from "lucide-react";
 import { api } from "../api";
 import type { RubricItem } from "../types";
 import { AI_NOTE, Bar, type Org } from "./Company";
+import { bandLabel, type Band } from "./band";
 
 type Event = {
   id: number;
@@ -56,6 +57,10 @@ type ReportBody = {
   competencyScores: Record<string, number>;
   overall: number;
   attention: number | null;
+  answeredAverage?: number;
+  band?: Band;
+  coverage?: { answered: number; total: number; noContent: number };
+  confidence?: "high" | "low";
 };
 type Turn = {
   question: { question: string; focus: string };
@@ -66,6 +71,8 @@ type Turn = {
     evidence: Evidence[];
     rationale: string;
     evidenceDropped?: number;
+    gate?: string | null;
+    confidence?: { samples: number; spread: number; unsupported: string[] };
     followUpForHuman?: string;
   } | null;
   attention: { eyeContact: number; inFrame: number } | null;
@@ -198,7 +205,9 @@ export function CandidateReport({
             aria-label={`AI estimate ${report.overall} out of 100`}
           >
             <b>{report.overall}</b>
-            <span>AI estimate</span>
+            <span>
+              AI estimate{report.band ? ` · ${bandLabel[report.band]}` : ""}
+            </span>
           </div>
         )}
         {report?.attention != null && (
@@ -405,6 +414,21 @@ export function CandidateReport({
                   </div>
                 ))}
               </div>
+              {turn.evaluation.gate && (
+                <p className="notice" role="note">
+                  No credit for this answer: {turn.evaluation.gate}
+                </p>
+              )}
+              {!turn.evaluation.gate &&
+                ((turn.evaluation.confidence?.spread ?? 0) >= 2 ||
+                  (turn.evaluation.confidence?.unsupported.length ?? 0) >
+                    0) && (
+                  <p className="notice" role="note">
+                    Lower confidence: the AI’s independent judgements disagreed
+                    or some scores had no supporting quote, so they were
+                    reduced. Read the answer before relying on them.
+                  </p>
+                )}
               {turn.evaluation.evidence.length === 0 &&
                 (turn.evaluation.evidenceDropped ?? 0) > 0 && (
                   <p className="notice" role="note">
@@ -610,10 +634,65 @@ function Scorecard({
         <strong>not part of the estimate</strong>, and they depend on camera
         position, lighting, accent, language and connection.
       </p>
+      {report?.band === "insufficient" && (
+        <p className="notice" role="note">
+          <strong>Not enough to judge.</strong> Only{" "}
+          {report.coverage?.answered ?? 0} of {report.coverage?.total ?? 0}{" "}
+          questions were answered
+          {report.coverage?.noContent
+            ? `, and ${report.coverage.noContent} had no real content`
+            : ""}
+          . Treat this as not assessed rather than as a low score.
+        </p>
+      )}
+      {report?.confidence === "low" && (
+        <p className="notice" role="note">
+          Lower confidence: for at least one answer the AI’s judgements
+          disagreed or some scores lacked a supporting quote.
+        </p>
+      )}
+      <details className="co-method">
+        <summary>How the estimate is calculated</summary>
+        <ol>
+          <li>
+            Answers that add nothing beyond the question (restating it, “I don’t
+            know”, filler, off topic) get <strong>0</strong> without being
+            judged.
+          </li>
+          <li>
+            Otherwise the AI judges each criterion three times on a 0 to 4 scale
+            (0 none, 1 generic, 2 partly specific, 3 specific and reasoned, 4
+            also weighs trade-offs or measures success), and the middle result
+            is used. A scale level maps to 0, 20, 45, 75 or 95.
+          </li>
+          <li>
+            Any credit of level 2 or more needs a quote the candidate really
+            said; otherwise it is capped at level 1. Communication can never
+            score more than one level above the best content criterion.
+          </li>
+          <li>
+            The overall is the weighted average over <strong>all</strong>{" "}
+            questions. A question not answered counts as 0, so leaving early
+            cannot raise the score
+            {report?.answeredAverage !== undefined
+              ? ` (the average of answered questions alone is ${report.answeredAverage}).`
+              : "."}
+          </li>
+          <li>
+            Eye contact, looking away, filler words and pace are never part of
+            the estimate.
+          </li>
+        </ol>
+      </details>
       <div className="co-stats">
         <div>
           <b>{report ? report.overall : "—"}</b>
-          <span>AI estimate (content)</span>
+          <span>
+            AI estimate (content)
+            {report?.coverage
+              ? ` · ${report.coverage.answered} of ${report.coverage.total} answered`
+              : ""}
+          </span>
         </div>
         <div>
           <b>{eyeContact !== null ? `${eyeContact}%` : "—"}</b>

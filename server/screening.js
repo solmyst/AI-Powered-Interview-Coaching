@@ -4,11 +4,11 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { ServiceError } from "./ai.js";
 import { answerOf, decideTurn, tidyQuestion } from "./turn.js";
+import { aggregate, evaluate } from "./scoring.js";
 import {
   answerSchema,
   questionSchema,
   roleConfigSchema,
-  screeningEvaluationSchema,
   screeningReportSchema,
 } from "./schemas.js";
 
@@ -147,13 +147,6 @@ export function deliverySummary(turns) {
     ),
   };
 }
-const normalize = (text) =>
-  text
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
 // Candidates see questions and their own words, never scores, rubric or reports.
 export const candidateView = (session) => ({
   id: session.id,
@@ -264,32 +257,19 @@ export function registerScreening(
       const current = readScreening(inviteId);
       const turn = current?.session.turns[index];
       if (!turn || turn.evaluation) return;
-      const generated = await ai.generate(
-        screeningEvaluationSchema(config.rubric),
-        "Score the candidate's answer against each rubric competency (0-100), quote evidence verbatim from the answer for strengths and concerns, and add a short rationale. If the answer is empty or evasive, score low and say so; do not invent evidence.",
-        {
-          company,
-          role: config.title,
-          rubric: config.rubric,
-          question: turn.question,
-          conversationBeforeAnswer: turn.exchanges || [],
-          answer: turn.answer,
-        },
-        { mode: "screening" },
-      );
-      // Quotes the model invented are dropped; only text the candidate really said reaches the report.
-      const said = normalize(turn.answer);
-      const verified = generated.value.evidence.filter((e) =>
-        said.includes(normalize(e.quote)),
-      );
+      // Anchored levels, evidence rules and a median of independent judgements; see scoring.js.
+      const generated = await evaluate(ai, {
+        company,
+        role: config.title,
+        rubric: config.rubric,
+        question: turn.question,
+        exchanges: turn.exchanges || [],
+        answer: turn.answer,
+      });
       const fresh = readScreening(inviteId);
       if (!fresh?.session.turns[index] || fresh.session.turns[index].evaluation)
         return;
-      fresh.session.turns[index].evaluation = {
-        ...generated.value,
-        evidence: verified,
-        evidenceDropped: generated.value.evidence.length - verified.length,
-      };
+      fresh.session.turns[index].evaluation = generated.value;
       db.transaction(() => {
         saveScreening(inviteId, fresh.session);
         const org = db
@@ -320,11 +300,13 @@ export function registerScreening(
     const { rubric } = invite.config;
     const generated = await ai.generate(
       screeningReportSchema,
-      "Write a short, evidence-based screening summary for the hiring team: strengths, concerns, and follow-up questions for a human interviewer. Use only what the candidate said; never invent performance and never recommend hiring or rejecting.",
+      "Write a short, evidence-based screening summary for the hiring team: strengths, concerns, and follow-up questions for a human interviewer. Use only what the candidate said; never invent performance and never recommend hiring or rejecting. If answered is less than questionCount, or an answer scored zero for having no substance, say so plainly and do not describe the candidate as strong.",
       {
         company: invite.org_name,
         role: invite.config.title,
         rubric,
+        answered: session.turns.length,
+        questionCount: session.setup.questionCount,
         turns: session.turns.map((t) => ({
           question: t.question.question,
           answer: t.answer.slice(0, 1500),
@@ -334,26 +316,15 @@ export function registerScreening(
       },
       { mode: "screening" },
     );
-    const competencyScores = Object.fromEntries(
-      rubric.map((r) => [
-        r.key,
-        Math.round(
-          session.turns.reduce(
-            (n, t) => n + (t.evaluation.scores[r.key] ?? 0),
-            0,
-          ) / session.turns.length,
-        ),
-      ]),
+    const result = aggregate(
+      rubric,
+      session.turns,
+      session.setup.questionCount,
     );
-    const weights = rubric.reduce((n, r) => n + r.weight, 0);
-    const overall = Math.round(
-      rubric.reduce((n, r) => n + competencyScores[r.key] * r.weight, 0) /
-        weights,
-    );
+    const { overall } = result;
     session.report = {
       ...generated.value,
-      competencyScores,
-      overall,
+      ...result,
       attention: attentionScore(session.turns),
       answered: session.turns.length,
       questionCount: session.setup.questionCount,
@@ -725,6 +696,7 @@ export function registerScreening(
           expires: r.expires,
           score: r.state === "complete" ? r.score : null,
           competencyScores: session?.report?.competencyScores || null,
+          band: session?.report?.band || null,
           attention: session ? attentionScore(session.turns) : null,
           delivery: session ? deliverySummary(session.turns) : null,
           terminated: r.terminated > 0,

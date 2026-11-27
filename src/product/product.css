@@ -3216,3 +3216,6 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
   .cand-actions > .primary, .cand-actions > .secondary { width: 100%; }
   .co-events .co-actions button { padding-inline: 10px; white-space: nowrap; }
 }
+.co-method { margin: 0 0 16px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 14px; }
+.co-method summary { cursor: pointer; font-weight: 600; }
+.co-method ol { display: grid; gap: 6px; margin: 10px 0 2px; padding-left: 20px; color: var(--muted); }

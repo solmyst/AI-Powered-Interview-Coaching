@@ -79,6 +79,32 @@ export const screeningEvaluationSchema = (rubric) =>
     rationale: z.string().trim().min(1).max(1200),
     followUpForHuman: z.string().trim().max(300).optional(),
   });
+// What the judge returns for one answer: ordinal levels (0-4, anchored in the prompt), not free 0-100 scores.
+export const screeningJudgeSchema = (rubric) =>
+  z.object({
+    relevant: z.boolean(),
+    substantive: z.boolean(),
+    levels: z.object(
+      Object.fromEntries(
+        rubric.map((r) => [r.key, z.number().int().min(0).max(4)]),
+      ),
+    ),
+    evidence: z
+      .array(
+        z.object({
+          competency: z.enum(rubric.map((r) => r.key)),
+          quote: z.string().trim().min(8).max(300),
+          supports: z.enum(["strength", "concern"]),
+        }),
+      )
+      .max(12),
+    rationale: z.string().trim().min(1).max(1200),
+    followUpForHuman: z.string().trim().max(300).optional(),
+  });
+// A short outline of what a strong answer to a question contains, so every candidate is judged against the same one.
+export const referenceSchema = z.object({
+  points: z.array(z.string().trim().min(3).max(200)).min(3).max(5),
+});
 export const screeningReportSchema = z.object({
   summary: z.string().trim().min(1).max(1500),
   strengths: z.array(z.string().trim().min(1).max(400)).min(1).max(4),

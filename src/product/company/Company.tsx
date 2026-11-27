@@ -16,6 +16,7 @@ import { api } from "../api";
 import choices from "../../../shared/interview-options.json";
 import type { RoleConfig, RubricItem } from "../types";
 import { CandidateReport } from "./CandidateReport";
+import { bandLabel, type Band } from "./band";
 
 export type Org = {
   id: string;
@@ -43,6 +44,7 @@ export type CandidateRow = {
   status: string;
   score: number | null;
   competencyScores: Record<string, number> | null;
+  band: Band | null;
   answered: number;
   questionCount: number;
   unreviewedFlags: number;
@@ -1165,7 +1167,10 @@ function Candidates({
                   </td>
                   <td>
                     {c.score !== null ? (
-                      <b className="co-score">{c.score}</b>
+                      <>
+                        <b className="co-score">{c.score}</b>
+                        {c.band && <small>{bandLabel[c.band]}</small>}
+                      </>
                     ) : (
                       "—"
                     )}
