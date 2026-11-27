@@ -65,6 +65,7 @@ type Turn = {
     scores: Record<string, number>;
     evidence: Evidence[];
     rationale: string;
+    evidenceDropped?: number;
     followUpForHuman?: string;
   } | null;
   attention: { eyeContact: number; inFrame: number } | null;
@@ -404,6 +405,14 @@ export function CandidateReport({
                   </div>
                 ))}
               </div>
+              {turn.evaluation.evidence.length === 0 &&
+                (turn.evaluation.evidenceDropped ?? 0) > 0 && (
+                  <p className="notice" role="note">
+                    The AI’s quotes for this answer could not be matched to what
+                    the candidate said, so they were discarded. Read the answer
+                    yourself before relying on these scores.
+                  </p>
+                )}
               <p>{turn.evaluation.rationale}</p>
               {turn.evaluation.evidence.length > 0 && (
                 <ul className="co-evidence">
@@ -574,9 +583,16 @@ function Scorecard({
       return acc;
     }, {}),
   );
+  // Weighted like the overall estimate, so the answers' scores average to it.
+  const weights = rubric.reduce((n, r) => n + r.weight, 0);
   const answerScore = (t: Turn) =>
     t.evaluation
-      ? average(rubric.map((r) => t.evaluation!.scores[r.key] ?? 0))
+      ? Math.round(
+          rubric.reduce(
+            (n, r) => n + (t.evaluation!.scores[r.key] ?? 0) * r.weight,
+            0,
+          ) / weights,
+        )
       : null;
   const hasCamera = summary.cameraAnswers > 0;
   // Averaged here so it shows while the interview is still in progress, before the final report exists.
@@ -669,12 +685,20 @@ function Scorecard({
           .
         </p>
       )}
-      <div className="co-table-wrap">
+      <div
+        className="co-table-wrap"
+        role="region"
+        aria-label="Answer score comparison, scroll horizontally for more columns"
+        tabIndex={0}
+      >
         <table className="co-table">
+          <caption className="co-table-caption">
+            Scroll for all criteria →
+          </caption>
           <thead>
             <tr>
               <th>Answer</th>
-              <th>AI score</th>
+              <th>AI score (weighted)</th>
               {rubric.map((r) => (
                 <th key={r.key}>{r.label}</th>
               ))}

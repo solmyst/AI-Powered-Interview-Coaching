@@ -1092,8 +1092,16 @@ function Candidates({
           <p>Try another filter or search.</p>
         </section>
       ) : (
-        <div className="co-table-wrap">
+        <div
+          className="co-table-wrap"
+          role="region"
+          aria-label="Candidate comparison, scroll horizontally for more columns"
+          tabIndex={0}
+        >
           <table className="co-table">
+            <caption className="co-table-caption">
+              Scroll for all criteria →
+            </caption>
             <thead>
               <tr>
                 <th>#</th>

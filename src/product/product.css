@@ -3004,3 +3004,138 @@ details p {
 .co-activity li:last-child { border-bottom: 0; }
 .co-activity li button { text-align: left; font-size: 14px; }
 .co-activity small { color: var(--muted); white-space: nowrap; }
+
+/* Hiring UI: keep evidence readable and comparison controls usable at every width. */
+.co-main .room-heading { gap: 20px; flex-wrap: wrap; }
+.co-main .room-heading > div:first-child { flex: 1 1 240px; min-width: 0; }
+.co-main h1, .co-main h2, .co-org, .cand-card h1 { overflow-wrap: anywhere; }
+.co-main .room-heading h1 { font-size: clamp(28px, 3vw, 40px); margin-block: 10px; }
+.co-main .panel > h2 { margin-bottom: 14px; font-size: clamp(22px, 2.4vw, 28px); }
+.co-main .panel > p { max-width: 78ch; }
+.co-main .panel > p + p { margin-top: 12px; }
+.co-main .two-col { gap: 28px; }
+.co-main .two-col h3 { margin-top: 8px; }
+.co-main .notice { line-height: 1.65; font-size: 13px; }
+.co-main .co-actions { row-gap: 10px; }
+.co-main .co-actions .text-button { padding-inline: 8px; min-height: 44px; }
+.co-side { max-height: calc(100dvh - 32px); overflow-y: auto; }
+.co-side button { min-height: 44px; }
+.co-org { color: var(--ink); }
+.co-search { min-height: 44px; max-width: 100%; }
+.co-search input { min-width: 0; width: 220px; }
+.co-search:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
+.co-tabs { gap: 8px; }
+.co-tabs button { display: inline-flex; align-items: center; gap: 6px; min-height: 42px; }
+.co-tabs button small { display: inline; margin: 0; font-size: 12px; }
+.co-sharebox { align-items: flex-start; }
+.co-sharebox code { white-space: normal; overflow-wrap: anywhere; align-self: center; line-height: 1.65; }
+.co-sharebox .primary { flex-shrink: 0; }
+.co-share > .co-actions { gap: 14px; }
+.co-table-wrap { max-width: 100%; position: relative; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: var(--accent) var(--surface-soft); }
+.co-table-caption { caption-side: top; padding: 12px 16px; text-align: left; font-size: 12px; line-height: 1.5; color: var(--muted); background: var(--surface); border-bottom: 1px solid var(--line); }
+.co-table th { background: var(--surface-soft); padding-block: 14px; }
+.co-table td { padding-block: 18px; }
+.co-table td:nth-child(2) { min-width: 180px; }
+.co-table td small { line-height: 1.6; margin-top: 4px; }
+.co-table tbody tr:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.co-table tbody tr:focus-visible td { background: var(--surface-tint); }
+.co-score { font-size: 20px; font-weight: 600; }
+.co-scorecard { border-top: 3px solid var(--accent); }
+.co-scorecard > .co-stats { margin-top: 22px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.co-scorecard .co-stats > div { padding: 18px; align-content: start; gap: 10px; min-width: 0; }
+.co-scorecard .co-stats > div:first-child { background: var(--ink); color: var(--paper); }
+.co-scorecard .co-stats > div:first-child span { color: var(--paper); }
+.co-scorecard .co-stats b { font-size: 30px; letter-spacing: -1px; }
+.co-scorecard .co-stats span { line-height: 1.65; }
+.co-scorecard > p { line-height: 1.75; }
+.co-scorecard > .co-table-wrap { margin-top: 20px; }
+.co-scorecard .co-table td:nth-child(2) { min-width: 90px; }
+.co-scorecard .co-table tbody tr { cursor: default; }
+.co-scorecard .co-table tbody tr:hover { background: transparent; }
+.co-table-caption { font-weight: 500; }
+.co-main .co-sharebox + p { line-height: 1.8; }
+.co-events li { flex-wrap: wrap; padding: 16px; }
+.co-events li > span:first-child { flex: 1 1 180px; }
+.co-events .co-actions { margin-left: auto; }
+.co-turn > h3 { font-size: 20px; line-height: 1.5; margin-top: 10px; }
+.co-turn blockquote { margin-block: 20px; font-size: 16px; line-height: 1.8; overflow-wrap: anywhere; }
+.co-chat p { line-height: 1.7; overflow-wrap: anywhere; }
+.co-evidence li { line-height: 1.75; border: 1px solid var(--line); }
+.co-evidence li b { font-size: 13px; margin-bottom: 6px; }
+.co-signals { line-height: 1.8; }
+.co-decision { border-left: 3px solid var(--accent); }
+.co-decision .co-actions { gap: 10px; }
+.co-decision input { width: 100%; }
+.co-danger { border-color: var(--line); }
+.co-activity li { flex-wrap: wrap; }
+.co-roles { grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); }
+.cand-card { overflow-wrap: anywhere; }
+.cand-card .check { padding-block: 8px; min-height: 44px; }
+.cand-card .check input { flex-shrink: 0; width: 18px; height: 18px; }
+@media (max-width: 1100px) {
+  .co-scorecard > .co-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .co-shell { gap: 22px; }
+  .co-side { min-width: 0; max-width: 100%; max-height: none; padding: 8px; scrollbar-width: thin; }
+  .co-side button { max-width: 220px; }
+}
+@media (max-width: 600px) {
+  .co-shell { padding: 16px 16px 40px; }
+  .co-main .room-heading { margin-bottom: 24px; gap: 14px; }
+  .co-main .room-heading > div:first-child { flex-basis: 100%; }
+  .co-main .room-heading > .co-actions { width: 100%; }
+  .co-main .room-heading > .co-actions > button { flex: 1 1 auto; }
+  .co-main .panel { padding: 20px; }
+  .co-sharebox { flex-direction: column; gap: 12px; }
+  .co-sharebox code { width: 100%; font-size: 12px; }
+  .co-sharebox .primary { width: 100%; }
+  .co-main > .co-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .co-stats > div { min-width: 0; padding: 14px; }
+  .co-scorecard > .co-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .co-scorecard .co-stats > div { padding: 14px; }
+  .co-scorecard .co-stats b { font-size: 26px; }
+  .co-toolbar { gap: 16px; }
+  .co-search { width: 100%; border-radius: 8px; }
+  .co-search input { width: 100%; min-height: 44px; }
+  .co-tabs { width: 100%; flex-wrap: nowrap; overflow-x: auto; padding: 3px 2px 8px; }
+  .co-tabs button { flex-shrink: 0; }
+  .co-table td:nth-child(2), .co-table th:nth-child(2) { position: sticky; left: 0; z-index: 1; background: var(--surface); box-shadow: 1px 0 var(--line); }
+  .co-table th:nth-child(2) { background: var(--surface-soft); }
+  .co-table tbody tr:hover td:nth-child(2), .co-table tbody tr:focus-visible td:nth-child(2) { background: var(--surface-tint); }
+  .co-scorecard .co-table td:nth-child(2), .co-scorecard .co-table th:nth-child(2) { position: static; box-shadow: none; }
+  .co-scorecard .co-table td:first-child, .co-scorecard .co-table th:first-child { position: sticky; left: 0; background: var(--surface); }
+  .co-table th, .co-table td { padding-inline: 12px; }
+  .co-events .co-actions { width: 100%; }
+  .co-events .co-actions button { flex: 1; }
+  .co-chat p { max-width: 95%; }
+  .co-main .co-decision > .co-actions { width: 100%; margin-top: 8px; }
+  .co-decision .co-actions button { flex: 1; }
+  .header-tools { gap: 10px; }
+  .header-tools .icon-button { min-width: 44px; min-height: 44px; }
+}
+
+/* Report reading rhythm and small-screen form/feedback resilience. */
+.report-overview > div:last-child { min-width: 0; }
+.report-overview p { max-width: 76ch; line-height: 1.8; }
+.answer-review summary { line-height: 1.6; padding-block: 6px; }
+.review-content > p, .review-content blockquote, .feedback-list li { overflow-wrap: anywhere; }
+.review-content > h3 { margin-top: 24px; }
+.review-content > p { line-height: 1.85; }
+.study-row > div { min-width: 0; }
+.practice-prompt { line-height: 1.75; }
+.panel details > summary { min-height: 44px; display: list-item; align-content: center; cursor: pointer; }
+.panel details[open] > summary { margin-bottom: 12px; }
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
+.notice { overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .report-overview { gap: 24px; }
+  .scores-grid { gap: 22px 16px; }
+  .score-label { gap: 8px; }
+  .score-label span { overflow-wrap: anywhere; }
+  .answer-review summary { font-size: 16px; }
+  .study-row { gap: 12px; }
+  .study-row > span { flex-shrink: 0; }
+  .cand-actions > .primary, .cand-actions > .secondary { width: 100%; }
+  .co-events .co-actions button { padding-inline: 10px; white-space: nowrap; }
+}
