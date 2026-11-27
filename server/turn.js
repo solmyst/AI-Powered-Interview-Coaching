@@ -19,7 +19,7 @@ export const tidyReply = (reply) =>
   reply
     .replace(stray, "")
     .replace(
-      /^(?:(?:good|great|nice|excellent|exactly|correct|right|solid|sure)\b[^.!?\n]*[.!]\s*|(?:that'?s|that is|you'?re|you are) (?:a |an |on the |)?(?:good|great|reasonable|solid|right|correct|nice|excellent)[^.!?\n]*[.!]\s*)+/i,
+      /^(?:(?:good|great|nice|excellent|exactly|correct|right|solid|sure)\b[^.!?\n]*[.!]\s*|(?:that'?s|that is|you'?re|you are) (?:a |an |on the |)?(?:good|great|reasonable|solid|right|correct|nice|excellent)[^.!?\n]*[.!]\s*|(?:that|this|your) (?:approach |idea |answer |)(?:works|could work|would work|makes sense|is one way)[^.!?\n]*[.!]\s*)+/i,
       "",
     )
     .trim();

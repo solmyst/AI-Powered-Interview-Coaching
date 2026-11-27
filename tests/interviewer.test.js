@@ -328,6 +328,7 @@ test("intent is decided by the server, not the model", () => {
     assert.equal(intentOf(said), intent, said);
   assert.equal(intentOf("what do you mean?", [{}, {}, {}]), "answer");
   assert.equal(tidyReply("Good instinct. Take your time."), "Take your time.");
+  assert.equal(tidyReply("That approach works. What would you check?"), "What would you check?");
 });
 
 test("an answer that ignores the question is pointed back to it once", async () => {

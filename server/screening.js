@@ -817,7 +817,9 @@ export function registerScreening(
       noteSent: Boolean(invite.candidate_note),
       ended: Boolean(
         db
-          .prepare("SELECT 1 FROM integrity_events WHERE invite_id=? AND kind='terminated'")
+          .prepare(
+            "SELECT 1 FROM integrity_events WHERE invite_id=? AND kind='terminated'",
+          )
           .get(invite.id),
       ),
     };
@@ -831,10 +833,17 @@ export function registerScreening(
     readScreening(inviteId)?.session.turns.length ?? 0;
 
   app.post("/api/candidate/session", authLimit, (req, res) => {
-    const { token } = z
+    const parsed = z
       .object({ token: z.string().regex(/^[a-f0-9]{64}$/) })
       .strict()
-      .parse(req.body);
+      .safeParse(req.body);
+    // A cut-off or mistyped link reaches here; tell the candidate that, not a validation error.
+    if (!parsed.success)
+      fail(
+        404,
+        "This link looks incomplete. Open the full link from your invitation, or ask the company for a new one.",
+      );
+    const { token } = parsed.data;
     const row = db
       .prepare(
         "SELECT i.*, r.org_id, r.config, r.status AS role_status, o.name AS org_name, o.retention_days, o.contact_email FROM invites i JOIN roles r ON r.id=i.role_id JOIN orgs o ON o.id=r.org_id WHERE i.token_hash=?",
