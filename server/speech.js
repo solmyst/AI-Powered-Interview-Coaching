@@ -4,7 +4,7 @@ const DEFAULT_MODEL = "bulbul:v4-flash";
 export function createSpeech(env = process.env, { fetchImpl = fetch } = {}) {
   const apiKey = env.SARVAM_API_KEY?.trim();
   const model = env.SARVAM_MODEL?.trim() || DEFAULT_MODEL;
-  const voiceId = env.SARVAM_VOICE?.trim() || "sophia_en_conversational";
+  const voiceId = env.SARVAM_VOICE?.trim() || "aarti_hi_customer";
   const ready = Boolean(apiKey && /^[A-Za-z0-9_-]{4,80}$/.test(voiceId));
 
   return {
