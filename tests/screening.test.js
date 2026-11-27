@@ -7,7 +7,7 @@ import options from "../shared/interview-options.json" with { type: "json" };
 const origin = "http://localhost:5173";
 const answerText =
   "I would cache hot reads with a TTL and invalidate the key on every write.";
-let server, base, db;
+let server, base, db, sync;
 
 const ai = {
   provider: "test-double",
@@ -94,7 +94,8 @@ before(async () => {
       DATABASE_PATH: ":memory:",
       APP_ORIGIN: origin,
       UNLIMITED_EMAILS: "owner@example.test",
-      SCREENING_EMAILS: "other-owner@example.test",
+      SCREENING_EMAILS:
+        "other-owner@example.test,unregistered-listed@example.test",
       CANDIDATE_SPEECH_LIMIT: "2",
     },
     ai,
@@ -102,6 +103,7 @@ before(async () => {
     speech,
   });
   db = result.db;
+  sync = result.syncApprovals;
   server = result.app.listen(0, "127.0.0.1");
   await new Promise((r) => server.once("listening", r));
   base = `http://127.0.0.1:${server.address().port}`;
@@ -134,6 +136,8 @@ async function signUp(email) {
     method: "POST",
     body: { name: "Person", email, password: "long-test-password" },
   });
+  // Approvals are pinned at startup in production; the sync stands in for the operator's restart.
+  sync();
   return res.cookie;
 }
 const roleBody = (title = "Backend engineer") => ({
@@ -787,4 +791,70 @@ test("company questions, résumé, interview window, eye contact and strict-proc
   const row = list.body.candidates.find((c) => c.email === "now@example.test");
   assert.equal(row.terminated, true);
   assert.equal(row.attention, 75);
+});
+
+test("a candidate session cannot use the API after the interview window closes", async () => {
+  const made = await call(`/orgs/${orgId}/roles`, {
+    method: "POST",
+    cookie: owner,
+    body: roleBody("Window check"),
+  });
+  const sent = await call(`/roles/${made.body.id}/invites`, {
+    method: "POST",
+    cookie: owner,
+    body: { candidates: [{ name: "Late", email: "late@example.test" }] },
+  });
+  const opened = await call("/candidate/session", {
+    method: "POST",
+    body: { token: tokenOf(sent.body.invites[0].link) },
+  });
+  await call("/candidate/consent", {
+    method: "POST",
+    cookie: opened.cookie,
+    body: { accepted: true, version: opened.body.consentVersion },
+  });
+  await call("/candidate/interview", {
+    method: "POST",
+    cookie: opened.cookie,
+    body: {},
+  });
+  const speak = () =>
+    call("/speech", {
+      method: "POST",
+      cookie: opened.cookie,
+      body: { text: "Hello" },
+      raw: true,
+    });
+  assert.equal((await speak()).status, 200);
+  // Window closed an hour ago (past the 15 minute grace): the session cookie is still valid but must not work.
+  db.prepare("UPDATE invites SET expires=? WHERE id=?").run(
+    Date.now() - 3600000,
+    sent.body.invites[0].id,
+  );
+  assert.equal((await speak()).status, 401);
+  for (const [path, body] of [
+    ["/candidate/interview/answers", { answer: answerText, expectedTurn: 0 }],
+    ["/candidate/interview/report", {}],
+  ])
+    assert.equal(
+      (await call(path, { method: "POST", cookie: opened.cookie, body }))
+        .status,
+      401,
+      path,
+    );
+});
+
+test("listing an email grants nothing to an account that registers it later", async () => {
+  // other-owner@ is listed but its account is created after the sync; a later registrant of a listed,
+  // unused email must not be approved until the operator syncs.
+  const res = await call("/auth/register", {
+    method: "POST",
+    body: {
+      name: "Squatter",
+      email: "unregistered-listed@example.test",
+      password: "long-test-password",
+    },
+  });
+  const before = await call("/orgs", { cookie: res.cookie });
+  assert.equal(before.body.canCreate, false);
 });

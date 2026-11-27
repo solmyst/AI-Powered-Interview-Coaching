@@ -3,7 +3,7 @@ import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { createApp } from "../server/app.js";
 const origin = "http://localhost:5173";
-let server, base, db;
+let sync, server, base, db;
 before(async () => {
   const result = createApp({
     env: {
@@ -40,6 +40,7 @@ before(async () => {
     },
   });
   db = result.db;
+  sync = result.syncApprovals;
   server = result.app.listen(0, "127.0.0.1");
   await new Promise((r) => server.once("listening", r));
   base = `http://127.0.0.1:${server.address().port}`;
@@ -87,7 +88,16 @@ const create = (cookie) =>
 test("testing accounts skip trial caps while new sign-ups stay on the trial", async () => {
   const owner = await account("OWNER@example.test");
   const trial = await account("trial-user@example.test");
-  assert.equal(owner.usage.limit, null);
+  // Listing an email grants nothing by itself: someone registering a listed address first
+  // gets the trial until an operator has seen the account and restarted (the sync).
+  assert.equal(owner.usage.limit, 2);
+  sync();
+  const session = await (
+    await fetch(base + "/api/auth/session", {
+      headers: { Cookie: owner.cookie },
+    })
+  ).json();
+  assert.equal(session.usage.limit, null);
   assert.equal(trial.usage.limit, 2);
   for (let i = 0; i < 3; i++)
     assert.equal((await create(owner.cookie)).status, 201);

@@ -58,20 +58,47 @@ export function createApp({
   const locks = new Set();
   const limit = Number(env.DAILY_INTERVIEW_LIMIT || 5);
   const speechLimit = Number(env.DAILY_SPEECH_LIMIT || 300);
-  // Owner/testing accounts skip daily trial caps. Everyone else is a trial user.
-  const unlimited = new Set(
-    (env.UNLIMITED_EMAILS || "")
+  // Owner/testing accounts skip daily trial caps, and approved accounts can create companies. The env lists
+  // are only a request: syncApprovals() pins each listed email to the account that already owns it, at startup.
+  // Registering a listed email that nobody has used yet therefore grants nothing until an operator
+  // has seen the account exist and restarted; there is no email verification to prove ownership.
+  const listed = (name) =>
+    (env[name] || "")
       .split(",")
       .map((email) => email.trim().toLowerCase())
-      .filter(Boolean),
-  );
-  // Company screening is a pilot: only these emails (plus the unlimited testing accounts) can create companies.
-  const screeners = new Set(
-    (env.SCREENING_EMAILS || "")
-      .split(",")
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean),
-  );
+      .filter(Boolean);
+  function syncApprovals() {
+    const wanted = [
+      ...listed("UNLIMITED_EMAILS").map((email) => ["unlimited", email]),
+      ...listed("SCREENING_EMAILS").map((email) => ["screening", email]),
+    ];
+    db.transaction(() => {
+      db.prepare("DELETE FROM approved_accounts").run();
+      for (const [kind, email] of wanted) {
+        const user = db
+          .prepare("SELECT id FROM users WHERE email=?")
+          .get(email);
+        if (user)
+          db.prepare(
+            "INSERT OR IGNORE INTO approved_accounts(user_id,kind,email,created) VALUES (?,?,?,?)",
+          ).run(user.id, kind, email, new Date().toISOString());
+        else if (env.NODE_ENV !== "test")
+          console.info(
+            JSON.stringify({ event: "approval_pending", email, kind }),
+          );
+      }
+    })();
+  }
+  syncApprovals();
+  const approved = (user, ...kinds) =>
+    Boolean(
+      db
+        .prepare(
+          `SELECT 1 FROM approved_accounts WHERE user_id=? AND kind IN (${kinds.map(() => "?").join(",")})`,
+        )
+        .get(user.id, ...kinds),
+    );
+  const isUnlimited = (user) => approved(user, "unlimited");
   const candidateSpeechLimit = Number(env.CANDIDATE_SPEECH_LIMIT || 150);
   let screening = null;
   const secure = env.NODE_ENV === "production";
@@ -148,7 +175,7 @@ export function createApp({
       db
         .prepare("SELECT count FROM usage WHERE user_id=? AND day=?")
         .get(user.id, day())?.count || 0,
-    limit: unlimited.has(user.email) ? null : limit,
+    limit: isUnlimited(user) ? null : limit,
     reset: "00:00 UTC",
   });
   const userFromCookie = (req) => {
@@ -274,7 +301,7 @@ export function createApp({
         "INSERT INTO usage(user_id,day,speech_calls) VALUES (?,?,1) ON CONFLICT(user_id,day) DO UPDATE SET speech_calls=speech_calls+1 RETURNING speech_calls",
       )
       .get(user.id, day());
-    if (speech_calls > speechLimit && !unlimited.has(user.email))
+    if (speech_calls > speechLimit && !isUnlimited(user))
       fail(
         429,
         "You've reached today's voice limit. Type your answers or return after 00:00 UTC.",
@@ -288,7 +315,11 @@ export function createApp({
       return next();
     }
     const candidate = screening.resolveCandidate(req);
-    if (candidate?.status === "started" && candidate.consent) {
+    if (
+      candidate?.status === "started" &&
+      candidate.consent &&
+      !screening.closed(candidate)
+    ) {
       req.candidate = candidate;
       return next();
     }
@@ -394,7 +425,7 @@ export function createApp({
     hash,
     secure,
     origin,
-    allowed: (user) => unlimited.has(user.email) || screeners.has(user.email),
+    allowed: (user) => approved(user, "unlimited", "screening"),
   });
   app.get("/api/interviews", auth, (req, res) => {
     const sessions = db
@@ -722,5 +753,5 @@ export function createApp({
       requestId: req.requestId,
     });
   });
-  return { app, db };
+  return { app, db, syncApprovals };
 }

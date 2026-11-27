@@ -14,6 +14,8 @@ import {
 
 export const CONSENT_VERSION = "2026-11-27";
 const DAY = 86400000;
+// A candidate who started in time may still submit for this long after the window closes.
+const GRACE = 15 * 60000;
 const fail = (status, message) => {
   throw new ServiceError(status, message);
 };
@@ -151,6 +153,8 @@ export function registerScreening(
     );
   }
   purge();
+  // Without this a server that stays up for weeks keeps expired candidate data past the promised window.
+  setInterval(purge, 60 * 60 * 1000).unref();
 
   // ----- scoring (shared by candidate completion and lazy report generation) -----
   const scoring = new Map();
@@ -800,9 +804,14 @@ export function registerScreening(
       .get(hash(token), Date.now());
     return row && { ...row, config: JSON.parse(row.config) };
   }
+  // A candidate session outlives the window (at least a day), so the window is enforced on every call.
+  // Finished interviews stay readable for the thank-you page and the optional note.
+  const closed = (invite) =>
+    ["pending", "started"].includes(invite.status) &&
+    invite.expires + GRACE < Date.now();
   function candidateAuth(req, _res, next) {
     const invite = resolveCandidate(req);
-    if (!invite || invite.status === "revoked")
+    if (!invite || invite.status === "revoked" || closed(invite))
       return next(
         new ServiceError(
           401,
@@ -1272,5 +1281,5 @@ export function registerScreening(
     orgUsage(invite.org_id, { speech: 1 });
   }
 
-  return { resolveCandidate, spendCandidateSpeech };
+  return { resolveCandidate, spendCandidateSpeech, closed };
 }

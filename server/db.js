@@ -66,5 +66,14 @@ export function openDatabase(path) {
       );
       db.pragma("user_version = 5");
     })();
+  // Version 6: privileged accounts are pinned to user ids, not matched by email at request time, so
+  // registering an allow-listed email that no one has used yet grants nothing.
+  if (db.pragma("user_version", { simple: true }) < 6)
+    db.transaction(() => {
+      db.exec(
+        "CREATE TABLE approved_accounts (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, kind TEXT NOT NULL CHECK (kind IN ('unlimited','screening')), email TEXT NOT NULL, created TEXT NOT NULL)",
+      );
+      db.pragma("user_version = 6");
+    })();
   return db;
 }
