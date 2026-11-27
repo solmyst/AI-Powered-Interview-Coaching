@@ -776,12 +776,12 @@ function Candidates({
                 <th>Candidate</th>
                 <th>Status</th>
                 <th>AI estimate</th>
+                <th>Decision</th>
+                <th>Notes</th>
                 <th>Eye contact</th>
                 {role.rubric.map((r) => (
                   <th key={r.key}>{r.label}</th>
                 ))}
-                <th>Notes</th>
-                <th>Decision</th>
               </tr>
             </thead>
             <tbody>
@@ -819,16 +819,15 @@ function Candidates({
                       "—"
                     )}
                   </td>
-                  <td>{c.attention !== null ? `${c.attention}%` : "—"}</td>
-                  {role.rubric.map((r) => (
-                    <td key={r.key}>
-                      {c.competencyScores ? (
-                        <Bar value={c.competencyScores[r.key]} />
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                  ))}
+                  <td>
+                    {c.decision ? (
+                      <span className={`co-chip decision-${c.decision.status}`}>
+                        {c.decision.status}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td>
                     {c.terminated && (
                       <span className="co-chip flag">Ended by proctoring</span>
@@ -841,15 +840,16 @@ function Candidates({
                       "—"
                     )}
                   </td>
-                  <td>
-                    {c.decision ? (
-                      <span className={`co-chip decision-${c.decision.status}`}>
-                        {c.decision.status}
-                      </span>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
+                  <td>{c.attention !== null ? `${c.attention}%` : "—"}</td>
+                  {role.rubric.map((r) => (
+                    <td key={r.key}>
+                      {c.competencyScores ? (
+                        <Bar value={c.competencyScores[r.key]} />
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>

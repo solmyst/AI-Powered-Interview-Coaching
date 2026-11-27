@@ -268,7 +268,9 @@ function Notice({
                 leave full screen or this tab, or connect a second display,
                 you have 10 seconds to return or the interview ends and your
                 answers so far are submitted.
-              </strong>
+              </strong>{" "}
+              Use a laptop or desktop with Chrome, Edge or Firefox; phones
+              cannot run it.
             </p>
           )}
           <ul>
@@ -281,9 +283,11 @@ function Notice({
           </ul>
           <p className="muted">
             These can have ordinary causes, like a notification. They are shown
-            to you when they happen and go to the reviewer as notes. Apart from
-            the full-screen rule above, nothing ends your interview
-            automatically, and a person makes every decision.
+            to you when they happen and go to the reviewer as notes.{" "}
+            {summary.proctoring === "strict"
+              ? "Apart from the full-screen rule above, nothing ends your interview automatically"
+              : "None of them ends your interview"}
+            , and a person makes every decision.
           </p>
         </div>
         <div>

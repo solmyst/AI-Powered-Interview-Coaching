@@ -185,43 +185,6 @@ export function CandidateReport({
       )}
       <p className="notice">{AI_NOTE}</p>
 
-      <section className="panel co-decision">
-        <h2>Your decision</h2>
-        <p className="muted">
-          A person makes every decision. Nothing happens to a candidate unless
-          you choose it here.
-        </p>
-        <label>
-          Note for your team <small>optional</small>
-          <input
-            value={note}
-            maxLength={1000}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </label>
-        <div className="co-actions">
-          {(["advance", "hold", "reject"] as const).map((s) => (
-            <button
-              key={s}
-              className={
-                invite.decision?.status === s
-                  ? `primary decision-${s}`
-                  : "secondary"
-              }
-              aria-pressed={invite.decision?.status === s}
-              onClick={() => void decide(s)}
-            >
-              {s === "advance" ? "Advance" : s === "hold" ? "Hold" : "Reject"}
-            </button>
-          ))}
-        </div>
-        {invite.decision && (
-          <p className="muted">
-            Recorded by {invite.decision.by} on{" "}
-            {new Date(invite.decision.at).toLocaleDateString()}.
-          </p>
-        )}
-      </section>
 
       {report && (
         <section className="panel">
@@ -428,6 +391,44 @@ export function CandidateReport({
           )}
         </section>
       ))}
+
+      <section className="panel co-decision">
+        <h2>Your decision</h2>
+        <p className="muted">
+          A person makes every decision. Nothing happens to a candidate unless
+          you choose it here.
+        </p>
+        <label>
+          Note for your team <small>optional</small>
+          <input
+            value={note}
+            maxLength={1000}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </label>
+        <div className="co-actions">
+          {(["advance", "hold", "reject"] as const).map((s) => (
+            <button
+              key={s}
+              className={
+                invite.decision?.status === s
+                  ? `primary decision-${s}`
+                  : "secondary"
+              }
+              aria-pressed={invite.decision?.status === s}
+              onClick={() => void decide(s)}
+            >
+              {s === "advance" ? "Advance" : s === "hold" ? "Hold" : "Reject"}
+            </button>
+          ))}
+        </div>
+        {invite.decision && (
+          <p className="muted">
+            Recorded by {invite.decision.by} on{" "}
+            {new Date(invite.decision.at).toLocaleDateString()}.
+          </p>
+        )}
+      </section>
 
       <section className="panel co-danger">
         <h2>Link and data</h2>
