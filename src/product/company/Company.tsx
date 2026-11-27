@@ -51,6 +51,13 @@ export type CandidateRow = {
   expires: number;
   lastSeen: number;
   leftAt: number;
+  delivery: {
+    cameraAnswers: number;
+    spokenAnswers: number;
+    awayEpisodes: number;
+    fillerTotal: number;
+    fillersPer100Words: number | null;
+  } | null;
 };
 type Activity = {
   id: string;
@@ -1096,6 +1103,8 @@ function Candidates({
                 <th>Decision</th>
                 <th>Notes</th>
                 <th>Eye contact</th>
+                <th>Looked away</th>
+                <th>Fillers</th>
                 {role.rubric.map((r) => (
                   <th key={r.key}>{r.label}</th>
                 ))}
@@ -1167,6 +1176,16 @@ function Candidates({
                     )}
                   </td>
                   <td>{c.attention !== null ? `${c.attention}%` : "—"}</td>
+                  <td>
+                    {c.delivery?.cameraAnswers
+                      ? `${c.delivery.awayEpisodes}×`
+                      : "—"}
+                  </td>
+                  <td>
+                    {c.delivery?.spokenAnswers
+                      ? `${c.delivery.fillerTotal}${c.delivery.fillersPer100Words !== null ? ` (${c.delivery.fillersPer100Words}/100w)` : ""}`
+                      : "—"}
+                  </td>
                   {role.rubric.map((r) => (
                     <td key={r.key}>
                       {c.competencyScores ? (

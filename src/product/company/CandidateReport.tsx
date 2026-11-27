@@ -19,6 +19,44 @@ type Evidence = {
   quote: string;
   supports: "strength" | "concern";
 };
+type Delivery = {
+  spoken: boolean;
+  words: number;
+  fillers: Record<string, number>;
+  fillerTotal: number;
+  captureMs: number;
+  wpm: number | null;
+  observedMs?: number;
+  awayEpisodes?: number;
+  awayMs?: number;
+  lostEpisodes?: number;
+  lostMs?: number;
+};
+type DeliverySummary = {
+  answers: number;
+  spokenAnswers: number;
+  typedAnswers: number;
+  words: number;
+  fillerTotal: number;
+  fillers: Record<string, number>;
+  fillersPer100Words: number | null;
+  wpm: number | null;
+  cameraAnswers: number;
+  awayEpisodes: number;
+  awaySeconds: number;
+  lostEpisodes: number;
+  lostSeconds: number;
+  observedSeconds: number;
+};
+type ReportBody = {
+  summary: string;
+  strengths: string[];
+  concerns: string[];
+  suggestedFollowUps: string[];
+  competencyScores: Record<string, number>;
+  overall: number;
+  attention: number | null;
+};
 type Turn = {
   question: { question: string; focus: string };
   answer: string;
@@ -30,6 +68,7 @@ type Turn = {
     followUpForHuman?: string;
   } | null;
   attention: { eyeContact: number; inFrame: number } | null;
+  delivery: Delivery | null;
   events: Event[];
 };
 type Report = {
@@ -50,17 +89,10 @@ type Report = {
   };
   screening: {
     state: string;
+    deliverySummary: DeliverySummary;
     turns: Turn[];
     currentQuestion: { question: string } | null;
-    report: {
-      summary: string;
-      strengths: string[];
-      concerns: string[];
-      suggestedFollowUps: string[];
-      competencyScores: Record<string, number>;
-      overall: number;
-      attention: number | null;
-    } | null;
+    report: ReportBody | null;
   } | null;
   events: Event[];
 };
@@ -185,7 +217,6 @@ export function CandidateReport({
       )}
       <p className="notice">{AI_NOTE}</p>
 
-
       {report && (
         <section className="panel">
           <h2>Summary</h2>
@@ -229,6 +260,15 @@ export function CandidateReport({
             ))}
           </ul>
         </section>
+      )}
+      {screening && screening.turns.length > 0 && (
+        <Scorecard
+          report={report}
+          rubric={role.rubric}
+          turns={screening.turns}
+          summary={screening.deliverySummary}
+          events={events}
+        />
       )}
       {!report && screening && (
         <p className="notice">
@@ -341,10 +381,17 @@ export function CandidateReport({
             </div>
           ))}
           <blockquote className="prewrap">{turn.answer}</blockquote>
-          {turn.attention && (
-            <p className="muted">
-              Eye contact {turn.attention.eyeContact}% · face in frame{" "}
-              {turn.attention.inFrame}% while answering
+          {(turn.attention || turn.delivery) && (
+            <p className="muted co-signals">
+              {turn.attention &&
+                `Eye contact ${turn.attention.eyeContact}% · face in frame ${turn.attention.inFrame}%`}
+              {turn.delivery?.awayEpisodes !== undefined &&
+                ` · looked away ${turn.delivery.awayEpisodes} time${turn.delivery.awayEpisodes === 1 ? "" : "s"} (${Math.round((turn.delivery.awayMs ?? 0) / 1000)} s)`}
+              {turn.delivery && ` · ${turn.delivery.words} words`}
+              {turn.delivery?.wpm ? ` · ${turn.delivery.wpm} words/min` : ""}
+              {turn.delivery?.spoken
+                ? ` · filler words ${turn.delivery.fillerTotal}${fillerList(turn.delivery.fillers)}`
+                : " · typed answer"}
             </p>
           )}
           {turn.evaluation ? (
@@ -487,5 +534,190 @@ export function CandidateReport({
         </div>
       </section>
     </>
+  );
+}
+
+const fillerList = (fillers: Record<string, number>) => {
+  const list = Object.entries(fillers).sort((a, b) => b[1] - a[1]);
+  return list.length
+    ? ` (${list.map(([w, n]) => `${w} ×${n}`).join(", ")})`
+    : "";
+};
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const average = (values: number[]) =>
+  values.length
+    ? Math.round(values.reduce((a, b) => a + b, 0) / values.length)
+    : null;
+
+// Everything a reviewer needs to judge a candidate in one place: the content score and how it was built,
+// then delivery signals and focus notes beside it (never inside it).
+function Scorecard({
+  report,
+  rubric,
+  turns,
+  summary,
+  events,
+}: {
+  report: ReportBody | null | undefined;
+  rubric: RubricItem[];
+  turns: Turn[];
+  summary: DeliverySummary;
+  events: Event[];
+}) {
+  const flagged = events.filter((e) => !quiet.has(e.kind));
+  const byKind = Object.entries(
+    flagged.reduce<Record<string, { n: number; ms: number }>>((acc, e) => {
+      const row = acc[e.kind] || { n: 0, ms: 0 };
+      row.n += 1;
+      row.ms += e.durationMs || 0;
+      acc[e.kind] = row;
+      return acc;
+    }, {}),
+  );
+  const answerScore = (t: Turn) =>
+    t.evaluation
+      ? average(rubric.map((r) => t.evaluation!.scores[r.key] ?? 0))
+      : null;
+  const hasCamera = summary.cameraAnswers > 0;
+  // Averaged here so it shows while the interview is still in progress, before the final report exists.
+  const eyeContact = average(
+    turns.flatMap((t) => (t.attention ? [t.attention.eyeContact] : [])),
+  );
+  return (
+    <section className="panel co-scorecard" aria-label="Evaluation scorecard">
+      <h2>Evaluation scorecard</h2>
+      <p className="muted">
+        The AI estimate is about <strong>what was said</strong>: each answer is
+        scored against your criteria, and the overall is the average of the
+        criteria weighted {rubric.map((r) => r.weight).join(" : ")}. Delivery
+        signals and focus notes below are shown for context. They are{" "}
+        <strong>not part of the estimate</strong>, and they depend on camera
+        position, lighting, accent, language and connection.
+      </p>
+      <div className="co-stats">
+        <div>
+          <b>{report ? report.overall : "—"}</b>
+          <span>AI estimate (content)</span>
+        </div>
+        <div>
+          <b>{eyeContact !== null ? `${eyeContact}%` : "—"}</b>
+          <span>Eye contact (avg)</span>
+        </div>
+        <div>
+          <b>{hasCamera ? summary.awayEpisodes : "—"}</b>
+          <span>
+            Times looked away
+            {hasCamera ? ` · ${summary.awaySeconds} s total` : ""}
+          </span>
+        </div>
+        <div>
+          <b>{hasCamera ? summary.lostEpisodes : "—"}</b>
+          <span>
+            Times out of frame
+            {hasCamera ? ` · ${summary.lostSeconds} s` : ""}
+          </span>
+        </div>
+        <div>
+          <b>{summary.spokenAnswers ? summary.fillerTotal : "—"}</b>
+          <span>
+            Filler words
+            {summary.fillersPer100Words !== null
+              ? ` · ${summary.fillersPer100Words} per 100 words`
+              : ""}
+          </span>
+        </div>
+        <div>
+          <b>{summary.wpm ?? "—"}</b>
+          <span>Speaking pace (words/min)</span>
+        </div>
+        <div>
+          <b>{flagged.length}</b>
+          <span>Focus notes</span>
+        </div>
+      </div>
+      {!hasCamera && (
+        <p className="muted">
+          No camera data was recorded for this candidate (the camera was off or
+          blocked), so eye contact and looking-away counts are not available.
+        </p>
+      )}
+      {summary.typedAnswers > 0 && (
+        <p className="muted">
+          {plural(summary.typedAnswers, "answer")} of {summary.answers} typed
+          instead of spoken; pace and filler words cover spoken answers only.
+        </p>
+      )}
+      {Object.keys(summary.fillers).length > 0 && (
+        <p>
+          <strong>Filler words used:</strong>{" "}
+          {Object.entries(summary.fillers)
+            .sort((a, b) => b[1] - a[1])
+            .map(([w, n]) => `“${w}” ×${n}`)
+            .join(", ")}
+          . Counted from the transcript, so a speech service may drop some.
+        </p>
+      )}
+      {byKind.length > 0 && (
+        <p>
+          <strong>Focus notes:</strong>{" "}
+          {byKind
+            .map(
+              ([kind, v]) =>
+                `${kindLabel[kind] || kind} ${plural(v.n, "time")}${v.ms ? ` (${Math.round(v.ms / 1000)} s)` : ""}`,
+            )
+            .join(", ")}
+          .
+        </p>
+      )}
+      <div className="co-table-wrap">
+        <table className="co-table">
+          <thead>
+            <tr>
+              <th>Answer</th>
+              <th>AI score</th>
+              {rubric.map((r) => (
+                <th key={r.key}>{r.label}</th>
+              ))}
+              <th>Eye contact</th>
+              <th>Looked away</th>
+              <th>Out of frame</th>
+              <th>Words</th>
+              <th>Pace</th>
+              <th>Fillers</th>
+            </tr>
+          </thead>
+          <tbody>
+            {turns.map((t, i) => (
+              <tr key={i}>
+                <td>
+                  Q{i + 1}
+                  <small>{t.question.focus}</small>
+                </td>
+                <td>
+                  <b className="co-score">{answerScore(t) ?? "—"}</b>
+                </td>
+                {rubric.map((r) => (
+                  <td key={r.key}>{t.evaluation?.scores[r.key] ?? "—"}</td>
+                ))}
+                <td>{t.attention ? `${t.attention.eyeContact}%` : "—"}</td>
+                <td>
+                  {t.delivery?.awayEpisodes !== undefined
+                    ? `${t.delivery.awayEpisodes}× · ${Math.round((t.delivery.awayMs ?? 0) / 1000)} s`
+                    : "—"}
+                </td>
+                <td>
+                  {t.delivery?.lostEpisodes !== undefined
+                    ? `${t.delivery.lostEpisodes}×`
+                    : "—"}
+                </td>
+                <td>{t.delivery?.words ?? "—"}</td>
+                <td>{t.delivery?.wpm ?? "—"}</td>
+                <td>{t.delivery?.spoken ? t.delivery.fillerTotal : "typed"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }

@@ -42,21 +42,34 @@ function waitForVideoFrame(video: HTMLVideoElement) {
   return new Promise<void>((resolve, reject) => {
     const deadline = performance.now() + 8000;
     const check = () => {
-      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0)
+      if (
+        video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+        video.videoWidth > 0
+      )
         return resolve();
       if (performance.now() >= deadline)
-        return reject(new Error("The camera connected but did not provide a picture."));
+        return reject(
+          new Error("The camera connected but did not provide a picture."),
+        );
       requestAnimationFrame(check);
     };
     check();
   });
 }
 
-type EventKind = "tab_hidden" | "fullscreen_exit" | "camera_off" | "paste" | "face_absent" | "multiple_faces" | "multiple_screens";
+type EventKind =
+  | "tab_hidden"
+  | "fullscreen_exit"
+  | "camera_off"
+  | "paste"
+  | "face_absent"
+  | "multiple_faces"
+  | "multiple_screens";
 type StrictReason = "fullscreen_exit" | "tab_hidden" | "multiple_screens";
 const GRACE_MS = 10000;
 // Chromium reports a second connected display without any permission prompt.
-const extendedDisplay = () => Boolean((screen as Screen & { isExtended?: boolean }).isExtended);
+const extendedDisplay = () =>
+  Boolean((screen as Screen & { isExtended?: boolean }).isExtended);
 const strictMessage: Record<StrictReason, string> = {
   fullscreen_exit: "You left full screen.",
   tab_hidden: "You left the interview tab.",
@@ -64,7 +77,8 @@ const strictMessage: Record<StrictReason, string> = {
 };
 const eventNotice: Record<EventKind, string> = {
   face_absent: "We can’t see your face. Stay in front of the camera.",
-  multiple_faces: "More than one person is in view. It is noted for the reviewer.",
+  multiple_faces:
+    "More than one person is in view. It is noted for the reviewer.",
   multiple_screens: "A second display is connected. Disconnect it to continue.",
   tab_hidden: "You left this tab. It is noted for the reviewer.",
   fullscreen_exit: "You left full screen. It is noted for the reviewer.",
@@ -104,8 +118,18 @@ export function Room({
     window.setTimeout(() => setNotice(""), 6000);
     void api("/candidate/integrity-events", {
       method: "POST",
-      body: JSON.stringify({ events: [{ kind, turn: Math.min(turnRef.current, 7), ...(durationMs ? { durationMs } : {}) }] }),
-    }).catch(() => { /* A lost note is acceptable; the interview must not stop for it. */ });
+      body: JSON.stringify({
+        events: [
+          {
+            kind,
+            turn: Math.min(turnRef.current, 7),
+            ...(durationMs ? { durationMs } : {}),
+          },
+        ],
+      }),
+    }).catch(() => {
+      /* A lost note is acceptable; the interview must not stop for it. */
+    });
   }
   const visual = useRef(emptyVisual());
   const spoken = useRef({ words: 0, fillers: 0 });
@@ -139,12 +163,22 @@ export function Room({
   const [helpOpen, setHelpOpen] = useState(false);
   const [answerStartedAt, setAnswerStartedAt] = useState(0);
   const [theme, setTheme] = useState<"dark" | "light">(() => {
-    try { return localStorage.getItem("interviewace:call-theme") === "light" ? "light" : "dark"; } catch { return "dark"; }
+    try {
+      return localStorage.getItem("interviewace:call-theme") === "light"
+        ? "light"
+        : "dark";
+    } catch {
+      return "dark";
+    }
   });
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
-    try { localStorage.setItem("interviewace:call-theme", next); } catch { /* Theme still applies for this call. */ }
+    try {
+      localStorage.setItem("interviewace:call-theme", next);
+    } catch {
+      /* Theme still applies for this call. */
+    }
   }
 
   async function submitSpokenAnswer(text: string) {
@@ -160,25 +194,37 @@ export function Room({
     setPhase("thinking");
     setError("");
     try {
-      const { reply, ...next } = await api<RoomSession & { reply?: string }>(`${base}/answers`, {
-        method: "POST",
-        body: JSON.stringify({
-          answer,
-          expectedTurn: session.turns.length,
-          // Screening sends only on-device camera counts (eye contact, face in frame); never speech style.
-          ...(screening ? (visual.current.samples ? { delivery: { visual: visual.current } } : {}) : {
-            delivery: {
-              ...(visual.current.samples ? { visual: visual.current } : {}),
-              speech: {
-                source: "assemblyai",
-                captureMs: transcription.durationMs(),
-                words: spoken.current.words,
-                fillers: spoken.current.fillers,
-              },
-            },
+      const { reply, ...next } = await api<RoomSession & { reply?: string }>(
+        `${base}/answers`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            answer,
+            expectedTurn: session.turns.length,
+            // Counts only: on-device camera counts and, for spoken answers, how long and how many words. The server
+            // derives filler words from the transcript itself. Never raw video or audio.
+            ...(visual.current.samples || spoken.current.words || !screening
+              ? {
+                  delivery: {
+                    ...(visual.current.samples
+                      ? { visual: visual.current }
+                      : {}),
+                    ...(!screening || spoken.current.words
+                      ? {
+                          speech: {
+                            source: "assemblyai" as const,
+                            captureMs: transcription.durationMs(),
+                            words: spoken.current.words,
+                            fillers: spoken.current.fillers,
+                          },
+                        }
+                      : {}),
+                  },
+                }
+              : {}),
           }),
-        }),
-      });
+        },
+      );
       setAnswerPending(false);
       if (reply) {
         // Same question, Maya talks back; delivery counters keep running for this question.
@@ -210,23 +256,41 @@ export function Room({
           update(latest);
           return;
         }
-      } catch { /* Preserve the response locally until the connection returns. */ }
+      } catch {
+        /* Preserve the response locally until the connection returns. */
+      }
       setError((reason as Error).message);
       pauseInterview();
     }
   }
 
   function receiveTranscript(text: string) {
-    const command = text.trim().toLowerCase().replace(/[?.!।]/g, "").trim();
-    if (/^(please )?(repeat( the)? question|repeat that|could you repeat( the question| that)?|can you repeat( the question| that)?)( please)?$/.test(command)) {
+    const command = text
+      .trim()
+      .toLowerCase()
+      .replace(/[?.!।]/g, "")
+      .trim();
+    if (
+      /^(please )?(repeat( the)? question|repeat that|could you repeat( the question| that)?|can you repeat( the question| that)?)( please)?$/.test(
+        command,
+      )
+    ) {
       repeatQuestion();
       return;
     }
-    if (/^(please )?(pause( the)? interview|give me a moment|pause)( please)?$/.test(command)) {
+    if (
+      /^(please )?(pause( the)? interview|give me a moment|pause)( please)?$/.test(
+        command,
+      )
+    ) {
       pauseInterview();
       return;
     }
-    if (/^(please )?(clarify( the)? question|could you clarify( the question| that)?|can you rephrase( the question| that)?)( please)?$/.test(command)) {
+    if (
+      /^(please )?(clarify( the)? question|could you clarify( the question| that)?|can you rephrase( the question| that)?)( please)?$/.test(
+        command,
+      )
+    ) {
       void clarifyQuestion();
       return;
     }
@@ -245,7 +309,8 @@ export function Room({
     () => () => {
       sharedStream.current?.getTracks().forEach((track) => track.stop());
       sharedStream.current = null;
-      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+      if (document.fullscreenElement)
+        void document.exitFullscreen().catch(() => {});
     },
     [],
   );
@@ -254,7 +319,11 @@ export function Room({
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
-      if (event.code !== "Space" || /^(INPUT|TEXTAREA|BUTTON|SELECT)$/.test(target.tagName)) return;
+      if (
+        event.code !== "Space" ||
+        /^(INPUT|TEXTAREA|BUTTON|SELECT)$/.test(target.tagName)
+      )
+        return;
       if (transcription.status !== "recording" || phase !== "listening") return;
       event.preventDefault();
       transcription.stop();
@@ -296,7 +365,12 @@ export function Room({
   }, [screening]);
 
   // Face checks during answers: no face for 10 s, or two faces for 3 s, is noted once per episode.
-  const presence = useRef({ none: 0, many: 0, notedNone: false, notedMany: false });
+  const presence = useRef({
+    none: 0,
+    many: 0,
+    notedNone: false,
+    notedMany: false,
+  });
   function onFaces(count: number) {
     if (!screening) return;
     const p = presence.current;
@@ -305,11 +379,20 @@ export function Room({
     p.many = count > 1 ? p.many || now : 0;
     if (!p.none) p.notedNone = false;
     if (!p.many) p.notedMany = false;
-    if (p.none && !p.notedNone && now - p.none >= 10000) { p.notedNone = true; noteEvent("face_absent"); }
-    if (p.many && !p.notedMany && now - p.many >= 3000) { p.notedMany = true; noteEvent("multiple_faces"); }
+    if (p.none && !p.notedNone && now - p.none >= 10000) {
+      p.notedNone = true;
+      noteEvent("face_absent");
+    }
+    if (p.many && !p.notedMany && now - p.many >= 3000) {
+      p.notedMany = true;
+      noteEvent("multiple_faces");
+    }
   }
 
-  const [violation, setViolation] = useState<{ reason: StrictReason; deadline: number } | null>(null);
+  const [violation, setViolation] = useState<{
+    reason: StrictReason;
+    deadline: number;
+  } | null>(null);
   const [clock, setClock] = useState(0);
   const [ended, setEnded] = useState("");
   const actions = useRef({ pause: pauseInterview, terminate });
@@ -319,7 +402,13 @@ export function Room({
     let current: { reason: StrictReason; deadline: number } | null = null;
     const check = () => {
       if (callEnded.current) return;
-      const reason: StrictReason | null = extendedDisplay() ? "multiple_screens" : document.hidden ? "tab_hidden" : !document.fullscreenElement ? "fullscreen_exit" : null;
+      const reason: StrictReason | null = extendedDisplay()
+        ? "multiple_screens"
+        : document.hidden
+          ? "tab_hidden"
+          : !document.fullscreenElement
+            ? "fullscreen_exit"
+            : null;
       setClock(Date.now());
       if (!reason) {
         if (current) setViolation((current = null));
@@ -329,18 +418,25 @@ export function Room({
         setViolation((current = { reason, deadline: Date.now() + GRACE_MS }));
         if (reason === "multiple_screens") noteEvent("multiple_screens");
         if (!paused.current) actions.current.pause();
-      } else if (Date.now() >= current.deadline) void actions.current.terminate(current.reason);
+      } else if (Date.now() >= current.deadline)
+        void actions.current.terminate(current.reason);
     };
     const timer = window.setInterval(check, 500);
     document.addEventListener("fullscreenchange", check);
     document.addEventListener("visibilitychange", check);
-    (screen as Screen & Partial<EventTarget>).addEventListener?.("change", check);
+    (screen as Screen & Partial<EventTarget>).addEventListener?.(
+      "change",
+      check,
+    );
     check();
     return () => {
       window.clearInterval(timer);
       document.removeEventListener("fullscreenchange", check);
       document.removeEventListener("visibilitychange", check);
-      (screen as Screen & Partial<EventTarget>).removeEventListener?.("change", check);
+      (screen as Screen & Partial<EventTarget>).removeEventListener?.(
+        "change",
+        check,
+      );
     };
     // noteEvent reads refs only; pause and terminate are read through a ref.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -352,14 +448,24 @@ export function Room({
       voice.stop();
       transcription.cancel();
       sharedStream.current?.getTracks().forEach((track) => track.stop());
-      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+      if (document.fullscreenElement)
+        void document.exitFullscreen().catch(() => {});
     }
     setViolation(null);
-    setEnded(`${strictMessage[reason]} The interview has ended and your answers so far were sent to ${company}.`);
+    setEnded(
+      `${strictMessage[reason]} The interview has ended and your answers so far were sent to ${company}.`,
+    );
     try {
-      update(await api(`${base}/terminate`, { method: "POST", body: JSON.stringify({ reason }) }));
+      update(
+        await api(`${base}/terminate`, {
+          method: "POST",
+          body: JSON.stringify({ reason }),
+        }),
+      );
     } catch (reason2) {
-      setEnded(`${strictMessage[reason]} The interview has ended. ${(reason2 as Error).message}`);
+      setEnded(
+        `${strictMessage[reason]} The interview has ended. ${(reason2 as Error).message}`,
+      );
     }
   }
 
@@ -368,7 +474,9 @@ export function Room({
       if (document.fullscreenElement) await document.exitFullscreen();
       else await document.documentElement.requestFullscreen();
     } catch {
-      setError("Full screen was blocked by the browser. You can continue normally.");
+      setError(
+        "Full screen was blocked by the browser. You can continue normally.",
+      );
     }
   }
 
@@ -401,19 +509,23 @@ export function Room({
       }
       const cameraTrack = stream.getVideoTracks()[0];
       setCameraLabel(cameraTrack?.label || "Camera connected");
-      stream.getTracks().forEach((track) => track.addEventListener(
-        "ended",
-        () => {
-          if (callEnded.current) return;
-          setMediaState("error");
-          setMediaError("A camera or microphone disconnected. Reconnect your devices to continue.");
-          if (callStartedAt.current) {
-            noteEvent("camera_off");
-            pauseInterview();
-          }
-        },
-        { once: true },
-      ));
+      stream.getTracks().forEach((track) =>
+        track.addEventListener(
+          "ended",
+          () => {
+            if (callEnded.current) return;
+            setMediaState("error");
+            setMediaError(
+              "A camera or microphone disconnected. Reconnect your devices to continue.",
+            );
+            if (callStartedAt.current) {
+              noteEvent("camera_off");
+              pauseInterview();
+            }
+          },
+          { once: true },
+        ),
+      );
       setMediaState("ready");
     } catch (reason) {
       setMediaState("error");
@@ -456,17 +568,27 @@ export function Room({
     setMayaReply("");
     setLastAnswer("");
     setError("");
-    voice.speak(`${session.currentQuestion?.lead || ""} ${question}`.trim(), () => {
-      if (callEnded.current || paused.current) return;
-      setPhase("listening");
-      void transcription.record({
-        autoStop: true,
-        mediaStream: sharedStream.current || undefined,
-      });
-    });
+    voice.speak(
+      `${session.currentQuestion?.lead || ""} ${question}`.trim(),
+      () => {
+        if (callEnded.current || paused.current) return;
+        setPhase("listening");
+        void transcription.record({
+          autoStop: true,
+          mediaStream: sharedStream.current || undefined,
+        });
+      },
+    );
     // retry intentionally replays the current turn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [joined, question, session.turns.length, session.state, transcription.status, retry]);
+  }, [
+    joined,
+    question,
+    session.turns.length,
+    session.state,
+    transcription.status,
+    retry,
+  ]);
 
   useEffect(() => {
     if (transcription.status === "recording") setAnswerStartedAt(Date.now());
@@ -519,7 +641,10 @@ export function Room({
 
   // Typing is a fallback for noisy rooms or speech trouble; it pauses the microphone first.
   function openTyping() {
-    if (typing) { setTyping(false); return; }
+    if (typing) {
+      setTyping(false);
+      return;
+    }
     pauseInterview();
     setTyping(true);
   }
@@ -534,7 +659,10 @@ export function Room({
     setTyping(false);
     paused.current = false;
     setPhase("listening");
-    void transcription.record({ autoStop: true, mediaStream: sharedStream.current || undefined });
+    void transcription.record({
+      autoStop: true,
+      mediaStream: sharedStream.current || undefined,
+    });
   }
 
   async function clarifyQuestion() {
@@ -545,11 +673,14 @@ export function Room({
     setError("");
     try {
       const result = await api<{ question: string }>(`${base}/clarify`, {
-        method: "POST", body: JSON.stringify({ expectedTurn: session.turns.length }),
+        method: "POST",
+        body: JSON.stringify({ expectedTurn: session.turns.length }),
       });
       if (callEnded.current) return;
       setClarifiedQuestion(result.question);
-      voice.speak(result.question, () => { if (!callEnded.current && !paused.current) resumeInterview(); });
+      voice.speak(result.question, () => {
+        if (!callEnded.current && !paused.current) resumeInterview();
+      });
     } catch (reason) {
       setError((reason as Error).message);
       if (!callEnded.current) pauseInterview();
@@ -559,7 +690,12 @@ export function Room({
   }
 
   async function endInterview() {
-    if (reportStarted.current || phase === "thinking" || phase === "transcribing") return;
+    if (
+      reportStarted.current ||
+      phase === "thinking" ||
+      phase === "transcribing"
+    )
+      return;
     reportStarted.current = true;
     callEnded.current = true;
     voice.stop();
@@ -585,18 +721,23 @@ export function Room({
     }
   }
 
-  const status = clarifying ? "Clarifying your question" : phase === "paused" ? "Paused · take your time" :
-    phase === "interviewer" && voice.preparing ? "Preparing interviewer audio" : phase === "interviewer"
-      ? "Interviewer speaking"
-      : phase === "listening"
-        ? "Listening to you"
-        : phase === "transcribing"
-          ? "Understanding your answer"
-          : phase === "thinking"
-            ? "Preparing a follow-up"
-            : phase === "complete"
-              ? "Writing your debrief"
-              : "Preparing interview";
+  const status = clarifying
+    ? "Clarifying your question"
+    : phase === "paused"
+      ? "Paused · take your time"
+      : phase === "interviewer" && voice.preparing
+        ? "Preparing interviewer audio"
+        : phase === "interviewer"
+          ? "Interviewer speaking"
+          : phase === "listening"
+            ? "Listening to you"
+            : phase === "transcribing"
+              ? "Understanding your answer"
+              : phase === "thinking"
+                ? "Preparing a follow-up"
+                : phase === "complete"
+                  ? "Writing your debrief"
+                  : "Preparing interview";
   const formatTime = (seconds: number) =>
     `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 
@@ -604,7 +745,11 @@ export function Room({
     return (
       <div className="call-preflight">
         <div className="preflight-copy">
-          <p className="eyebrow">{screening ? `${company.toUpperCase()} · ${session.setup.role.toUpperCase()}` : "PRIVATE PRACTICE INTERVIEW"}</p>
+          <p className="eyebrow">
+            {screening
+              ? `${company.toUpperCase()} · ${session.setup.role.toUpperCase()}`
+              : "PRIVATE PRACTICE INTERVIEW"}
+          </p>
           <h1>Your interviewer is ready.</h1>
           <p className="preflight-lead">
             {screening
@@ -612,19 +757,67 @@ export function Room({
               : "This works like a real video call. The interviewer asks every question aloud, listens to your spoken answer, and responds with an adaptive follow-up. There is nothing to type."}
           </p>
           <div className="preflight-checks" aria-label="Interview readiness">
-            <div><Camera /><span><strong>Camera</strong>{screening ? "Self-view. The picture is checked on your device only; it is never recorded or sent" : "Private self-view and on-device presence coaching"}</span></div>
-            <div><Mic /><span><strong>Microphone</strong>Automatic English and Hindi transcription</span></div>
-            <div><Headphones /><span><strong>Headphones recommended</strong>Prevents the interviewer’s voice entering your answer</span></div>
-            {strict && <div><ShieldAlert /><span><strong>Full screen, one display</strong>The interview runs in full screen on one screen. If you leave full screen or the tab, or connect a second display, you have 10 seconds to return or the interview ends</span></div>}
-            <div><ShieldCheck /><span><strong>{screening ? `What ${company} sees` : "Private by design"}</strong>{screening ? "Your transcript and focus notes. Video is never recorded; audio is sent for transcription only" : "Video stays on-device; audio is sent securely for transcription"}</span></div>
+            <div>
+              <Camera />
+              <span>
+                <strong>Camera</strong>
+                {screening
+                  ? "Self-view. The picture is checked on your device only; it is never recorded or sent"
+                  : "Private self-view and on-device presence coaching"}
+              </span>
+            </div>
+            <div>
+              <Mic />
+              <span>
+                <strong>Microphone</strong>Automatic English and Hindi
+                transcription
+              </span>
+            </div>
+            <div>
+              <Headphones />
+              <span>
+                <strong>Headphones recommended</strong>Prevents the
+                interviewer’s voice entering your answer
+              </span>
+            </div>
+            {strict && (
+              <div>
+                <ShieldAlert />
+                <span>
+                  <strong>Full screen, one display</strong>The interview runs in
+                  full screen on one screen. If you leave full screen or the
+                  tab, or connect a second display, you have 10 seconds to
+                  return or the interview ends
+                </span>
+              </div>
+            )}
+            <div>
+              <ShieldCheck />
+              <span>
+                <strong>
+                  {screening ? `What ${company} sees` : "Private by design"}
+                </strong>
+                {screening
+                  ? "Your transcript and focus notes. Video is never recorded; audio is sent for transcription only"
+                  : "Video stays on-device; audio is sent securely for transcription"}
+              </span>
+            </div>
           </div>
-          {(transcription.error || error) && <div className="call-error" role="alert">{transcription.error || error}</div>}
+          {(transcription.error || error) && (
+            <div className="call-error" role="alert">
+              {transcription.error || error}
+            </div>
+          )}
           {!transcriptionReady && (
             <div className="call-error" role="alert">
               Speech transcription is not configured on the server yet.
             </div>
           )}
-          {mediaError && <div className="call-error" role="alert">{mediaError}</div>}
+          {mediaError && (
+            <div className="call-error" role="alert">
+              {mediaError}
+            </div>
+          )}
           <div className="preflight-actions">
             {mediaState !== "ready" && (
               <button
@@ -642,19 +835,30 @@ export function Room({
             )}
             <button
               className="join-call"
-              disabled={!transcriptionReady || transcription.status !== "ready" || mediaState !== "ready"}
+              disabled={
+                !transcriptionReady ||
+                transcription.status !== "ready" ||
+                mediaState !== "ready"
+              }
               onClick={async () => {
                 voice.unlock();
                 if (strict) {
                   if (extendedDisplay())
-                    return setError("Disconnect your second display, then join. This interview allows one screen only.");
+                    return setError(
+                      "Disconnect your second display, then join. This interview allows one screen only.",
+                    );
                   try {
                     await document.documentElement.requestFullscreen();
                   } catch {
-                    return setError("This interview needs full screen. Use Chrome, Edge or Firefox on a laptop or desktop.");
+                    return setError(
+                      "This interview needs full screen. Use Chrome, Edge or Firefox on a laptop or desktop.",
+                    );
                   }
                   setError("");
-                } else void document.documentElement.requestFullscreen?.().catch(() => {});
+                } else
+                  void document.documentElement
+                    .requestFullscreen?.()
+                    .catch(() => {});
                 callStartedAt.current = Date.now();
                 setPhase("joining");
                 setJoined(true);
@@ -664,63 +868,129 @@ export function Room({
               {!transcriptionReady
                 ? "Speech service unavailable"
                 : mediaState !== "ready"
-                ? "Complete device check first"
-                : transcription.status === "ready"
-                  ? "Join interview"
-                  : "Speech service unavailable"}
+                  ? "Complete device check first"
+                  : transcription.status === "ready"
+                    ? "Join interview"
+                    : "Speech service unavailable"}
             </button>
             <button
               className="text-button"
               onClick={() => {
-                sharedStream.current?.getTracks().forEach((track) => track.stop());
+                sharedStream.current
+                  ?.getTracks()
+                  .forEach((track) => track.stop());
                 back();
               }}
-            >Return to dashboard</button>
+            >
+              Return to dashboard
+            </button>
           </div>
         </div>
-        <div className="preflight-interviewer" aria-label="AI interviewer preview">
-          <div className="interviewer-orbit"><Brain size={54} /></div>
-          <span className="availability"><i /> Ready now</span>
+        <div
+          className="preflight-interviewer"
+          aria-label="AI interviewer preview"
+        >
+          <div className="interviewer-orbit">
+            <Brain size={54} />
+          </div>
+          <span className="availability">
+            <i /> Ready now
+          </span>
           <h2>Maya</h2>
           <p>{screening ? "AI interviewer" : "AI interview coach"}</p>
-          <small>{session.setup.role} · {session.setup.track} round</small>
+          <small>
+            {session.setup.role} · {session.setup.track} round
+          </small>
           <div className={`preflight-device-preview ${mediaState}`}>
-            <video ref={previewVideo} autoPlay muted playsInline aria-label="Camera preview" />
+            <video
+              ref={previewVideo}
+              autoPlay
+              muted
+              playsInline
+              aria-label="Camera preview"
+            />
             {mediaState !== "ready" && (
-              <span><Camera size={24} /> Your camera preview will appear here</span>
+              <span>
+                <Camera size={24} /> Your camera preview will appear here
+              </span>
             )}
             {mediaState === "ready" && (
-              <b title={cameraLabel}><Check size={14} /> Camera and microphone ready</b>
+              <b title={cameraLabel}>
+                <Check size={14} /> Camera and microphone ready
+              </b>
             )}
           </div>
         </div>
-        {phase === "complete" && <BriefingDialog screening={screening} error={briefingError} retry={() => void endInterview()} back={back} />}
+        {phase === "complete" && (
+          <BriefingDialog
+            screening={screening}
+            error={briefingError}
+            retry={() => void endInterview()}
+            back={back}
+          />
+        )}
       </div>
     );
 
   const total = session.setup.questionCount;
   const current = Math.min(session.turns.length + 1, total);
-  const locked = phase === "thinking" || phase === "transcribing" || phase === "complete" || clarifying || answerPending;
+  const locked =
+    phase === "thinking" ||
+    phase === "transcribing" ||
+    phase === "complete" ||
+    clarifying ||
+    answerPending;
   const shown = clarifiedQuestion || question;
   const recording = transcription.status === "recording";
-  const answerSeconds = recording && answerStartedAt ? Math.floor((Date.now() - answerStartedAt) / 1000) : 0;
+  const answerSeconds =
+    recording && answerStartedAt
+      ? Math.floor((Date.now() - answerStartedAt) / 1000)
+      : 0;
   const level = recording ? transcription.level : 0;
   return (
-    <div className="interview-call-shell" data-theme={theme} style={{ "--level": level } as React.CSSProperties}>
+    <div
+      className="interview-call-shell"
+      data-theme={theme}
+      style={{ "--level": level } as React.CSSProperties}
+    >
       <header className="call-topbar">
-        <div className="call-brand"><Brain size={20} aria-hidden="true" /><span>InterviewAce</span></div>
-        <span className="call-round">{screening ? `${company} · ${session.setup.role}` : `${session.setup.role} · ${session.setup.track}`}</span>
+        <div className="call-brand">
+          <Brain size={20} aria-hidden="true" />
+          <span>InterviewAce</span>
+        </div>
+        <span className="call-round">
+          {screening
+            ? `${company} · ${session.setup.role}`
+            : `${session.setup.role} · ${session.setup.track}`}
+        </span>
         {screening && (
-          <button className="focus-chip" onClick={() => setHelpOpen((open) => !open)} aria-expanded={helpOpen}>
+          <button
+            className="focus-chip"
+            onClick={() => setHelpOpen((open) => !open)}
+            aria-expanded={helpOpen}
+          >
             <ShieldCheck size={14} aria-hidden="true" /> Focus notes on
           </button>
         )}
         <div className="call-meta">
-          <span className="call-timer" title="Time in this interview"><Clock size={14} aria-hidden="true" /> {formatTime(elapsed)}</span>
-          <button className="icon-only" onClick={toggleTheme} aria-label={theme === "dark" ? "Use light theme" : "Use dark theme"} title="Switch theme">
+          <span className="call-timer" title="Time in this interview">
+            <Clock size={14} aria-hidden="true" /> {formatTime(elapsed)}
+          </span>
+          <button
+            className="icon-only"
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Use light theme" : "Use dark theme"}
+            title="Switch theme"
+          >
             {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          <button className="icon-only" onClick={() => setHelpOpen((open) => !open)} aria-label="Interview help" aria-expanded={helpOpen} title="Help">
+          <button
+            className="icon-only"
+            onClick={() => setHelpOpen((open) => !open)}
+            aria-label="Interview help"
+            aria-expanded={helpOpen}
+            title="Help"
+          >
             <HelpCircle size={18} />
           </button>
           <button
@@ -728,7 +998,11 @@ export function Room({
             disabled={locked}
             onClick={() => void endInterview()}
             aria-label="End interview"
-            title={phase === "thinking" || phase === "transcribing" ? "Saving your answer before ending the interview" : "End interview and prepare briefing"}
+            title={
+              phase === "thinking" || phase === "transcribing"
+                ? "Saving your answer before ending the interview"
+                : "End interview and prepare briefing"
+            }
           >
             End interview
           </button>
@@ -736,23 +1010,51 @@ export function Room({
         {helpOpen && (
           <section className="call-help" aria-label="How this interview works">
             <h2>How this works</h2>
-            <p>Maya asks one question at a time out loud. Take a moment to think; the microphone only waits for you to start. It stops after a short pause, or press <b>Space</b>.</p>
-            <p>Say “repeat the question”, “could you clarify that?” or “pause the interview” at any time, or use the buttons below.</p>
-            <p>Prefer typing? Use the keyboard button. Each answer is saved before the next question.</p>
+            <p>
+              Maya asks one question at a time out loud. Take a moment to think;
+              the microphone only waits for you to start. It stops after a short
+              pause, or press <b>Space</b>.
+            </p>
+            <p>
+              Say “repeat the question”, “could you clarify that?” or “pause the
+              interview” at any time, or use the buttons below.
+            </p>
+            <p>
+              Prefer typing? Use the keyboard button. Each answer is saved
+              before the next question.
+            </p>
             {screening && (
               <>
                 <h2>What {company} can see</h2>
-                <p>Your transcript and the AI’s score estimates. A person at {company} reviews them and makes every decision. No video or audio is recorded.</p>
-                <p>These focus notes are shown to the reviewer, with their length: leaving this tab for 3 seconds or more, leaving full screen, your camera stopping, and pasting a large block of text. They are notes, not penalties.</p>
+                <p>
+                  Your transcript and the AI’s score estimates. A person at{" "}
+                  {company} reviews them and makes every decision. No video or
+                  audio is recorded.
+                </p>
+                <p>
+                  These focus notes are shown to the reviewer, with their
+                  length: leaving this tab for 3 seconds or more, leaving full
+                  screen, your camera stopping, and pasting a large block of
+                  text. They are notes, not penalties.
+                </p>
               </>
             )}
           </section>
         )}
       </header>
 
-      {notice && <div className="call-toast" role="status">{notice}</div>}
+      {notice && (
+        <div className="call-toast" role="status">
+          {notice}
+        </div>
+      )}
       {(violation || ended) && (
-        <div className="strict-overlay" role="alertdialog" aria-modal="true" aria-labelledby="strict-title">
+        <div
+          className="strict-overlay"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="strict-title"
+        >
           <div>
             <ShieldAlert size={36} aria-hidden="true" />
             {ended ? (
@@ -760,41 +1062,79 @@ export function Room({
                 <h2 id="strict-title">Interview ended</h2>
                 <p>{ended}</p>
               </>
-            ) : violation && (
-              <>
-                <h2 id="strict-title">{strictMessage[violation.reason]}</h2>
-                <p>
-                  {violation.reason === "multiple_screens" ? "Disconnect the second display" : "Return to full screen"} within{" "}
-                  <strong>{Math.max(0, Math.ceil((violation.deadline - clock) / 1000))} seconds</strong> or the interview ends. Your answers so far are saved.
-                </p>
-                {violation.reason !== "multiple_screens" && (
-                  <button className="primary" onClick={() => void document.documentElement.requestFullscreen().catch(() => {})}>
-                    <Maximize size={18} /> Return to full screen
-                  </button>
-                )}
-              </>
+            ) : (
+              violation && (
+                <>
+                  <h2 id="strict-title">{strictMessage[violation.reason]}</h2>
+                  <p>
+                    {violation.reason === "multiple_screens"
+                      ? "Disconnect the second display"
+                      : "Return to full screen"}{" "}
+                    within{" "}
+                    <strong>
+                      {Math.max(
+                        0,
+                        Math.ceil((violation.deadline - clock) / 1000),
+                      )}{" "}
+                      seconds
+                    </strong>{" "}
+                    or the interview ends. Your answers so far are saved.
+                  </p>
+                  {violation.reason !== "multiple_screens" && (
+                    <button
+                      className="primary"
+                      onClick={() =>
+                        void document.documentElement
+                          .requestFullscreen()
+                          .catch(() => {})
+                      }
+                    >
+                      <Maximize size={18} /> Return to full screen
+                    </button>
+                  )}
+                </>
+              )
             )}
           </div>
         </div>
       )}
       <div className="call-stage">
         <nav className="interview-map" aria-label="Interview progress">
-          <p className="map-title">Question {current} of {total}</p>
+          <p className="map-title">
+            Question {current} of {total}
+          </p>
           <ol>
             {Array.from({ length: total }, (_, i) => {
               const done = session.turns[i];
-              const state = done ? "done" : i === session.turns.length ? "current" : "upcoming";
+              const state = done
+                ? "done"
+                : i === session.turns.length
+                  ? "current"
+                  : "upcoming";
               return (
-                <li key={i} className={state} aria-current={state === "current" ? "step" : undefined}>
-                  <span className="map-dot" aria-hidden="true">{done ? <Check size={12} /> : i + 1}</span>
+                <li
+                  key={i}
+                  className={state}
+                  aria-current={state === "current" ? "step" : undefined}
+                >
+                  <span className="map-dot" aria-hidden="true">
+                    {done ? <Check size={12} /> : i + 1}
+                  </span>
                   {done ? (
                     <details>
                       <summary>{done.question.focus}</summary>
                       <p className="map-q">{done.question.question}</p>
-                      <p className="map-a"><span className="sr-only">Your answer: </span>{done.answer}</p>
+                      <p className="map-a">
+                        <span className="sr-only">Your answer: </span>
+                        {done.answer}
+                      </p>
                     </details>
                   ) : (
-                    <span className="map-label">{state === "current" ? session.currentQuestion?.focus || "Current question" : "Coming up"}</span>
+                    <span className="map-label">
+                      {state === "current"
+                        ? session.currentQuestion?.focus || "Current question"
+                        : "Coming up"}
+                    </span>
                   )}
                 </li>
               );
@@ -802,31 +1142,66 @@ export function Room({
           </ol>
         </nav>
 
-        <section className={`interviewer-tile phase-${phase}`} aria-label="AI interviewer">
+        <section
+          className={`interviewer-tile phase-${phase}`}
+          aria-label="AI interviewer"
+        >
           <div className="maya-presence" aria-hidden="true">
             <span className="maya-ring r1" />
             <span className="maya-ring r2" />
-            <span className="maya-core"><Brain size={26} /></span>
+            <span className="maya-core">
+              <Brain size={26} />
+            </span>
           </div>
-          <p className={`turn-badge phase-${phase}`} aria-live="polite"><i aria-hidden="true" />{status}</p>
+          <p className={`turn-badge phase-${phase}`} aria-live="polite">
+            <i aria-hidden="true" />
+            {status}
+          </p>
           <div
             className={`question-caption ${shown.length > 170 ? "question-very-long" : shown.length > 105 ? "question-long" : ""}`}
             aria-live="polite"
           >
-            {mayaReply ? <p className="question-lead maya-reply">{mayaReply}</p> : session.currentQuestion?.lead && !clarifiedQuestion && <p className="question-lead">{session.currentQuestion.lead}</p>}
+            {mayaReply ? (
+              <p className="question-lead maya-reply">{mayaReply}</p>
+            ) : (
+              session.currentQuestion?.lead &&
+              !clarifiedQuestion && (
+                <p className="question-lead">{session.currentQuestion.lead}</p>
+              )
+            )}
             {session.currentQuestion && (
-              <span className="question-meta">{session.currentQuestion.focus} · {session.currentQuestion.difficulty}</span>
+              <span className="question-meta">
+                {session.currentQuestion.focus} ·{" "}
+                {session.currentQuestion.difficulty}
+              </span>
             )}
             <h1>{shown}</h1>
           </div>
           <div className="turn-state-slot" aria-live="polite">
-            {phase === "listening" && !recording && <p className="turn-hint">Take a moment. I’m listening as soon as you start.</p>}
-            {recording && <p className="turn-hint">Answer naturally. I’ll continue after a short pause.</p>}
-            {phase === "transcribing" && <p className="turn-hint">Turning your answer into text…</p>}
-            {lastAnswer && (phase === "thinking" || answerPending) && (
-              <blockquote className="answer-receipt"><span>You said</span>{lastAnswer}</blockquote>
+            {phase === "listening" && !recording && (
+              <p className="turn-hint">
+                Take a moment. I’m listening as soon as you start.
+              </p>
             )}
-            {phase === "paused" && !typing && <p className="turn-hint">Microphone paused. Resume when you’re ready.</p>}
+            {recording && (
+              <p className="turn-hint">
+                Answer naturally. I’ll continue after a short pause.
+              </p>
+            )}
+            {phase === "transcribing" && (
+              <p className="turn-hint">Turning your answer into text…</p>
+            )}
+            {lastAnswer && (phase === "thinking" || answerPending) && (
+              <blockquote className="answer-receipt">
+                <span>You said</span>
+                {lastAnswer}
+              </blockquote>
+            )}
+            {phase === "paused" && !typing && (
+              <p className="turn-hint">
+                Microphone paused. Resume when you’re ready.
+              </p>
+            )}
           </div>
         </section>
 
@@ -837,16 +1212,24 @@ export function Room({
             mediaStream={sharedStream.current}
             paused={phase !== "listening"}
             turn={session.turns.length}
-            onSummary={(summary) => { visual.current = summary; }}
+            onSummary={(summary) => {
+              visual.current = summary;
+            }}
             maxFaces={screening ? 2 : 1}
             onFaces={onFaces}
           />
           <div className={`mic-meter ${recording ? "live" : ""}`}>
             <Mic size={16} aria-hidden="true" />
-            <span className="meter-track" aria-hidden="true"><span className="meter-fill" /></span>
-            <span className="meter-time">{recording ? formatTime(answerSeconds) : "—"}</span>
+            <span className="meter-track" aria-hidden="true">
+              <span className="meter-fill" />
+            </span>
+            <span className="meter-time">
+              {recording ? formatTime(answerSeconds) : "—"}
+            </span>
           </div>
-          {recording && answerSeconds >= 120 && <p className="pace-hint">Good time to wrap up this answer.</p>}
+          {recording && answerSeconds >= 120 && (
+            <p className="pace-hint">Good time to wrap up this answer.</p>
+          )}
         </aside>
       </div>
 
@@ -862,43 +1245,144 @@ export function Room({
             void submitSpokenAnswer(text);
           }}
         >
-          <label htmlFor="typed-answer" className="sr-only">Type your answer</label>
-          <textarea id="typed-answer" autoFocus rows={3} maxLength={8000} value={draft} onChange={(event) => setDraft(event.target.value)} onPaste={(event) => { if (event.clipboardData.getData("text").length > 40) noteEvent("paste"); }} placeholder="Type your answer…" />
-          <button className="primary-action" disabled={draft.trim().length < 2 || locked}>Send answer</button>
+          <label htmlFor="typed-answer" className="sr-only">
+            Type your answer
+          </label>
+          <textarea
+            id="typed-answer"
+            autoFocus
+            rows={3}
+            maxLength={8000}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onPaste={(event) => {
+              if (event.clipboardData.getData("text").length > 40)
+                noteEvent("paste");
+            }}
+            placeholder="Type your answer…"
+          />
+          <button
+            className="primary-action"
+            disabled={draft.trim().length < 2 || locked}
+          >
+            Send answer
+          </button>
         </form>
       )}
 
       {(mediaError || error || transcription.error || voice.error) && (
         <div className="call-error" role="alert">
           {mediaError || error || transcription.error || voice.error}
-          {mediaError ? <button disabled={mediaState === "requesting"} onClick={() => void requestMedia()}>{mediaState === "requesting" ? "Reconnecting…" : "Reconnect camera & microphone"}</button> : <button onClick={() => answerPending ? void submitSpokenAnswer(lastAnswer) : repeatQuestion()}>{answerPending ? "Retry saving my answer" : "Retry this question"}</button>}
+          {mediaError ? (
+            <button
+              disabled={mediaState === "requesting"}
+              onClick={() => void requestMedia()}
+            >
+              {mediaState === "requesting"
+                ? "Reconnecting…"
+                : "Reconnect camera & microphone"}
+            </button>
+          ) : (
+            <button
+              onClick={() =>
+                answerPending
+                  ? void submitSpokenAnswer(lastAnswer)
+                  : repeatQuestion()
+              }
+            >
+              {answerPending ? "Retry saving my answer" : "Retry this question"}
+            </button>
+          )}
         </div>
       )}
 
       <footer className="call-controls" aria-label="Interview controls">
         <div className="call-dock">
-          <div className={`active-mic ${recording ? "live" : ""}`} role="img" aria-label={recording ? "Microphone is recording" : "Microphone is paused"}>
+          <div
+            className={`active-mic ${recording ? "live" : ""}`}
+            role="img"
+            aria-label={
+              recording ? "Microphone is recording" : "Microphone is paused"
+            }
+          >
             <Mic size={18} />
           </div>
-          <button className="round-control" disabled={locked} onClick={repeatQuestion} aria-label="Repeat question" data-tip="Repeat"><RotateCcw size={18} /></button>
-          <button className="round-control" disabled={locked} onClick={() => void clarifyQuestion()} aria-label="Clarify question" data-tip="Clarify"><MessageCircle size={18} /></button>
-          <button className={`round-control ${typing ? "on" : ""}`} disabled={locked} onClick={openTyping} aria-label={typing ? "Close typed answer" : "Type your answer instead"} aria-pressed={typing} data-tip="Type"><Keyboard size={18} /></button>
-          <button className="round-control" disabled={locked} onClick={() => phase === "paused" ? resumeInterview() : pauseInterview()} aria-label={phase === "paused" ? "Resume interview" : "Pause interview"} data-tip={phase === "paused" ? "Resume" : "Pause"}>
+          <button
+            className="round-control"
+            disabled={locked}
+            onClick={repeatQuestion}
+            aria-label="Repeat question"
+            data-tip="Repeat"
+          >
+            <RotateCcw size={18} />
+          </button>
+          <button
+            className="round-control"
+            disabled={locked}
+            onClick={() => void clarifyQuestion()}
+            aria-label="Clarify question"
+            data-tip="Clarify"
+          >
+            <MessageCircle size={18} />
+          </button>
+          <button
+            className={`round-control ${typing ? "on" : ""}`}
+            disabled={locked}
+            onClick={openTyping}
+            aria-label={
+              typing ? "Close typed answer" : "Type your answer instead"
+            }
+            aria-pressed={typing}
+            data-tip="Type"
+          >
+            <Keyboard size={18} />
+          </button>
+          <button
+            className="round-control"
+            disabled={locked}
+            onClick={() =>
+              phase === "paused" ? resumeInterview() : pauseInterview()
+            }
+            aria-label={
+              phase === "paused" ? "Resume interview" : "Pause interview"
+            }
+            data-tip={phase === "paused" ? "Resume" : "Pause"}
+          >
             {phase === "paused" ? <Play size={18} /> : <Pause size={18} />}
           </button>
-          <button className="round-control" onClick={() => void toggleFullscreen()} aria-label={fullscreen ? "Exit full screen" : "Enter full screen"} data-tip={fullscreen ? "Exit full screen" : "Full screen"}>
+          <button
+            className="round-control"
+            onClick={() => void toggleFullscreen()}
+            aria-label={fullscreen ? "Exit full screen" : "Enter full screen"}
+            data-tip={fullscreen ? "Exit full screen" : "Full screen"}
+          >
             {fullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
           </button>
         </div>
         {phase === "interviewer" && !clarifying ? (
-          <button className="primary-action" onClick={skipToAnswer}>Skip to my answer</button>
+          <button className="primary-action" onClick={skipToAnswer}>
+            Skip to my answer
+          </button>
         ) : (
-          <button className="primary-action" aria-label="Done speaking" aria-keyshortcuts="Space" disabled={!recording || phase !== "listening"} onClick={transcription.stop}>
+          <button
+            className="primary-action"
+            aria-label="Done speaking"
+            aria-keyshortcuts="Space"
+            disabled={!recording || phase !== "listening"}
+            onClick={transcription.stop}
+          >
             Done speaking <kbd aria-hidden="true">Space</kbd>
           </button>
         )}
       </footer>
-      {phase === "complete" && <BriefingDialog screening={screening} error={briefingError} retry={() => void endInterview()} back={back} />}
+      {phase === "complete" && (
+        <BriefingDialog
+          screening={screening}
+          error={briefingError}
+          retry={() => void endInterview()}
+          back={back}
+        />
+      )}
     </div>
   );
 }

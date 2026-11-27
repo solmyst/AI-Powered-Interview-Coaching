@@ -12,7 +12,7 @@ import {
   screeningReportSchema,
 } from "./schemas.js";
 
-export const CONSENT_VERSION = "2026-11-27";
+export const CONSENT_VERSION = "2026-11-28";
 const DAY = 86400000;
 // A candidate who started in time may still submit for this long after the window closes.
 const GRACE = 15 * 60000;
@@ -48,6 +48,105 @@ export const attentionScore = (turns) => {
     ? Math.round(seen.reduce((n, a) => n + a.eyeContact, 0) / seen.length)
     : null;
 };
+// Filler words counted from the transcript, never from audio: hesitation sounds and common spoken padding in
+// English and Hindi. Counted per word so a reviewer sees which ones, and shown beside the score, not inside it.
+const FILLERS = [
+  "um+",
+  "uh+",
+  "er+m?",
+  "hm+",
+  "you know",
+  "i mean",
+  "kind of",
+  "sort of",
+  "basically",
+  "actually",
+  "matlab",
+  "yaani",
+  "मतलब",
+  "यानी",
+];
+const FILLER_RE = new RegExp(
+  `(?<![\\p{L}\\p{N}])(${FILLERS.join("|")})(?![\\p{L}\\p{N}])`,
+  "giu",
+);
+export function fillersOf(text) {
+  const by = {};
+  for (const m of text.matchAll(FILLER_RE)) {
+    const word = m[1].toLowerCase().replace(/(.)\1+$/u, "$1");
+    by[word] = (by[word] || 0) + 1;
+  }
+  return by;
+}
+const wordCount = (text) => text.trim().split(/\s+/).filter(Boolean).length;
+// Per-answer delivery record: camera counts from the candidate's device, plus counts taken from their own words.
+export function deliveryOf(input, text) {
+  const spoken = Number(input?.speech?.captureMs) > 0;
+  const words = wordCount(text);
+  const fillers = fillersOf(text);
+  const v = input?.visual;
+  const fillerTotal = Object.values(fillers).reduce((n, c) => n + c, 0);
+  return {
+    spoken,
+    words,
+    fillers,
+    fillerTotal,
+    captureMs: spoken ? input.speech.captureMs : 0,
+    wpm:
+      spoken && input.speech.captureMs >= 5000
+        ? Math.round(words / (input.speech.captureMs / 60000))
+        : null,
+    ...(v?.samples
+      ? {
+          observedMs: v.observedMs,
+          awayEpisodes: v.awayEpisodes ?? 0,
+          awayMs: v.awayMs ?? 0,
+          lostEpisodes: v.lostEpisodes ?? 0,
+          lostMs: v.lostMs ?? 0,
+        }
+      : {}),
+  };
+}
+// Candidate-level totals for the report and the CSV.
+export function deliverySummary(turns) {
+  const rows = turns.map((t) => t.delivery).filter(Boolean);
+  const sum = (key) => rows.reduce((n, d) => n + (d[key] || 0), 0);
+  const spokenRows = rows.filter((d) => d.spoken);
+  const spokenWords = spokenRows.reduce((n, d) => n + d.words, 0);
+  const spokenMs = spokenRows.reduce((n, d) => n + d.captureMs, 0);
+  const fillers = {};
+  for (const d of rows)
+    for (const [word, n] of Object.entries(d.fillers || {}))
+      fillers[word] = (fillers[word] || 0) + n;
+  const withCamera = rows.filter((d) => d.observedMs !== undefined);
+  return {
+    answers: turns.length,
+    spokenAnswers: spokenRows.length,
+    typedAnswers: turns.length - spokenRows.length,
+    words: sum("words"),
+    fillerTotal: sum("fillerTotal"),
+    fillers,
+    fillersPer100Words: spokenWords
+      ? Math.round(
+          (1000 * spokenRows.reduce((n, d) => n + d.fillerTotal, 0)) /
+            spokenWords,
+        ) / 10
+      : null,
+    wpm: spokenMs >= 5000 ? Math.round(spokenWords / (spokenMs / 60000)) : null,
+    cameraAnswers: withCamera.length,
+    awayEpisodes: withCamera.reduce((n, d) => n + d.awayEpisodes, 0),
+    awaySeconds: Math.round(
+      withCamera.reduce((n, d) => n + d.awayMs, 0) / 1000,
+    ),
+    lostEpisodes: withCamera.reduce((n, d) => n + d.lostEpisodes, 0),
+    lostSeconds: Math.round(
+      withCamera.reduce((n, d) => n + d.lostMs, 0) / 1000,
+    ),
+    observedSeconds: Math.round(
+      withCamera.reduce((n, d) => n + d.observedMs, 0) / 1000,
+    ),
+  };
+}
 const normalize = (text) =>
   text
     .toLowerCase()
@@ -627,6 +726,7 @@ export function registerScreening(
           score: r.state === "complete" ? r.score : null,
           competencyScores: session?.report?.competencyScores || null,
           attention: session ? attentionScore(session.turns) : null,
+          delivery: session ? deliverySummary(session.turns) : null,
           terminated: r.terminated > 0,
           answered: session?.turns.length || 0,
           questionCount: role.config.questionCount,
@@ -692,8 +792,10 @@ export function registerScreening(
             exchanges: t.exchanges || [],
             evaluation: t.evaluation || null,
             attention: t.attention || null,
+            delivery: t.delivery || null,
             events: events.filter((e) => e.turn === i),
           })),
+          deliverySummary: deliverySummary(session.turns),
           currentQuestion: session.currentQuestion,
           report: session.report,
         },
@@ -770,6 +872,12 @@ export function registerScreening(
         "Overall (AI estimate)",
         ...role.config.rubric.map((r) => r.label),
         "Answered",
+        "Eye contact %",
+        "Looked away (times)",
+        "Face out of frame (times)",
+        "Filler words",
+        "Fillers per 100 words",
+        "Pace (words per minute)",
         "Decision",
         "Unreviewed flags",
       ]
@@ -783,6 +891,12 @@ export function registerScreening(
           c.score,
           ...keys.map((k) => c.competencyScores?.[k]),
           `${c.answered}/${c.questionCount}`,
+          c.attention,
+          c.delivery?.cameraAnswers ? c.delivery.awayEpisodes : "",
+          c.delivery?.cameraAnswers ? c.delivery.lostEpisodes : "",
+          c.delivery?.spokenAnswers ? c.delivery.fillerTotal : "",
+          c.delivery?.fillersPer100Words,
+          c.delivery?.wpm,
           c.decision?.status,
           c.unreviewedFlags,
         ]
@@ -1264,7 +1378,6 @@ export function registerScreening(
     async (req, res) =>
       locked(req.candidate.id, async () => {
         const invite = req.candidate;
-        // Delivery metrics (gaze, framing, filler words) are never stored for screening: bias risk.
         const input = answerSchema.parse(req.body);
         const session = activeScreening(invite, input.expectedTurn);
         const turn = await decideTurn(ai, session, input.answer, {
@@ -1294,10 +1407,14 @@ export function registerScreening(
           ...(session.exchanges?.length
             ? { exchanges: session.exchanges }
             : {}),
-          // Only the two percentages are kept, never raw camera data.
+          // Aggregate counts only, never raw camera frames or audio.
           ...(attentionOf(input.delivery?.visual)
             ? { attention: attentionOf(input.delivery.visual) }
             : {}),
+          delivery: deliveryOf(
+            input.delivery,
+            answerOf(session.exchanges, input.answer),
+          ),
         });
         session.exchanges = [];
         session.currentQuestion = turn.last ? null : turn.nextQuestion;

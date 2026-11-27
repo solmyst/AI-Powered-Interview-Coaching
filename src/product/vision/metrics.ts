@@ -23,7 +23,17 @@ export type VisualSummary = {
   headLevelSamples: number;
   shoulderSamples: number;
   levelShoulderSamples: number;
+  // Looking away: runs of 1 s or more with the face visible and the eyes open but not facing the screen.
+  awayEpisodes: number;
+  awayMs: number;
+  awayRunMs: number;
+  // Face out of view: runs of 2 s or more.
+  lostEpisodes: number;
+  lostMs: number;
+  lostRunMs: number;
 };
+export const AWAY_RUN_MS = 1000;
+export const LOST_RUN_MS = 2000;
 export const emptyVisual = (): VisualSummary => ({
   samples: 0,
   observedMs: 0,
@@ -34,6 +44,12 @@ export const emptyVisual = (): VisualSummary => ({
   headLevelSamples: 0,
   shoulderSamples: 0,
   levelShoulderSamples: 0,
+  awayEpisodes: 0,
+  awayMs: 0,
+  awayRunMs: 0,
+  lostEpisodes: 0,
+  lostMs: 0,
+  lostRunMs: 0,
 });
 function tilt(a: Landmark, b: Landmark, aspect: number) {
   const [left, right] = a.x < b.x ? [a, b] : [b, a];
@@ -106,6 +122,16 @@ export function accumulate(
   frame: FrameSignals,
   elapsedMs: number,
 ): VisualSummary {
+  const step = Math.round(Math.min(500, Math.max(0, elapsedMs)));
+  // Unknown gaze (eyes closed, a blink) neither starts nor ends a run of looking away.
+  const away = frame.face && frame.gazeAligned === false;
+  const awayRun = away
+    ? summary.awayRunMs + step
+    : frame.gazeAligned === true || !frame.face
+      ? 0
+      : summary.awayRunMs;
+  const lost = !frame.face;
+  const lostRun = lost ? summary.lostRunMs + step : 0;
   return {
     samples: summary.samples + 1,
     observedMs:
@@ -123,6 +149,16 @@ export function accumulate(
     levelShoulderSamples:
       summary.levelShoulderSamples +
       Number(frame.shoulderTilt !== null && Math.abs(frame.shoulderTilt) < 10),
+    awayEpisodes:
+      summary.awayEpisodes +
+      Number(away && summary.awayRunMs < AWAY_RUN_MS && awayRun >= AWAY_RUN_MS),
+    awayMs: summary.awayMs + (away ? step : 0),
+    awayRunMs: awayRun,
+    lostEpisodes:
+      summary.lostEpisodes +
+      Number(lost && summary.lostRunMs < LOST_RUN_MS && lostRun >= LOST_RUN_MS),
+    lostMs: summary.lostMs + (lost ? step : 0),
+    lostRunMs: lostRun,
   };
 }
 export function combineVisual(values: VisualSummary[]): VisualSummary {

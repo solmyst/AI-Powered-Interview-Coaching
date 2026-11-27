@@ -375,11 +375,15 @@ function Notice({
           <h2>What is collected</h2>
           <p>
             Your answers as text, the AI’s score estimates with quotes from what
-            you said, the focus notes below, and the share of your answering
-            time you looked at the screen (eye contact, as a percentage). Audio
-            is sent to a speech service to become text and is not stored by
-            InterviewAce. <strong>No video is recorded or sent.</strong> Your
-            camera is checked on your device only.
+            you said, and the focus notes below. From your camera, checked on
+            your device only, we keep counts: the share of your answering time
+            you looked at the screen (eye contact), how many times you looked
+            away or left the frame, and how long for. From your words we count
+            how many you spoke, your speaking pace and filler words such as
+            “um”. The company sees these next to the AI’s estimate as context;
+            they are not part of the estimate. Audio is sent to a speech service
+            to become text and is not stored by InterviewAce.{" "}
+            <strong>No video is recorded or sent.</strong>
           </p>
         </div>
         <div>

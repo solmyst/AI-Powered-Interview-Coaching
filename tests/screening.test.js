@@ -974,3 +974,121 @@ test("the company can tell a candidate who left from one who is answering, and s
   });
   assert.equal((await row()).leftAt, 0);
 });
+
+test("delivery counts are stored per answer, summarised for the company, and never shown to the candidate", async () => {
+  const { fillersOf, deliveryOf, deliverySummary } =
+    await import("../server/screening.js");
+  assert.deepEqual(
+    fillersOf(
+      "Um, so basically I think, uh, you know, matlab it is good. Ummm",
+    ),
+    {
+      um: 2,
+      basically: 1,
+      uh: 1,
+      "you know": 1,
+      matlab: 1,
+    },
+  );
+  const one = deliveryOf(
+    {
+      speech: { source: "assemblyai", captureMs: 30000, words: 60, fillers: 0 },
+      visual: {
+        samples: 56,
+        observedMs: 28000,
+        awayEpisodes: 2,
+        awayMs: 5000,
+        lostEpisodes: 1,
+        lostMs: 3000,
+      },
+    },
+    "Um we should look at funnel data, you know, and uh check drop off at the entry step. ".repeat(
+      3,
+    ),
+  );
+  assert.equal(one.spoken, true);
+  assert.equal(one.fillerTotal, 9);
+  assert.equal(one.wpm, Math.round(one.words / 0.5));
+  const typed = deliveryOf(undefined, "A typed answer with no fillers at all.");
+  assert.equal(typed.spoken, false);
+  assert.equal(typed.wpm, null);
+  const sum = deliverySummary([{ delivery: one }, { delivery: typed }]);
+  assert.equal(sum.spokenAnswers, 1);
+  assert.equal(sum.typedAnswers, 1);
+  assert.equal(sum.awayEpisodes, 2);
+  assert.equal(sum.lostEpisodes, 1);
+  assert.equal(sum.fillerTotal, 9);
+
+  // Through the API: the company report carries them, the candidate's own view does not.
+  const made = await call(`/orgs/${orgId}/roles`, {
+    method: "POST",
+    cookie: owner,
+    body: roleBody("Delivery check"),
+  });
+  const sent = await call(`/roles/${made.body.id}/invites`, {
+    method: "POST",
+    cookie: owner,
+    body: { candidates: [{ name: "Dee", email: "dee@example.test" }] },
+  });
+  const opened = await call("/candidate/session", {
+    method: "POST",
+    body: { token: tokenOf(sent.body.invites[0].link) },
+  });
+  await call("/candidate/consent", {
+    method: "POST",
+    cookie: opened.cookie,
+    body: { accepted: true, version: opened.body.consentVersion },
+  });
+  await call("/candidate/interview", {
+    method: "POST",
+    cookie: opened.cookie,
+    body: {},
+  });
+  const answered = await call("/candidate/interview/answers", {
+    method: "POST",
+    cookie: opened.cookie,
+    body: {
+      answer: answerText,
+      expectedTurn: 0,
+      delivery: {
+        speech: {
+          source: "assemblyai",
+          captureMs: 20000,
+          words: 40,
+          fillers: 0,
+        },
+        visual: {
+          samples: 40,
+          observedMs: 20000,
+          faceSamples: 38,
+          gazeSamples: 36,
+          alignedGazeSamples: 30,
+          centeredSamples: 30,
+          headLevelSamples: 30,
+          shoulderSamples: 0,
+          levelShoulderSamples: 0,
+          awayEpisodes: 3,
+          awayMs: 6000,
+          awayRunMs: 0,
+          lostEpisodes: 1,
+          lostMs: 2500,
+          lostRunMs: 0,
+        },
+      },
+    },
+  });
+  assert.equal(JSON.stringify(answered.body).includes("awayEpisodes"), false);
+  assert.equal(JSON.stringify(answered.body).includes("fillerTotal"), false);
+  const invite = sent.body.invites[0].id;
+  const report = await call(`/invites/${invite}/report`, { cookie: owner });
+  const turn = report.body.screening.turns[0];
+  assert.equal(turn.delivery.awayEpisodes, 3);
+  assert.equal(turn.delivery.spoken, true);
+  assert.equal(report.body.screening.deliverySummary.awayEpisodes, 3);
+  assert.equal(report.body.screening.deliverySummary.cameraAnswers, 1);
+  const csv = await call(`/roles/${made.body.id}/export.csv`, {
+    cookie: owner,
+    raw: true,
+  });
+  assert.match(csv.body.split("\r\n")[0], /Looked away \(times\)/);
+});

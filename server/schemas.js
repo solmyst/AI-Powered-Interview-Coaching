@@ -159,6 +159,13 @@ export const visualSchema = z
     headLevelSamples: count,
     shoulderSamples: count,
     levelShoulderSamples: count,
+    // Optional so older browser tabs keep working.
+    awayEpisodes: count.optional(),
+    awayMs: z.number().int().min(0).max(7200000).optional(),
+    awayRunMs: z.number().int().min(0).max(7200000).optional(),
+    lostEpisodes: count.optional(),
+    lostMs: z.number().int().min(0).max(7200000).optional(),
+    lostRunMs: z.number().int().min(0).max(7200000).optional(),
   })
   .strict()
   .superRefine((v, ctx) => {

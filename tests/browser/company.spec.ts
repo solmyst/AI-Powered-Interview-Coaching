@@ -70,6 +70,22 @@ const report = {
   screening: {
     state: "complete",
     currentQuestion: null,
+    deliverySummary: {
+      answers: 1,
+      spokenAnswers: 1,
+      typedAnswers: 0,
+      words: 52,
+      fillerTotal: 4,
+      fillers: { um: 3, "you know": 1 },
+      fillersPer100Words: 7.7,
+      wpm: 128,
+      cameraAnswers: 1,
+      awayEpisodes: 3,
+      awaySeconds: 9,
+      lostEpisodes: 1,
+      lostSeconds: 4,
+      observedSeconds: 24,
+    },
     report: {
       summary: "Structured answers with good instincts.",
       strengths: ["Idempotency"],
@@ -85,6 +101,20 @@ const report = {
           focus: "Judgment",
         },
         answer: "I would use an idempotency key stored with the request.",
+        attention: { eyeContact: 71, inFrame: 96 },
+        delivery: {
+          spoken: true,
+          words: 52,
+          fillers: { um: 3, "you know": 1 },
+          fillerTotal: 4,
+          captureMs: 24000,
+          wpm: 130,
+          observedMs: 24000,
+          awayEpisodes: 3,
+          awayMs: 9000,
+          lostEpisodes: 1,
+          lostMs: 4000,
+        },
         exchanges: [
           { said: "What do you mean?", reply: "I mean a retried payment." },
         ],
@@ -287,6 +317,13 @@ test("a reviewer sees a ranked list, evidence and flags, and records a human dec
     page.getByText("A person makes every decision", { exact: false }),
   ).toBeVisible();
   await expect(page.getByText("Little caching experience")).toBeVisible();
+  // One scorecard with the delivery signals beside the content score.
+  const card = page.getByRole("region", { name: "Evaluation scorecard" });
+  await expect(card).toContainText("Times looked away");
+  await expect(card).toContainText("9 s total");
+  await expect(card).toContainText("Filler words used");
+  await expect(card).toContainText("“um” ×3");
+  await expect(card).toContainText("not part of the estimate");
   await expect(page.getByText("My connection dropped once.")).toBeVisible();
   await expect(page.getByText("“use an idempotency key”")).toBeVisible();
   await expect(page.getByText("Left the tab · 14s")).toBeVisible();
