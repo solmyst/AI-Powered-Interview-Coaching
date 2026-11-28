@@ -39,11 +39,12 @@ export const tidyQuestion = (q) => ({
     .join(" "),
 });
 // Used only when the model keeps repeating itself, so the interview never stalls on one question.
+// Role-neutral on purpose: they must fit any job, not only software teams.
 export const fallbackQuestions = [
-  "Imagine your team ships a release and, an hour later, users report that checkout is failing. What do you do in the first fifteen minutes?",
-  "Suppose a teammate's pull request works but is hard to read. How would you give feedback, and what would you want to see change?",
-  "Imagine you are given a task with unclear requirements and a deadline in two days. How do you get unstuck?",
-  "Suppose a page you built loads slowly for users on weak connections. How would you find the cause and what would you try first?",
+  "Tell me about a time you had to make a decision without all the information you wanted. What did you decide, and how did you check it was right?",
+  "Imagine you are given a task with unclear requirements and a deadline in two days. How do you get started?",
+  "Tell me about a time something you worked on did not go as planned. What did you do next?",
+  "Suppose two people you work with need different things from you this week. How do you decide what to do first?",
 ];
 // Only words of 4+ letters count, so "would you what" filler cannot hide a reworded question.
 const words = (text) =>
@@ -259,7 +260,7 @@ export async function decideTurn(ai, session, answer, persona = {}) {
     usage = addUsage(usage, generated.usage);
   }
   let nextQuestion = generated.value.nextQuestion;
-  if (repeated(generated.value)) {
+  if (repeated(generated.value) && !thin) {
     const question = fallbackQuestions.find((q) => !repeats(q, asked));
     if (!question)
       throw new ServiceError(
