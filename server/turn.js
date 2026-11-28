@@ -260,7 +260,7 @@ export async function decideTurn(ai, session, answer, persona = {}) {
     usage = addUsage(usage, generated.usage);
   }
   let nextQuestion = generated.value.nextQuestion;
-  if (repeated(generated.value) && !thin) {
+  if (repeated(generated.value)) {
     const question = fallbackQuestions.find((q) => !repeats(q, asked));
     if (!question)
       throw new ServiceError(
