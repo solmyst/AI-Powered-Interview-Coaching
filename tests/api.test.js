@@ -94,7 +94,7 @@ const ai = {
                 }
               : shape.levels
                 ? {
-                    relevant: true,
+                    relevant: !offTopicFixture,
                     substantive: true,
                     levels: Object.fromEntries(
                       Object.keys(shape.levels.shape).map((k) => [k, 3]),

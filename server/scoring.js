@@ -299,10 +299,9 @@ export async function evaluate(ai, ctx) {
     sampling: { temperature: 0, topP: 1 },
     requestedSamples: SAMPLES,
   };
-  const why =
-    ctx.offTopic === true
-      ? "The answer did not address the question after a clarification opportunity."
-      : substanceGate(answer, ctx.question.question);
+  // The interviewer's quick relevance check (ctx.offTopic) only decides whether to re-ask; it misreads vague but
+  // related attempts, so the judge panel, which zeroes unrelated answers by majority, decides relevance for scoring.
+  const why = substanceGate(answer, ctx.question.question);
   if (why)
     return {
       value: {

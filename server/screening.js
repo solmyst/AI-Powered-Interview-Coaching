@@ -293,6 +293,17 @@ export function registerScreening(
     return job;
   }
 
+  // One report job per invite, whether the candidate's submit or a reviewer's open started it.
+  const finishing = new Map();
+  function finishLater(invite) {
+    if (!finishing.has(invite.id))
+      finishing.set(
+        invite.id,
+        finishReport(invite).finally(() => finishing.delete(invite.id)),
+      );
+    return finishing.get(invite.id);
+  }
+
   async function finishReport(invite) {
     let { session } = readScreening(invite.id);
     if (session.report) return session;
@@ -748,7 +759,7 @@ export function registerScreening(
       const invite = loadInvite(req);
       let found = readScreening(invite.id);
       if (found?.session.state === "report_pending") {
-        await finishReport(invite);
+        await finishLater(invite);
         found = readScreening(invite.id);
       }
       const events = db
@@ -1460,7 +1471,8 @@ export function registerScreening(
           fail(400, "Answer at least one question before submitting.");
         found.session.state = "report_pending";
         saveScreening(invite.id, found.session);
-        await finishReport(invite);
+        // Candidates never see scores, so they do not wait for scoring; a failure is retried when a reviewer opens it.
+        finishLater(invite).catch(() => {});
       }
       res.json(summary({ ...invite, status: "completed" }));
     }),
@@ -1496,8 +1508,8 @@ export function registerScreening(
         } else {
           session.state = "report_pending";
           saveScreening(invite.id, session);
-          // A failed report is retried when the reviewer opens the candidate.
-          await finishReport(invite).catch(() => {});
+          // Scored in the background; a failed report is retried when the reviewer opens the candidate.
+          finishLater(invite).catch(() => {});
         }
         res.json(summary({ ...invite, status: "completed" }));
       }),

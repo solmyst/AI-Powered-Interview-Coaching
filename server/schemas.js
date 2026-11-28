@@ -49,7 +49,7 @@ export const roleConfigSchema = z
         "Rubric keys must be unique",
       ),
     inviteDays: z.number().int().min(1).max(30).default(7),
-    candidateFeedback: z.enum(["none", "summary"]).default("summary"),
+    candidateFeedback: z.enum(["none", "summary"]).default("none"),
     // Company-written questions are asked first, in order; Maya writes the rest.
     questions: z.array(z.string().trim().min(10).max(600)).max(8).default([]),
     // strict: full screen and one display required; leaving for 10 s ends the interview.

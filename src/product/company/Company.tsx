@@ -591,7 +591,7 @@ function RoleForm({
     questionCount: 5,
     rubric: (choices.rubrics as Record<string, RubricItem[]>).Technical,
     inviteDays: 7,
-    candidateFeedback: "summary",
+    candidateFeedback: "none",
     questions: [],
     proctoring: "strict",
   });
@@ -883,12 +883,12 @@ function RoleForm({
                   set("candidateFeedback", e.target.value as "none" | "summary")
                 }
               >
-                <option value="summary">Preparation summary</option>
                 <option value="none">Thank-you message</option>
+                <option value="summary">Preparation summary</option>
               </NativeSelect>
               <small id="role-feedback-help" className="field-help">
                 {form.candidateFeedback === "summary"
-                  ? "A short summary of areas to prepare. Scores stay private to your team."
+                  ? "A short summary of areas to prepare, shown once scoring finishes. Scores stay private to your team."
                   : "Candidates see a thank-you message without scores or feedback."}
               </small>
             </label>

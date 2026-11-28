@@ -202,15 +202,20 @@ test("unrepairable judge evidence is an assessment error, never a low candidate 
   await assert.rejects(evaluate(ai, context), /judge panel|assessment/i);
 });
 
-test("server-recorded off-topic dispositions cannot later receive scoring credit", async () => {
-  const ai = {
-    generate: () => {
-      throw new Error("Should not call the model");
-    },
-  };
-  const result = await evaluate(ai, { ...context, offTopic: true });
-  assert.equal(result.value.scores.judgment, 0);
-  assert.match(result.value.gate, /did not address/);
+test("an off-topic flag from the interviewer does not zero an answer, but the judges' off-topic verdict does", async () => {
+  const panel = (relevant) => ({
+    generate: async (schema) => ({
+      value: schema.shape.points
+        ? { points: ["Contain harm"] }
+        : { ...judgeSample(3), relevant },
+      usage,
+    }),
+  });
+  const kept = await evaluate(panel(true), { ...context, offTopic: true });
+  assert.equal(kept.value.scores.judgment, 75);
+  const dropped = await evaluate(panel(false), { ...context, offTopic: true });
+  assert.equal(dropped.value.scores.judgment, 0);
+  assert.match(dropped.value.gate, /did not address/);
 });
 
 test("a repair cannot hide missing evidence by quietly lowering the candidate's level", async () => {

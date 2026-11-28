@@ -160,6 +160,7 @@ const roleBody = (title = "Backend engineer") => ({
   jobDescription:
     "Build and operate APIs for a payments product. Own reliability, caching and data models.",
   questionCount: 3,
+  candidateFeedback: "summary",
   rubric: options.rubrics.Technical,
 });
 const tokenOf = (link) => link.split("#t=")[1];
@@ -372,17 +373,23 @@ test("candidate flow: consent first, candidates never see scores, report verifie
     cookie: asha,
     body: {},
   });
+  // Submitting returns at once; scoring runs in the background, so the candidate never waits for it.
   assert.equal(done.status, 200);
-  assert.equal(done.body.state, "complete");
-  assert.deepEqual(Object.keys(done.body.feedback), [
-    "strengths",
-    "areasToPrepare",
-  ]);
+  assert.equal(done.body.state, "report_pending");
+  assert.equal(done.body.feedback, null);
   assert.doesNotMatch(done.text, /"(overall|competencyScores)"/);
 
   const report = await call(`/invites/${invites[0].id}/report`, {
     cookie: owner,
   });
+  // A role that opted in to candidate feedback shows it once the report exists, still without scores.
+  const later = await call("/candidate/session", { cookie: asha });
+  assert.equal(later.body.state, "complete");
+  assert.deepEqual(Object.keys(later.body.feedback), [
+    "strengths",
+    "areasToPrepare",
+  ]);
+  assert.doesNotMatch(later.text, /"(overall|competencyScores)"/);
   const { turns, report: summary } = report.body.screening;
   // The server supplies the actual transcript text; the model can select only source IDs.
   assert.ok(turns[0].evaluation.evidence.every((e) => e.quote === answerText));
