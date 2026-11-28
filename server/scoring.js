@@ -11,7 +11,7 @@ export { normalize } from "./evidence.js";
 
 // Level 0-4 to a score. Level 1 is "touches the topic, nothing more", so it earns little.
 export const LEVEL_SCORE = [0, 20, 45, 75, 100];
-export const SCORING_VERSION = "anchored-evidence-v2";
+export const SCORING_VERSION = "anchored-evidence-v3";
 // An odd full panel is required; incomplete panels remain retryable rather than silently changing the method.
 export const SAMPLES = Number(process.env.SCORING_SAMPLES || 3);
 if (![3, 5].includes(SAMPLES))
@@ -67,9 +67,9 @@ const SCALE = `Use ONLY these criterion-specific anchors, independently for ever
 0 = no credit: no attempt, unrelated, only restates the question, "I don't know", or filler.
 1 = touches the topic but is generic: no specifics, no reasoning, could be said about any question.
 2 = relevant and partly specific, with some reasoning, but with clear gaps or missing important points.
-3 = proficient: specific and substantially correct, covers most of the criterion, but leaves an important criterion-relevant explanation or action implicit.
-4 = fully meets the criterion for this question and role: concrete, correct and sufficiently reasoned, with no material gap for that criterion. Where the criterion calls for judgment, look for a justified priority, trade-off, verification step, or relevant failure case. A clear concise answer can earn 4. Do not require exceptional accomplishments, every possible edge case, invented metrics, senior-level depth from an intern, or extra topics the question did not request.
-Award 4 when supported; it is not reserved for a rare percentile of candidates. Do not award it for verbosity or merely mentioning many actions. Clear organisation can fully meet communication without adding a technical trade-off. Reasoning needs an actual explanation, not just a list. The server maps these anchors to percentages; do not invent numeric bands.`;
+3 = solid: specific, correct and complete enough to act on for this criterion. A correct, sensible plan with brief reasons is a 3.
+4 = excellent: everything in 3, AND the answer explicitly justifies its choices for this criterion: it states why one step comes first, weighs a trade-off or risk, explains how the cause would be verified, or says how success would be checked. Name that justification in the rationale. Do not require exceptional accomplishments, every possible edge case, invented metrics, senior-level depth from an intern, or extra topics the question did not request; a concise answer can earn 4 if the justification is there.
+Do not award 4 for verbosity or merely mentioning many actions. Clear organisation can fully meet communication without adding a technical trade-off. Reasoning needs an actual explanation, not just a list. The server maps these anchors to percentages; do not invent numeric bands.`;
 
 const judgeTask = (points) =>
   `You are an evidence-based criterion assessor, not a stack ranker. Score ONLY the content of candidateAnswer against each rubric criterion.
@@ -81,7 +81,7 @@ Rules:
 - A criterion about communication is about how clearly the substance given is organised. With little or no substance it is 0 or 1, however fluent.
 - Be consistent: the same answer must get the same levels. Judge against the scale, not against how other candidates might answer.
 - Grade each criterion independently. A missing operational detail cannot lower communication if the answer itself is clear and organised. A proportionate remedy can fully demonstrate empathy without an additional gift. A sound alternative implementation can fully demonstrate correctness without the reference's preferred tool.
-- A level below 4 must be justified by a MATERIAL gap for THAT criterion in the question's requested scope. Do not invent additional duties, require escalating to a particular team, demand an extra compensation gesture, or require unasked-for metrics just to avoid the highest level.
+- Do not lower a level by inventing duties the question did not ask for, such as escalating to a particular team, an extra compensation gesture, or unasked-for metrics.
 - substantive is false when the answer has no real content of its own.
 ${points.length ? `A strong answer to this question would likely make these points (a guide, not a checklist; accept equally good alternatives):\n${points.map((p, i) => `${i + 1}. ${p}`).join("\n")}` : ""}
 Give a short rationale that names what was good and what was missing.`;

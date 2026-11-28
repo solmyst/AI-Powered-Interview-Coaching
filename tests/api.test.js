@@ -246,7 +246,7 @@ test("an unrelated answer gets one retry, is recorded as off-topic, and cannot r
     assert.equal(report.body.report.overall, 0);
     assert.deepEqual(report.body.turns[0].evaluation.strengths, []);
     assert.deepEqual(report.body.report.strengths, []);
-    assert.equal(report.body.report.scoringVersion, "anchored-evidence-v2");
+    assert.equal(report.body.report.scoringVersion, "anchored-evidence-v3");
   } finally {
     offTopicFixture = false;
   }

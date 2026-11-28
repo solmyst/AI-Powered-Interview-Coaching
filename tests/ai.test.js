@@ -223,3 +223,54 @@ test("hosted calls wait for a free slot instead of failing, and replies go befor
     globalThis.fetch = realFetch;
   }
 });
+test("assessment calls go to the grader endpoint with its key; interview calls stay on NVIDIA", async () => {
+  const original = globalThis.fetch;
+  const calls = [];
+  const schema = z.object({ ok: z.boolean() });
+  try {
+    globalThis.fetch = async (url, options) => {
+      calls.push({
+        url,
+        auth: options.headers.Authorization,
+        body: JSON.parse(options.body),
+      });
+      return new Response(
+        JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }] }),
+        { status: 200 },
+      );
+    };
+    const ai = createAI({
+      AI_PROVIDER: "nvidia",
+      NVIDIA_API_KEY: "nv-key",
+      NVIDIA_MODEL: "nvidia/nemotron-3.5-lightning-30b-a3b",
+      GRADER_API_KEY: "grader-key",
+      GRADER_BASE_URL: "https://gateway.example/v1/",
+      GRADER_MODEL: "gemini/gemini-3.8-flash",
+    });
+    assert.equal(ai.assessmentModel, "gemini/gemini-3.8-flash");
+    await ai.generate(schema, "", {}, { purpose: "assessment" });
+    await ai.generate(schema, "", {}, { purpose: "interview" });
+    await ai.generate(schema, "", {}, { purpose: "classification" });
+    assert.equal(calls[0].url, "https://gateway.example/v1/chat/completions");
+    assert.equal(calls[0].auth, "Bearer grader-key");
+    assert.equal(calls[0].body.model, "gemini/gemini-3.8-flash");
+    assert.equal(calls[0].body.temperature, 0);
+    assert.equal(calls[0].body.chat_template_kwargs, undefined);
+    for (const call of calls.slice(1)) {
+      assert.match(call.url, /integrate\.api\.nvidia\.com/);
+      assert.equal(call.auth, "Bearer nv-key");
+    }
+    await assert.rejects(
+      createAI({
+        AI_PROVIDER: "nvidia",
+        NVIDIA_API_KEY: "k",
+        NVIDIA_MODEL: "m",
+        GRADER_API_KEY: "g",
+        GRADER_BASE_URL: "https://gateway.example/v1",
+      }).generate(schema, "", {}, { purpose: "assessment" }),
+      /GRADER_MODEL/,
+    );
+  } finally {
+    globalThis.fetch = original;
+  }
+});

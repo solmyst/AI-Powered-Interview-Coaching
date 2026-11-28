@@ -48,3 +48,17 @@ Controlled clarification currently repeats the original question rather than gen
 Regression coverage includes source ownership and offsets, Unicode, complete panels, evidence repair without candidate penalties, rubric/model cache boundaries, concise answers, classification failures and neutral speech. API tests cover repeated off-topic handling and report metadata. UI, accessibility and media suites must remain green.
 
 Deploy only after calibration and relevance gates pass on held-out data. Start with shadow results and human review, monitor disagreement/errors/latency, and retain the previous scoring version for rollback. Infrastructure and unit-test success cannot substitute for assessment validity.
+
+## Separate grader model (28 November 2026, anchored-evidence-v3)
+
+Scoring calls can now go to a separate OpenAI-compatible endpoint (`GRADER_BASE_URL`, `GRADER_API_KEY`, `GRADER_MODEL`, `GRADER_RPM`); the interview and relevance checks stay on NVIDIA. Tested through a Bifrost gateway with Gemini models, same synthetic fixtures, three runs each.
+
+The v2 prompt told judges to give the top level unless they could name a gap, so stronger models gave "decent" and "strong" both 100. v3 defines level 3 as a correct, sensible plan with brief reasons, and level 4 as one that also justifies its choices (priority, trade-off, verification or success check).
+
+| Model (v3 prompt) | Junk fixtures | Vague | Decent | Strong | Spread |
+| --- | --- | --- | --- | --- | --- |
+| gemini/gemini-3.8-flash (chosen) | 0 | 0 | 75 | 100 | 0 |
+| gemini/gemini-2.5-pro | 0 | 0 | 83 | 100 | 0 |
+| gemini/gemini-3.1-pro-preview | 0 | 14 | 100 | 100 | 0 |
+
+One answer takes about 12 seconds to score (three judges in parallel), which is fine for background scoring. Vague answers score 0 rather than the provisional 15-30, because most judges mark them as having no substance. These fixtures are still synthetic and not human-reviewed.
