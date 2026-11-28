@@ -82,7 +82,7 @@ Rules:
 - Be consistent: the same answer must get the same levels. Judge against the scale, not against how other candidates might answer.
 - Grade each criterion independently. A missing operational detail cannot lower communication if the answer itself is clear and organised. A proportionate remedy can fully demonstrate empathy without an additional gift. A sound alternative implementation can fully demonstrate correctness without the reference's preferred tool.
 - Do not lower a level by inventing duties the question did not ask for, such as escalating to a particular team, an extra compensation gesture, or unasked-for metrics.
-- substantive is false when the answer has no real content of its own.
+- substantive is false ONLY when the answer has no content of its own (filler, "I don't know", restating the question, unrelated talk). A relevant but generic answer, such as "fix it quickly, talk to the team, find what went wrong", IS substantive: give it level 1 on the criteria it touches, not 0.
 ${points.length ? `A strong answer to this question would likely make these points (a guide, not a checklist; accept equally good alternatives):\n${points.map((p, i) => `${i + 1}. ${p}`).join("\n")}` : ""}
 Give a short rationale that names what was good and what was missing.`;
 

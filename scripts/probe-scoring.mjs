@@ -56,7 +56,7 @@ const cases = [
   [
     "vague generic",
     "I would try to fix the problem quickly and make sure the customer is happy. I would talk to the team and see what went wrong and make it better for the future.",
-    "0-5",
+    "10-25",
   ],
   [
     "wrong and confident",

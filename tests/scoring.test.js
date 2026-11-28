@@ -118,3 +118,13 @@ test("ending early cannot raise a score: unanswered questions count as zero", ()
   assert.equal(none.overall, 0);
   assert.equal(none.band, "insufficient");
 });
+test("company criterion weights drive the overall", () => {
+  const turn = {
+    evaluation: { scores: { product: 100, judgment: 0, communication: 0 } },
+  };
+  assert.equal(aggregate(rubric, [turn, turn, turn], 3).overall, 38); // 100*3 / (3+3+2)
+  const heavier = rubric.map((r) =>
+    r.key === "product" ? { ...r, weight: 5 } : r,
+  );
+  assert.equal(aggregate(heavier, [turn, turn, turn], 3).overall, 50); // 100*5 / (5+3+2)
+});
