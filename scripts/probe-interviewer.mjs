@@ -12,8 +12,8 @@ const base = () => ({
     difficulty: "Medium",
     industry: "Fintech",
     company: "",
+    questionCount: 5,
   },
-  questionCount: 5,
   turns: [
     {
       question: q("Tell me about yourself and a recent project."),
@@ -53,6 +53,16 @@ const cases = [
     "redirect",
   ],
   [
+    "off-topic shared keyword",
+    "The payment at our hiking cafe was cheap, and we spent the weekend cooking outside with friends.",
+    "redirect",
+  ],
+  [
+    "on-topic Hindi",
+    "मैं हर भुगतान के लिए एक अनोखी कुंजी रखूँगा और डेटाबेस में उसी कुंजी पर unique constraint लगाऊँगा ताकि दो अनुरोध एक ही भुगतान दो बार न कर सकें।",
+    "answer",
+  ],
+  [
     "off-topic hinglish",
     "Mera project ek e-commerce website tha jisme maine React use kiya aur UI banaya tha, bahut accha experience tha.",
     "redirect|answer",
@@ -88,3 +98,4 @@ for (const [name, said, want] of cases)
 console.log(
   `\n${out.filter(Boolean).length}/${out.length} classified as wanted`,
 );
+if (out.some((ok) => !ok)) process.exitCode = 1;

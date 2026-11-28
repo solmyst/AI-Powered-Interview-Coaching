@@ -72,7 +72,12 @@ type Turn = {
     rationale: string;
     evidenceDropped?: number;
     gate?: string | null;
-    confidence?: { samples: number; spread: number; unsupported: string[] };
+    confidence?: {
+      samples: number;
+      spread: number;
+      unsupported: string[];
+      reviewRequired?: boolean;
+    };
     followUpForHuman?: string;
   } | null;
   attention: { eyeContact: number; inFrame: number } | null;
@@ -420,13 +425,15 @@ export function CandidateReport({
                 </p>
               )}
               {!turn.evaluation.gate &&
-                ((turn.evaluation.confidence?.spread ?? 0) >= 2 ||
+                (turn.evaluation.confidence?.reviewRequired ||
+                  (turn.evaluation.confidence?.spread ?? 0) >= 2 ||
                   (turn.evaluation.confidence?.unsupported.length ?? 0) >
                     0) && (
                   <p className="notice" role="note">
-                    Lower confidence: the AI’s independent judgements disagreed
-                    or some scores had no supporting quote, so they were
-                    reduced. Read the answer before relying on them.
+                    Review needed: the AI’s judgements disagreed or some scores
+                    had no supporting quote, so they were reduced. Read the
+                    answer before relying on them. Judge agreement is not a
+                    calibrated probability of correctness.
                   </p>
                 )}
               {turn.evaluation.evidence.length === 0 &&

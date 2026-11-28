@@ -3,7 +3,12 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { ServiceError } from "./ai.js";
-import { answerOf, decideTurn, tidyQuestion } from "./turn.js";
+import {
+  answerOf,
+  clarificationReply,
+  decideTurn,
+  tidyQuestion,
+} from "./turn.js";
 import { aggregate, evaluate } from "./scoring.js";
 import {
   answerSchema,
@@ -265,6 +270,10 @@ export function registerScreening(
         question: turn.question,
         exchanges: turn.exchanges || [],
         answer: turn.answer,
+        offTopic: turn.offTopic,
+        experience: config.experience,
+        track: config.track,
+        difficulty: config.difficulty,
       });
       const fresh = readScreening(inviteId);
       if (!fresh?.session.turns[index] || fresh.session.turns[index].evaluation)
@@ -325,6 +334,15 @@ export function registerScreening(
     session.report = {
       ...generated.value,
       ...result,
+      ...(!session.turns.some((t) =>
+        Object.values(t.evaluation.scores).some((score) => score > 0),
+      )
+        ? {
+            strengths: [],
+            summary:
+              "There was not enough relevant answer content for a substantive assessment. A human reviewer should inspect the transcript.",
+          }
+        : {}),
       attention: attentionScore(session.turns),
       answered: session.turns.length,
       questionCount: session.setup.questionCount,
@@ -1376,6 +1394,7 @@ export function registerScreening(
         session.turns.push({
           question: session.currentQuestion,
           answer: answerOf(session.exchanges, input.answer),
+          ...(turn.offTopic ? { offTopic: true } : {}),
           ...(session.exchanges?.length
             ? { exchanges: session.exchanges }
             : {}),
@@ -1422,21 +1441,11 @@ export function registerScreening(
             429,
             "This question has been clarified twice. Take your time and answer what you understand.",
           );
-        const generated = await ai.generate(
-          questionSchema,
-          "lead: a short phrase such as 'Sure, let me put that another way.' question: rephrase the current question in plain language, preserving its meaning and difficulty. Do not give hints, solutions or a new question. Ask ONE question.",
-          {
-            role: session.setup.role,
-            currentQuestion: session.currentQuestion,
-          },
-          { mode: "screening" },
-        );
         session.clarifications[expectedTurn] = used + 1;
         db.transaction(() => {
           saveScreening(invite.id, session);
-          tokenUsage(invite.org_id, generated.usage);
         })();
-        res.json({ question: generated.value.question });
+        res.json({ question: clarificationReply(session.currentQuestion) });
       }),
   );
 

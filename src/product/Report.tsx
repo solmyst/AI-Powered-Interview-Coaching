@@ -70,7 +70,8 @@ export function Report({
           {report.coverage?.noContent
             ? `, and ${report.coverage.noContent} had no real content`
             : ""}
-          . Try a longer attempt at each question for a fuller score.
+          . Try answering each question with a relevant explanation for a fuller
+          assessment.
         </p>
       )}
       <RehearsalLab
@@ -80,6 +81,13 @@ export function Report({
         speechReady={speechReady}
         transcriptionReady={transcriptionReady}
       />
+      {report.reviewRequired && (
+        <p className="notice" role="note">
+          Review these estimates with your transcript: the scoring judgements
+          disagreed or the assessment methods differ. Judge agreement is not a
+          measure of hiring readiness.
+        </p>
+      )}
       <DeliveryReport turns={session.turns} />
       <section className="panel">
         <h2>Your answer profile</h2>
@@ -97,13 +105,16 @@ export function Report({
         <details>
           <summary>How to interpret these scores</summary>
           <p>
-            0–24: missing or incorrect · 25–49: partial · 50–74: sound with gaps
-            · 75–89: strong · 90–100: exceptional, supported reasoning. Model
-            judgments can be wrong. Compare similar roles and difficulty levels,
-            and verify technical claims independently.
+            {report.scoringVersion === "anchored-evidence-v2"
+              ? "Criterion anchors: 0 = no support, 20 = generic, 45 = partial, 75 = proficient with a material gap, 100 = fully meets the criterion for this question and role. Combined scores average the criterion anchors."
+              : "0–24: missing or incorrect · 25–49: partial · 50–74: sound with gaps · 75–89: strong · 90–100: exceptional, supported reasoning."}{" "}
+            Model judgements can be wrong. Scores from different questions,
+            rubrics, models or assessment versions are not directly comparable.
           </p>
           <small>
-            Generated with {session.provider} / {session.model}.
+            Interview model: {session.provider} / {session.model}.
+            {report.scoringVersion &&
+              ` Assessment version: ${report.scoringVersion}.`}
           </small>
         </details>
       </section>

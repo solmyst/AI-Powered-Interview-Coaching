@@ -1,29 +1,29 @@
 import { screeningJudgeSchema, referenceSchema } from "./schemas.js";
+import { createHash } from "node:crypto";
+import { ServiceError } from "./ai.js";
+import { normalize, quoteIn, evidenceSpans } from "./evidence.js";
+export { normalize } from "./evidence.js";
 
 // Scoring of one screening answer. The design follows structured-interview practice and LLM-judge research:
 // anchored ordinal levels instead of free 0-100 numbers, evidence required for any real credit, a reference
-// outline of what a good answer contains, several independent judgements combined by their median, and
+// outline of what a good answer contains, repeated rubric-rotated judgements combined by their median, and
 // server-side rules the model cannot talk its way around. Delivery (eye contact, pace, fillers) is never an input.
 
 // Level 0-4 to a score. Level 1 is "touches the topic, nothing more", so it earns little.
-export const LEVEL_SCORE = [0, 20, 45, 75, 95];
-// Independent judgements per answer. 3 is the tested setting; 2 saves a third of the model calls under load.
+export const LEVEL_SCORE = [0, 20, 45, 75, 100];
+export const SCORING_VERSION = "anchored-evidence-v2";
+// An odd full panel is required; incomplete panels remain retryable rather than silently changing the method.
 export const SAMPLES = Number(process.env.SCORING_SAMPLES || 3);
-
-export const normalize = (text) =>
-  text
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, "")
-    .replace(/\s+/g, " ")
-    .trim();
+if (![3, 5].includes(SAMPLES))
+  throw new Error("SCORING_SAMPLES must be 3 or 5.");
+const fingerprint = (value) =>
+  createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
 const STOP = new Set(
-  "that with this have what your them they then were from about would could should there their which when will into more also just like very some been only over make sure need want know think because okay yeah well basically actually really maybe probably something anything thing things than these those been being does done after before first next".split(
+  "that with this have what your them they then were from about would could should there their which when will into more also just like very some been only over make sure need want know think because okay yeah well basically actually really maybe probably something anything thing things than these those been being does done after before first next you hmm matlab uh um".split(
     " ",
   ),
 );
-const GAVE_UP =
-  /\b(don'?t know|do not know|no idea|no clue|can'?t answer|cannot answer|not sure|pass|skip|move on)\b/i;
 const content = (text) =>
   new Set(
     (text.toLowerCase().match(/[\p{L}\p{M}\p{N}]{3,}/gu) || []).filter(
@@ -39,67 +39,106 @@ export function substanceGate(answer, question) {
   const asked = content(question);
   const mine = [...content(answer)];
   const novel = mine.filter((w) => !asked.has(w));
-  const words = answer.trim().split(/\s+/).length;
-  if (words < 25 && GAVE_UP.test(answer))
+  if (
+    /^(?:i (?:don'?t|do not) know|no idea|no clue|i can'?t answer|i cannot answer|pass|skip|next question)[.!\s]*$/i.test(
+      answer.trim(),
+    )
+  )
     return "They said they did not know or could not answer.";
   // Mostly the question's own words with little added: a restatement, not an answer.
   const restates =
     mine.length > 0 &&
     (mine.length - novel.length) / mine.length >= 0.5 &&
     novel.length < 10;
-  if (novel.length < 3 || restates)
+  const action =
+    /\b(use|refund|apologi[sz]e|check|first|because|if|would|should|implement|prevent|measure|compare|test)\b/i.test(
+      answer,
+    );
+  if (
+    !mine.length ||
+    normalize(answer) === normalize(question) ||
+    (restates && /^so\b/i.test(answer.trim()) && !action)
+  )
     return "The answer added nothing meaningful beyond the question (it restated it, was too short, or was only filler).";
   return null;
 }
 
-const SCALE = `Use this scale for every criterion:
+const SCALE = `Use ONLY these criterion-specific anchors, independently for every criterion:
 0 = no credit: no attempt, unrelated, only restates the question, "I don't know", or filler.
 1 = touches the topic but is generic: no specifics, no reasoning, could be said about any question.
 2 = relevant and partly specific, with some reasoning, but with clear gaps or missing important points.
-3 = specific and reasoned, covers most of what matters, with sound judgment.
-4 = everything in 3, and also at least one of: a trade-off weighed, an edge case or risk anticipated, a concrete way to measure success, or a clear order of priorities. Give 4 when it is earned; do not hold it back out of caution.`;
+3 = proficient: specific and substantially correct, covers most of the criterion, but leaves an important criterion-relevant explanation or action implicit.
+4 = fully meets the criterion for this question and role: concrete, correct and sufficiently reasoned, with no material gap for that criterion. Where the criterion calls for judgment, look for a justified priority, trade-off, verification step, or relevant failure case. A clear concise answer can earn 4. Do not require exceptional accomplishments, every possible edge case, invented metrics, senior-level depth from an intern, or extra topics the question did not request.
+Award 4 when supported; it is not reserved for a rare percentile of candidates. Do not award it for verbosity or merely mentioning many actions. Clear organisation can fully meet communication without adding a technical trade-off. Reasoning needs an actual explanation, not just a list. The server maps these anchors to percentages; do not invent numeric bands.`;
 
 const judgeTask = (points) =>
-  `You are a strict, fair interview scorer. Score ONLY the content of candidateAnswer against each rubric criterion.
+  `You are an evidence-based criterion assessor, not a stack ranker. Score ONLY the content of candidateAnswer against each rubric criterion.
 ${SCALE}
 Rules:
 - Judge what the candidate actually said. Never reward length, confidence, fluency, accent, language or delivery.
 - Do not give credit for restating the question, saying they do not know, filler, or an off-topic reply: those are 0 on every criterion, relevant false.
-- Any level of 2 or more needs a verbatim quote from candidateAnswer in evidence, tagged with that criterion's key. If you cannot quote support, score at most 1.
+- Any level of 2 or more needs a strength evidence entry tagged with that criterion's key and an existing spanId from evidenceSpans that demonstrates it. Select source IDs; do not copy, paraphrase or invent quotes. The server attaches the original transcript text. If no source span supports the criterion, score at most 1.
 - A criterion about communication is about how clearly the substance given is organised. With little or no substance it is 0 or 1, however fluent.
 - Be consistent: the same answer must get the same levels. Judge against the scale, not against how other candidates might answer.
+- Grade each criterion independently. A missing operational detail cannot lower communication if the answer itself is clear and organised. A proportionate remedy can fully demonstrate empathy without an additional gift. A sound alternative implementation can fully demonstrate correctness without the reference's preferred tool.
+- A level below 4 must be justified by a MATERIAL gap for THAT criterion in the question's requested scope. Do not invent additional duties, require escalating to a particular team, demand an extra compensation gesture, or require unasked-for metrics just to avoid the highest level.
 - substantive is false when the answer has no real content of its own.
 ${points.length ? `A strong answer to this question would likely make these points (a guide, not a checklist; accept equally good alternatives):\n${points.map((p, i) => `${i + 1}. ${p}`).join("\n")}` : ""}
 Give a short rationale that names what was good and what was missing.`;
 
-const references = new Map();
+const references = new WeakMap();
 // What a good answer should contain, made once per question and role so every candidate is judged against the same
 // outline. A failure here only means scoring without it.
 async function referencePoints(ai, ctx) {
-  const key = normalize(`${ctx.role}|${ctx.question.question}`);
-  if (references.has(key))
-    return { points: references.get(key), usage: { input: 0, output: 0 } };
-  let points = [];
-  let usage = { input: 0, output: 0 };
-  try {
-    const out = await ai.generate(
-      referenceSchema,
-      "List 3 to 5 specific points a strong answer to this interview question would make for this role. Short phrases about substance only, never about delivery or communication style.",
-      {
-        role: ctx.role,
-        company: ctx.company,
-        question: ctx.question,
-        rubric: ctx.rubric,
-      },
-      { mode: ctx.mode || "screening", priority: "background" },
-    );
-    points = out.value.points;
-    usage = out.usage;
-  } catch {
-    /* score without a reference outline */
+  let cache = references.get(ai);
+  if (!cache) {
+    cache = new Map();
+    references.set(ai, cache);
   }
-  references.set(key, points);
-  return { points, usage };
+  const referenceContext = {
+    role: ctx.role,
+    experience: ctx.experience || "",
+    track: ctx.track || "",
+    difficulty: ctx.difficulty || "",
+    question: ctx.question,
+    rubric: ctx.rubric,
+  };
+  const key = fingerprint({
+    version: SCORING_VERSION,
+    model: ai.assessmentModel || ai.model,
+    ...referenceContext,
+  });
+  if (cache.has(key))
+    return { points: await cache.get(key), usage: { input: 0, output: 0 } };
+  const pending = ai.generate(
+    referenceSchema.extend({
+      points: referenceSchema.shape.points.length(ctx.rubric.length),
+    }),
+    "Return exactly ONE assessment anchor per rubric criterion, in the same order, prefixed with that criterion's key. Each anchor describes the observable content that would FULLY meet that criterion for THIS question, role and experience level. Extract the required scope from the question and criterion. Do not write a model-solution checklist or invent additional actions. Accept equivalent valid remedies and implementations; escalation to a specific team, extra goodwill gifts, named tools, or numerical outcomes are not mandatory unless explicitly required. For communication, judge organisation and clarity of the given substance, not whether a separate technical criterion is complete. Short substantive phrases, not delivery style or invented achievements.",
+    referenceContext,
+    {
+      mode: ctx.mode || "screening",
+      priority: "background",
+      purpose: "assessment",
+    },
+  );
+  cache.set(
+    key,
+    pending.then((out) => out.value.points),
+  );
+  // Avoid an unhandled rejection while the original request owns the failure.
+  cache.get(key).catch(() => {});
+  if (cache.size > 256) cache.delete(cache.keys().next().value);
+  try {
+    const out = await pending;
+    return { points: out.value.points, usage: out.usage };
+  } catch {
+    cache.delete(key);
+    throw new ServiceError(
+      503,
+      "The assessment reference could not be prepared. Retry scoring; no score has been published.",
+    );
+  }
 }
 
 const median = (values) => {
@@ -129,18 +168,42 @@ function failed(rubric, why, extra = {}) {
 
 // Pure combination step, separate from the model calls so the rules can be tested exactly.
 export function combine(rubric, answer, samples) {
-  const said = normalize(answer);
+  if (!samples.length)
+    throw new ServiceError(503, "The judge panel returned no assessments.");
   const verified = new Map();
+  const unsupported = new Set();
   let dropped = 0;
-  for (const sample of samples)
-    for (const e of sample.evidence) {
-      if (said.includes(normalize(e.quote))) {
-        const k = `${e.competency}|${normalize(e.quote)}`;
-        if (!verified.has(k)) verified.set(k, e);
-      } else dropped += 1;
-    }
-  const evidence = [...verified.values()];
-  // Majority vote on the answer-level flags: one model's mood cannot zero or rescue an answer alone.
+  // Validate each judge BEFORE aggregation: another judge's quote cannot rescue an unsupported rating.
+  const checked = samples.map((sample) => {
+    const evidence = sample.evidence.filter((e) => {
+      const valid =
+        quoteIn(answer, e.quote) && rubric.some((r) => r.key === e.competency);
+      if (!valid) dropped++;
+      return valid;
+    });
+    const levels = Object.fromEntries(
+      rubric.map((r) => {
+        let level =
+          sample.relevant && sample.substantive
+            ? (sample.levels[r.key] ?? 0)
+            : 0;
+        if (
+          level >= 2 &&
+          !evidence.some(
+            (e) => e.competency === r.key && e.supports === "strength",
+          )
+        ) {
+          level = 1;
+          unsupported.add(r.key);
+        }
+        return [r.key, level];
+      }),
+    );
+    if (sample.relevant && sample.substantive)
+      for (const e of evidence)
+        verified.set(`${e.competency}|${e.supports}|${normalize(e.quote)}`, e);
+    return { ...sample, levels };
+  });
   const relevant =
     samples.filter((s) => s.relevant).length * 2 > samples.length;
   const substantive =
@@ -151,38 +214,44 @@ export function combine(rubric, answer, samples) {
       relevant
         ? "The answer had no substance of its own."
         : "The answer did not address the question.",
-      { evidence: [], evidenceDropped: dropped, samples: samples.length },
+      {
+        evidenceDropped: dropped,
+        confidence: {
+          samples: samples.length,
+          spread: 0,
+          unsupported: [...unsupported],
+          reviewRequired: samples.some(
+            (s) => s.relevant !== relevant || s.substantive !== substantive,
+          ),
+        },
+      },
     );
   const levels = {};
-  const unsupported = [];
   let spread = 0;
   for (const r of rubric) {
-    const values = samples.map((s) => s.levels[r.key] ?? 0);
+    const values = checked.map((s) => s.levels[r.key]);
     spread = Math.max(spread, Math.max(...values) - Math.min(...values));
-    let level = median(values);
-    // Real credit needs a quote the candidate really said; otherwise the model is guessing.
-    if (
-      level >= 2 &&
-      !evidence.some((e) => e.competency === r.key && e.supports === "strength")
-    ) {
-      level = 1;
-      unsupported.push(r.key);
-    }
-    levels[r.key] = level;
+    levels[r.key] = median(values);
   }
-  // Fluency cannot outrun content: communication is capped just above the best content criterion.
   const others = rubric
     .filter((r) => !isCommunication(r))
     .map((r) => levels[r.key]);
   const ceiling = others.length ? Math.max(...others) + 1 : 4;
   for (const r of rubric)
     if (isCommunication(r)) levels[r.key] = Math.min(levels[r.key], ceiling);
-  const total = (s) => rubric.reduce((n, r) => n + (s.levels[r.key] ?? 0), 0);
-  const target = rubric.reduce((n, r) => n + levels[r.key], 0);
-  // The rationale comes from the judgement closest to the combined levels.
-  const nearest = [...samples].sort(
-    (a, b) => Math.abs(total(a) - target) - Math.abs(total(b) - target),
-  )[0];
+  const distance = (sample) =>
+    rubric.reduce(
+      (n, r) => n + Math.abs(sample.levels[r.key] - levels[r.key]),
+      0,
+    );
+  const nearest = [...checked].sort((a, b) => distance(a) - distance(b))[0];
+  const weights = rubric.reduce((n, r) => n + r.weight, 0);
+  const judgeScores = checked.map((s) =>
+    Math.round(
+      rubric.reduce((n, r) => n + LEVEL_SCORE[s.levels[r.key]] * r.weight, 0) /
+        weights,
+    ),
+  );
   return {
     scores: Object.fromEntries(
       rubric.map((r) => [r.key, LEVEL_SCORE[levels[r.key]]]),
@@ -191,46 +260,178 @@ export function combine(rubric, answer, samples) {
     relevant: true,
     substantive: true,
     gate: null,
-    evidence,
+    evidence: [...verified.values()],
     evidenceDropped: dropped,
-    rationale: nearest.rationale,
+    rationale: [...unsupported].some((key) => levels[key] < 2)
+      ? `Verified quotes did not support higher credit for: ${[...unsupported].join(", ")}. Review the transcript before relying on these estimates.`
+      : nearest.rationale,
     followUpForHuman: nearest.followUpForHuman,
-    confidence: { samples: samples.length, spread, unsupported },
+    confidence: {
+      samples: samples.length,
+      spread,
+      unsupported: [...unsupported],
+      reviewRequired:
+        spread > 0 ||
+        unsupported.size > 0 ||
+        samples.some((s) => !s.relevant || !s.substantive),
+      scoreRange: {
+        min: Math.min(...judgeScores),
+        max: Math.max(...judgeScores),
+      },
+    },
   };
 }
 
 // Returns an evaluation plus the token usage it cost.
 export async function evaluate(ai, ctx) {
   const { rubric, answer } = ctx;
-  const why = substanceGate(answer, ctx.question.question);
+  const manifest = {
+    version: SCORING_VERSION,
+    provider: ai.provider || "unknown",
+    model: ai.assessmentModel || ai.model || "unknown",
+    rubricFingerprint: fingerprint(rubric),
+    inputFingerprint: fingerprint({
+      role: ctx.role,
+      question: ctx.question,
+      answer,
+      rubric,
+    }),
+    sampling: { temperature: 0, topP: 1 },
+    requestedSamples: SAMPLES,
+  };
+  const why =
+    ctx.offTopic === true
+      ? "The answer did not address the question after a clarification opportunity."
+      : substanceGate(answer, ctx.question.question);
   if (why)
     return {
-      value: failed(rubric, why, { gate: why }),
+      value: {
+        ...failed(rubric, why, { gate: why }),
+        assessment: { ...manifest, source: "deterministic_gate" },
+      },
       usage: { input: 0, output: 0 },
     };
   const ref = await referencePoints(ai, ctx);
+  const spans = evidenceSpans(answer);
+  const sources = new Map(spans.map((span) => [span.id, span]));
+  const materialize = (value) => ({
+    ...value,
+    evidence: value.evidence.map((entry) => {
+      const source = sources.get(entry.spanId);
+      if (!source)
+        throw new ServiceError(
+          503,
+          "The judge cited an unknown transcript source. Retry assessment; no score was published.",
+        );
+      return {
+        competency: entry.competency,
+        supports: entry.supports,
+        quote: source.text,
+        spanId: source.id,
+        start: source.start,
+        end: source.end,
+      };
+    }),
+  });
   const task = judgeTask(ref.points);
   const context = {
-    company: ctx.company,
     role: ctx.role,
+    experience: ctx.experience || "",
+    track: ctx.track || "",
+    difficulty: ctx.difficulty || "",
     rubric: ctx.rubric,
     question: ctx.question,
     conversationBeforeAnswer: ctx.exchanges || [],
     candidateAnswer: answer,
+    evidenceSpans: spans,
   };
   // Independent judgements in parallel (no added wait); the median removes one-off swings.
   const results = await Promise.allSettled(
-    Array.from({ length: SAMPLES }, () =>
-      ai.generate(screeningJudgeSchema(rubric), task, context, {
+    Array.from({ length: SAMPLES }, async (_, index) => {
+      const offset = index % rubric.length;
+      const ordered = [...rubric.slice(offset), ...rubric.slice(0, offset)];
+      const schema = screeningJudgeSchema(
+        ordered,
+        spans.map((span) => span.id),
+      );
+      const judgeContext = { ...context, rubric: ordered };
+      const options = {
         mode: ctx.mode || "screening",
         priority: "background",
-      }),
-    ),
+        purpose: "assessment",
+      };
+      let result = await ai.generate(schema, task, judgeContext, options);
+      const rawAssessment = result.value;
+      result = { ...result, value: materialize(result.value) };
+      const missingSupport = (value) =>
+        value.relevant && value.substantive
+          ? rubric
+              .filter(
+                (r) =>
+                  value.levels[r.key] >= 2 &&
+                  !value.evidence.some(
+                    (e) =>
+                      e.competency === r.key &&
+                      e.supports === "strength" &&
+                      quoteIn(answer, e.quote),
+                  ),
+              )
+              .map((r) => r.key)
+          : [];
+      const missing = missingSupport(result.value);
+      if (missing.length) {
+        const repaired = await ai.generate(
+          schema,
+          `${task} EVIDENCE REPAIR ONLY: the previous assessment did not select a supporting source span for ${missing.join(", ")}. Preserve all levels, relevant and substantive flags. Cite existing evidenceSpans IDs that support those criteria; do not invent IDs or lower a candidate's level to evade validation. This is an evaluator validation failure, not a candidate mistake.`,
+          { ...judgeContext, invalidAssessment: rawAssessment },
+          options,
+        );
+        if (
+          rubric.some(
+            (r) => repaired.value.levels[r.key] !== result.value.levels[r.key],
+          ) ||
+          repaired.value.relevant !== result.value.relevant ||
+          repaired.value.substantive !== result.value.substantive
+        )
+          throw new ServiceError(
+            503,
+            "Evidence repair changed the judgement. Retry assessment or request human review; no score was published.",
+          );
+        result = {
+          value: materialize(repaired.value),
+          usage: {
+            input: result.usage.input + repaired.usage.input,
+            output: result.usage.output + repaired.usage.output,
+          },
+        };
+        if (missingSupport(result.value).length)
+          throw new ServiceError(
+            503,
+            "The judge could not ground its assessment in the transcript. Retry or request human review; no score was published.",
+          );
+      }
+      return result;
+    }),
   );
   const ok = results
     .filter((r) => r.status === "fulfilled")
     .map((r) => r.value);
-  if (!ok.length) throw results[0].reason;
+  if (ok.length !== SAMPLES) {
+    const error = new ServiceError(
+      503,
+      "The full judge panel could not complete. Retry assessment; no partial-panel score has been published.",
+    );
+    error.assessmentFailures = results
+      .filter((r) => r.status === "rejected")
+      .map((r) =>
+        r.reason?.message?.includes("Evidence repair changed")
+          ? "evidence_repair_changed_rating"
+          : r.reason?.message?.includes("ground its assessment")
+            ? "ungrounded_judgement"
+            : "provider_or_schema_error",
+      );
+    throw error;
+  }
   const usage = ok.reduce(
     (n, r) => ({
       input: n.input + r.usage.input,
@@ -239,11 +440,20 @@ export async function evaluate(ai, ctx) {
     ref.usage,
   );
   return {
-    value: combine(
-      rubric,
-      answer,
-      ok.map((r) => r.value),
-    ),
+    value: {
+      ...combine(
+        rubric,
+        answer,
+        ok.map((r) => r.value),
+      ),
+      assessment: {
+        ...manifest,
+        source: "judge_panel",
+        referencePoints: ref.points,
+        referenceFingerprint: fingerprint(ref.points),
+        evidenceStrategy: "source_spans",
+      },
+    },
     usage,
   };
 }
@@ -282,14 +492,35 @@ export function aggregate(rubric, turns, questionCount) {
   const shaky = turns.filter(
     (t) =>
       (t.evaluation.confidence?.spread ?? 0) >= 2 ||
+      t.evaluation.confidence?.reviewRequired === true ||
       (t.evaluation.confidence?.unsupported?.length ?? 0) > 0,
   ).length;
+  const versions = [
+    ...new Set(turns.map((t) => t.evaluation.assessment?.version || "legacy")),
+  ];
+  const mixedScoringVersions = versions.length > 1;
+  const methods = new Set(
+    turns.map((t) =>
+      JSON.stringify([
+        t.evaluation.assessment?.version || "legacy",
+        t.evaluation.assessment?.provider || "legacy",
+        t.evaluation.assessment?.model || "legacy",
+        t.evaluation.assessment?.rubricFingerprint || "legacy",
+      ]),
+    ),
+  );
+  const mixedAssessmentMethods = methods.size > 1;
   return {
     competencyScores,
     overall,
     answeredAverage,
     band,
     coverage: { answered: turns.length, total: questionCount, noContent },
-    confidence: shaky ? "low" : "high",
+    confidence: shaky || mixedAssessmentMethods ? "low" : "high",
+    reviewRequired: shaky > 0 || mixedAssessmentMethods,
+    scoringVersion: mixedScoringVersions
+      ? "mixed"
+      : versions[0] || SCORING_VERSION,
+    mixedScoringVersions,
   };
 }

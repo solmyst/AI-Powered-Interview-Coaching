@@ -53,6 +53,20 @@ export type Evaluation = {
   improvements: string[];
   missingConcepts: string[];
   modelAnswer: string;
+  confidence?: {
+    samples: number;
+    spread: number;
+    unsupported: string[];
+    reviewRequired?: boolean;
+    scoreRange?: { min: number; max: number };
+  };
+  assessment?: {
+    version: string;
+    model: string;
+    provider: string;
+    rubricFingerprint: string;
+    referenceFingerprint?: string;
+  };
 };
 export type Turn = {
   question: Question;
@@ -68,6 +82,10 @@ export type Report = {
   answeredAverage?: number;
   band?: "strong" | "promising" | "mixed" | "weak" | "insufficient";
   coverage?: { answered: number; total: number; noContent: number };
+  confidence?: "high" | "low";
+  reviewRequired?: boolean;
+  scoringVersion?: string;
+  mixedScoringVersions?: boolean;
   strengths: string[];
   improvements: string[];
   studyPlan: {

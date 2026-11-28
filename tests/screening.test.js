@@ -13,8 +13,13 @@ const ai = {
   provider: "test-double",
   model: "fixture",
   status: async () => ({ ready: true }),
-  generate: async (schema) => {
+  generate: async (schema, _task, context) => {
     const usage = { input: 3, output: 2 };
+    if (schema.shape.evidence && !schema.shape.levels && !schema.shape.scores)
+      return {
+        value: { relevant: true, evidence: context.evidenceSpans[0].id },
+        usage,
+      };
     if (schema.shape.kind)
       return {
         value: {
@@ -42,19 +47,16 @@ const ai = {
         value: {
           relevant: true,
           substantive: true,
-          levels: Object.fromEntries(keys.map((k, i) => [k, i === 0 ? 3 : 2])),
+          levels: Object.fromEntries(
+            keys.map((k) => [k, k === "problem_solving" ? 3 : 2]),
+          ),
           // Every criterion above level 1 needs a quote the candidate really said.
           evidence: [
             ...keys.map((k) => ({
               competency: k,
-              quote: "cache hot reads with a TTL",
+              spanId: context.evidenceSpans[0].id,
               supports: "strength",
             })),
-            {
-              competency: keys[0],
-              quote: "I rewrote the whole kernel myself",
-              supports: "strength",
-            },
           ],
           rationale: "Mentions caching and invalidation.",
         },
@@ -382,14 +384,13 @@ test("candidate flow: consent first, candidates never see scores, report verifie
     cookie: owner,
   });
   const { turns, report: summary } = report.body.screening;
-  // The invented quote is dropped (once per judgement); the real one stays for each criterion.
-  assert.ok(
-    turns[0].evaluation.evidence.every(
-      (e) => e.quote === "cache hot reads with a TTL",
-    ),
-  );
+  // The server supplies the actual transcript text; the model can select only source IDs.
+  assert.ok(turns[0].evaluation.evidence.every((e) => e.quote === answerText));
   assert.equal(turns[0].evaluation.evidence.length, 4);
-  assert.equal(turns[0].evaluation.evidenceDropped, 3);
+  assert.equal(turns[0].evaluation.evidenceDropped, 0);
+  assert.equal(turns[0].evaluation.evidence[0].quote, answerText);
+  assert.equal(turns[0].evaluation.evidence[0].start, 0);
+  assert.equal(turns[0].evaluation.evidence[0].end, answerText.length);
   // Anchored levels (3,2,2,2) become scores 75,45,45,45. Questions never answered count as 0, so ending
   // early lowers the overall; the average of answered questions is kept separately.
   assert.deepEqual(turns[0].evaluation.levels, {

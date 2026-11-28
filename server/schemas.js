@@ -80,7 +80,7 @@ export const screeningEvaluationSchema = (rubric) =>
     followUpForHuman: z.string().trim().max(300).optional(),
   });
 // What the judge returns for one answer: ordinal levels (0-4, anchored in the prompt), not free 0-100 scores.
-export const screeningJudgeSchema = (rubric) =>
+export const screeningJudgeSchema = (rubric, spanIds) =>
   z.object({
     relevant: z.boolean(),
     substantive: z.boolean(),
@@ -93,7 +93,9 @@ export const screeningJudgeSchema = (rubric) =>
       .array(
         z.object({
           competency: z.enum(rubric.map((r) => r.key)),
-          quote: z.string().trim().min(8).max(300),
+          ...(spanIds
+            ? { spanId: z.enum(spanIds) }
+            : { quote: z.string().trim().min(8).max(300) }),
           supports: z.enum(["strength", "concern"]),
         }),
       )
@@ -103,11 +105,11 @@ export const screeningJudgeSchema = (rubric) =>
   });
 // A short outline of what a strong answer to a question contains, so every candidate is judged against the same one.
 export const referenceSchema = z.object({
-  points: z.array(z.string().trim().min(3).max(200)).min(3).max(5),
+  points: z.array(z.string().trim().min(3).max(400)).min(1).max(8),
 });
 export const screeningReportSchema = z.object({
   summary: z.string().trim().min(1).max(1500),
-  strengths: z.array(z.string().trim().min(1).max(400)).min(1).max(4),
+  strengths: z.array(z.string().trim().min(1).max(400)).min(0).max(4),
   concerns: z.array(z.string().trim().min(1).max(400)).max(4),
   suggestedFollowUps: z.array(z.string().trim().min(1).max(400)).min(1).max(4),
 });
@@ -125,7 +127,7 @@ export const dimensions = [
 export const evaluationSchema = z.object({
   scores: z.object(Object.fromEntries(dimensions.map((k) => [k, score]))),
   rationale: text,
-  strengths: z.array(text).min(1).max(3),
+  strengths: z.array(text).min(0).max(3),
   improvements: z.array(text).min(1).max(3),
   missingConcepts: z.array(text).max(4),
   modelAnswer: text,
@@ -174,13 +176,19 @@ export const talkReplySchema = replySchema.extend({
   kind: z.literal("conversation"),
   nextQuestion: z.null(),
 });
+// Relevance is decided independently of question writing. Evidence must come from the original-language answer.
+export const relevanceSchema = (spanIds) =>
+  z.object({
+    relevant: z.boolean(),
+    evidence: z.enum(["", ...spanIds]),
+  });
 export const turnSchema = z.object({
   evaluation: evaluationSchema,
   nextQuestion: questionSchema,
 });
 export const reportSchema = z.object({
   summary: text,
-  strengths: z.array(text).min(1).max(5),
+  strengths: z.array(text).min(0).max(5),
   improvements: z.array(text).min(1).max(5),
   studyPlan: z
     .array(

@@ -1,9 +1,8 @@
 // Real-model scoring probe: node --env-file=.env scripts/probe-scoring.mjs [module]
-// Runs fixed answers of known quality through the scoring used by the app and prints scores, so changes to
-// the method can be judged against what a careful human would give.
+// Synthetic regression fixtures, NOT an expert-labelled calibration set. The suggested ranges are provisional.
+// Repeats actual application scoring; no answer-score cache is used to hide model variation.
 import { createAI } from "../server/ai.js";
-import { screeningEvaluationSchema } from "../server/schemas.js";
-import options from "../shared/interview-options.json" with { type: "json" };
+import { writeFileSync } from "node:fs";
 const ai = createAI();
 const rubric = [
   {
@@ -36,7 +35,7 @@ const rubric = [
 ];
 const question =
   "The assistant tells a driver parking costs ₹40, but the gate charges ₹120 and the driver is angry. What do you do in the next hour?";
-// expected = what a careful human interviewer would give overall (0-100)
+// expected = an illustrative acceptance range; requires independent human review before use as gold data.
 const cases = [
   ["empty / no attempt", "I don't know.", "0-5"],
   [
@@ -75,56 +74,96 @@ const cases = [
     "80-95",
   ],
 ];
-const task =
-  "Score the candidate's answer against each rubric competency (0-100), quote evidence verbatim from the answer for strengths and concerns, and add a short rationale. If the answer is empty or evasive, score low and say so; do not invent evidence.";
-const mod = process.argv[2] ? await import(process.argv[2]) : null;
+const mod = await import(process.argv[2] || "../server/scoring.js");
+const runs = Number(process.env.PROBE_RUNS || 3);
+if (!Number.isInteger(runs) || runs < 1 || runs > 10)
+  throw new Error("PROBE_RUNS must be an integer from 1 to 10");
+const maxSpread = Number(process.env.PROBE_MAX_SPREAD || 8);
 const weights = rubric.reduce((n, r) => n + r.weight, 0);
+const report = {
+  generatedAt: new Date().toISOString(),
+  provider: ai.provider,
+  model: ai.assessmentModel || ai.model,
+  scoringVersion: mod.SCORING_VERSION,
+  fixtureVersion: "illustrative-product-v1",
+  humanReviewed: false,
+  releaseReady: false,
+  runs,
+  maxSpread,
+  cases: [],
+};
+console.log(
+  "Synthetic fixtures: expected ranges are illustrative, not expert calibration. Errors are assessment failures, not candidate zeros.",
+);
 for (const [name, answer, expected] of cases) {
   if (
     process.env.PROBE_ONLY &&
     !process.env.PROBE_ONLY.split(",").some((k) => name.includes(k))
   )
     continue;
-  const run = async () => {
-    if (mod)
-      return (
-        await mod.evaluate(ai, {
-          rubric,
-          question: { question, focus: "Judgment" },
-          answer,
-          exchanges: [],
-          company: "Park+",
-          role: "Product AI Intern",
-        })
-      ).value;
-    const g = await ai.generate(
-      screeningEvaluationSchema(rubric),
-      task,
-      {
-        company: "Park+",
-        role: "Product AI Intern",
+  const values = [];
+  for (let i = 0; i < runs; i++) {
+    const started = Date.now();
+    try {
+      const { value, usage } = await mod.evaluate(ai, {
         rubric,
         question: { question, focus: "Judgment" },
-        conversationBeforeAnswer: [],
         answer,
-      },
-      { mode: "screening" },
-    );
-    return g.value;
-  };
-  const values = [];
-  for (let i = 0; i < Number(process.env.PROBE_RUNS || 2); i++) {
-    const v = await run();
-    const overall = Math.round(
-      rubric.reduce((n, r) => n + (v.scores[r.key] ?? 0) * r.weight, 0) /
-        weights,
-    );
-    values.push({
-      overall,
-      scores: rubric.map((r) => v.scores[r.key]).join("/"),
-    });
+        exchanges: [],
+        company: "Park+",
+        role: "Product AI Intern",
+        experience: "Student / graduate",
+        track: "Product sense",
+        difficulty: "Intermediate",
+      });
+      if (process.env.PROBE_DETAILS === "1")
+        console.log(JSON.stringify({ name, evaluation: value }, null, 2));
+      values.push({
+        overall: Math.round(
+          rubric.reduce((n, r) => n + value.scores[r.key] * r.weight, 0) /
+            weights,
+        ),
+        scores: value.scores,
+        durationMs: Date.now() - started,
+        usage,
+        reviewRequired: Boolean(value.confidence?.reviewRequired),
+        panelRange: value.confidence?.scoreRange,
+        referenceFingerprint: value.assessment?.referenceFingerprint,
+      });
+    } catch (error) {
+      values.push({
+        error: error.message,
+        failures: error.assessmentFailures,
+        durationMs: Date.now() - started,
+      });
+    }
   }
+  const scores = values.filter((v) => !v.error).map((v) => v.overall);
+  const spread = scores.length
+    ? Math.max(...scores) - Math.min(...scores)
+    : null;
+  const range = expected.split("-").map(Number);
+  const complete = scores.length === runs;
+  const inIllustrativeRange =
+    complete && scores.every((score) => score >= range[0] && score <= range[1]);
+  const stable = complete && spread <= maxSpread;
+  report.cases.push({
+    name,
+    expected,
+    values,
+    spread,
+    complete,
+    stable,
+    inIllustrativeRange,
+  });
   console.log(
-    `${name.padEnd(22)} expected ${expected.padEnd(6)} got ${values.map((v) => `${v.overall} (${v.scores})`).join("  |  ")}`,
+    `${name.padEnd(22)} expected ${expected.padEnd(6)} got ${values.map((v) => (v.error ? "ASSESSMENT ERROR" : `${v.overall} (${Object.values(v.scores).join("/")})`)).join("  |  ")} spread=${spread ?? "n/a"}`,
   );
 }
+report.passesIllustrativeChecks =
+  report.cases.length > 0 &&
+  report.cases.every((c) => c.complete && c.stable && c.inIllustrativeRange);
+if (process.env.PROBE_OUTPUT)
+  writeFileSync(process.env.PROBE_OUTPUT, JSON.stringify(report, null, 2));
+if (process.env.PROBE_ENFORCE === "1" && !report.passesIllustrativeChecks)
+  process.exitCode = 1;

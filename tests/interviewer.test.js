@@ -26,6 +26,8 @@ const tasks = [];
 // Scoring runs in the background; only the calls that produce Maya's reply matter for latency.
 const replyCalls = () =>
   tasks.filter((t) => t.startsWith("You are mid-interview")).length;
+const firstReplyTask = () =>
+  tasks.find((t) => t.startsWith("You are mid-interview"));
 let server, base, db;
 let mode = "answer";
 before(async () => {
@@ -35,8 +37,17 @@ before(async () => {
       provider: "test-double",
       model: "fixture",
       status: async () => ({ ready: true }),
-      generate: async (schema, task) => {
+      generate: async (schema, task, context) => {
         tasks.push(task);
+        if (
+          schema.shape.evidence &&
+          !schema.shape.levels &&
+          !schema.shape.scores
+        )
+          return {
+            value: { relevant: true, evidence: context.evidenceSpans[0].id },
+            usage: { input: 1, output: 1 },
+          };
         const value = schema.shape.kind
           ? mode === "stuck"
             ? { kind: "answer", reply: "", nextQuestion: ask(first) }
@@ -180,9 +191,12 @@ test("a repeated follow-up is regenerated once and the new question is saved", a
     })
   ).json();
   assert.equal(replyCalls(), 2);
-  assert.match(tasks[0], /never repeat or reword anything in alreadyAsked/);
   assert.match(
-    tasks[0],
+    firstReplyTask(),
+    /never repeat or reword anything in alreadyAsked/,
+  );
+  assert.match(
+    firstReplyTask(),
     /refer to a specific detail the candidate actually said/,
   );
   assert.equal(answered.currentQuestion.question, fresh);
@@ -242,10 +256,7 @@ test("questions back to Maya get a reply and keep the same question; scoring hap
   ).json();
   assert.equal(report.state, "complete");
   // "I would check the logs first." adds almost nothing beyond the question, so it earns no credit.
-  assert.match(
-    report.turns[0].evaluation.rationale,
-    /did not address/,
-  );
+  assert.match(report.turns[0].evaluation.rationale, /did not address/);
   assert.equal(report.report.overall, 0);
 });
 
@@ -286,7 +297,10 @@ test("an almost empty answer skips the retry and moves to a fresh scenario strai
     moved.currentQuestion.question,
     session.currentQuestion.question,
   );
-  assert.match(moved.currentQuestion.lead, /different angle/);
+  assert.equal(
+    moved.currentQuestion.lead,
+    "Thank you. Here is the next question.",
+  );
 });
 
 test("a real answer is never treated as chat, and earlier substantive statements stay with it", async () => {
@@ -325,7 +339,7 @@ test("a real answer is never treated as chat, and earlier substantive statements
   mode = "answer";
   assert.equal(moved.turns.length, 1);
   assert.equal(moved.turns[0].answer, real);
-  assert.match(tasks[0], /treat this as kind answer/);
+  assert.match(firstReplyTask(), /treat this as kind answer/);
   // A short question stays chat; a real attempt made earlier is kept when the question finally closes.
   assert.equal(
     answerOf(
@@ -349,7 +363,7 @@ test("intent is decided by the server, not the model", () => {
   };
   for (const [said, intent] of Object.entries(want))
     assert.equal(intentOf(said), intent, said);
-  assert.equal(intentOf("what do you mean?", [{}, {}, {}]), "answer");
+  assert.equal(intentOf("what do you mean?", [{}, {}, {}]), "talk");
   assert.equal(tidyReply("Good instinct. Take your time."), "Take your time.");
   assert.equal(
     tidyReply("That approach works. What would you check?"),
@@ -383,10 +397,7 @@ test("an answer that ignores the question is pointed back to it once", async () 
   const first = await decideTurn(ai, session, said);
   assert.equal(first.answered, false);
   assert.equal(first.redirect, true);
-  assert.match(
-    first.reply,
-    /^Okay, that is about your weekend\. Let me repeat the question\. How do you avoid/,
-  );
+  assert.match(first.reply, /^That doesn't address the current question\./);
   session.exchanges = [{ said, reply: first.reply, redirect: true }];
   const second = await decideTurn(ai, session, said);
   assert.equal(second.answered, true);

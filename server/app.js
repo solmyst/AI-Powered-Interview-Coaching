@@ -17,7 +17,12 @@ import { createAI, ServiceError } from "./ai.js";
 import { createTranscriber } from "./transcription.js";
 import { createSpeech } from "./speech.js";
 import { registerRehearsal } from "./rehearsal.js";
-import { answerOf, decideTurn, tidyQuestion } from "./turn.js";
+import {
+  answerOf,
+  clarificationReply,
+  decideTurn,
+  tidyQuestion,
+} from "./turn.js";
 import { aggregate, evaluate } from "./scoring.js";
 import { registerScreening } from "./screening.js";
 export { tidyQuestion, repeats } from "./turn.js";
@@ -525,15 +530,9 @@ export function createApp({
           429,
           "This question has been clarified twice. Take your time and answer what you understand.",
         );
-      const generated = await ai.generate(
-        questionSchema,
-        "lead: a short phrase such as 'Sure, let me put that another way.' question: rephrase the current question in plain language, preserving its technical meaning, difficulty, and constraints. Explain ambiguous wording only. Do not give hints, solutions, an example answer, or a new question. Ask ONE question. Use the same language as the current question.",
-        { role: session.setup.role, currentQuestion: session.currentQuestion },
-      );
       session.clarifications[expectedTurn] = used + 1;
       save(session.id, session);
-      recordUsage(req.user.id, generated.usage);
-      res.json({ question: generated.value.question });
+      res.json({ question: clarificationReply(session.currentQuestion) });
     }),
   );
   app.post("/api/interviews/:id/answers", auth, async (req, res) =>
@@ -571,6 +570,7 @@ export function createApp({
       session.turns.push({
         question: session.currentQuestion,
         answer: answerOf(exchanges, input.answer),
+        ...(turn.offTopic ? { offTopic: true } : {}),
         ...(exchanges.length ? { exchanges } : {}),
         ...(input.delivery ? { delivery: input.delivery } : {}),
       });
@@ -608,6 +608,10 @@ export function createApp({
           rubric: PRACTICE_RUBRIC,
           question: turn.question,
           answer: turn.answer,
+          offTopic: turn.offTopic,
+          experience: session.setup.experience,
+          track: session.setup.track,
+          difficulty: session.setup.difficulty,
           exchanges: turn.exchanges || [],
           company: "",
           role: `${session.setup.role}, ${session.setup.track} round, ${session.setup.experience}`,
@@ -630,7 +634,14 @@ export function createApp({
         ),
       ]);
       const generated = {
-        value: { ...coaching.value, ...graded.value },
+        value: {
+          ...coaching.value,
+          ...graded.value,
+          strengths:
+            graded.value.relevant && graded.value.substantive
+              ? coaching.value.strengths
+              : [],
+        },
         usage: {
           input: graded.usage.input + coaching.usage.input,
           output: graded.usage.output + coaching.usage.output,
@@ -673,12 +684,24 @@ export function createApp({
       );
       session.report = {
         ...generated.value,
+        ...(!session.turns.some((t) =>
+          Object.values(t.evaluation.scores).some((score) => score > 0),
+        )
+          ? {
+              strengths: [],
+              summary:
+                "There was not enough relevant answer content for a substantive assessment. Review the transcript and try answering each question with your own explanation.",
+            }
+          : {}),
         scores: result.competencyScores,
         overall: result.overall,
         answeredAverage: result.answeredAverage,
         band: result.band,
         coverage: result.coverage,
         confidence: result.confidence,
+        reviewRequired: result.reviewRequired,
+        scoringVersion: result.scoringVersion,
+        mixedScoringVersions: result.mixedScoringVersions,
         answered: session.turns.length,
       };
       session.state = "complete";

@@ -30,6 +30,7 @@ const report = {
   })),
 };
 let badAI = false,
+  offTopicFixture = false,
   calls = 0,
   delay = 0,
   transcribedBytes = 0,
@@ -40,12 +41,20 @@ const ai = {
   provider: "test-double",
   model: "fixture",
   status: async () => ({ ready: true }),
-  generate: async (schema) => {
+  generate: async (schema, _task, context) => {
     calls++;
     if (delay) await new Promise((r) => setTimeout(r, delay));
     if (badAI)
       throw Object.assign(new Error("Provider unavailable"), { status: 503 });
     const shape = schema.shape;
+    if (shape.evidence && !shape.levels && !shape.scores)
+      return {
+        value: {
+          relevant: !offTopicFixture,
+          evidence: offTopicFixture ? "" : context.evidenceSpans[0].id,
+        },
+        usage: { input: 1, output: 1 },
+      };
     return {
       value: shape.checkpoints
         ? {
@@ -92,7 +101,7 @@ const ai = {
                     ),
                     evidence: Object.keys(shape.levels.shape).map((k) => ({
                       competency: k,
-                      quote: "a TTL to expire stale entries",
+                      spanId: context.evidenceSpans[0].id,
                       supports: "strength",
                     })),
                     rationale:
@@ -201,6 +210,47 @@ const create = (cookie, id = crypto.randomUUID()) =>
     body: setup,
     headers: { "Idempotency-Key": id },
   });
+
+test("an unrelated answer gets one retry, is recorded as off-topic, and cannot receive later credit or invented strengths", async () => {
+  const a = await account("off-topic-regression@example.test");
+  const started = await create(a.cookie);
+  const id = started.body.id;
+  offTopicFixture = true;
+  try {
+    const body = {
+      expectedTurn: 0,
+      answer:
+        "The cache at our hiking cafe was interesting, but we spent the weekend cooking outside with friends.",
+    };
+    const first = await request(`/interviews/${id}/answers`, {
+      method: "POST",
+      cookie: a.cookie,
+      body,
+    });
+    assert.equal(first.status, 200);
+    assert.equal(first.body.turns.length, 0);
+    assert.match(first.body.reply, /doesn't address/);
+    const second = await request(`/interviews/${id}/answers`, {
+      method: "POST",
+      cookie: a.cookie,
+      body,
+    });
+    assert.equal(second.status, 200);
+    assert.equal(second.body.turns[0].offTopic, true);
+    const report = await request(`/interviews/${id}/report`, {
+      method: "POST",
+      cookie: a.cookie,
+      body: {},
+    });
+    assert.equal(report.status, 200);
+    assert.equal(report.body.report.overall, 0);
+    assert.deepEqual(report.body.turns[0].evaluation.strengths, []);
+    assert.deepEqual(report.body.report.strengths, []);
+    assert.equal(report.body.report.scoringVersion, "anchored-evidence-v2");
+  } finally {
+    offTopicFixture = false;
+  }
+});
 test("Answer Lab persists retry and transfer, enforces ownership, deduplicates and preserves interview scores", async () => {
   const a = await account("lab@example.test"),
     b = await account("lab-other@example.test");
