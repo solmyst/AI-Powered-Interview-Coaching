@@ -1120,3 +1120,37 @@ test("delivery counts are stored per answer, summarised for the company, and nev
   });
   assert.match(csv.body.split("\r\n")[0], /Looked away \(times\)/);
 });
+test("an owner can delete a role with everything under it; another company cannot", async () => {
+  const made = await call(`/orgs/${orgId}/roles`, {
+    method: "POST",
+    cookie: owner,
+    body: roleBody("Role to delete"),
+  });
+  assert.equal(made.status, 201);
+  const sent = await call(`/roles/${made.body.id}/invites`, {
+    method: "POST",
+    cookie: owner,
+    body: { candidates: [{ name: "Ravi", email: "ravi-delete@example.com" }] },
+  });
+  const inviteId = sent.body.invites[0].id;
+  assert.equal(
+    (await call(`/roles/${made.body.id}`, { method: "DELETE", cookie: other }))
+      .status,
+    404,
+  );
+  assert.equal(
+    (await call(`/roles/${made.body.id}`, { method: "DELETE", cookie: owner }))
+      .status,
+    200,
+  );
+  assert.equal(
+    (await call(`/roles/${made.body.id}`, { cookie: owner })).status,
+    404,
+  );
+  assert.equal(
+    db.prepare("SELECT 1 FROM invites WHERE id=?").get(inviteId),
+    undefined,
+  );
+  // Other roles are untouched.
+  assert.equal((await call(`/roles/${roleId}`, { cookie: owner })).status, 200);
+});

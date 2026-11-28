@@ -582,6 +582,13 @@ export function registerScreening(
     res.json({ ok: true });
   });
 
+  // Deletes the role with every invite, interview, score and event under it (foreign keys cascade).
+  app.delete("/api/roles/:roleId", auth, (req, res) => {
+    const role = loadRole(req, "owner");
+    db.prepare("DELETE FROM roles WHERE id=?").run(role.id);
+    res.json({ ok: true });
+  });
+
   app.post("/api/roles/:roleId/invites", auth, (req, res) => {
     const role = loadRole(req);
     if (role.status !== "open") fail(409, "This role is closed.");

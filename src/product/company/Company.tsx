@@ -994,6 +994,24 @@ function Candidates({
               {role.status === "open" ? "Close role" : "Reopen role"}
             </button>
           )}
+          {org.role === "owner" && (
+            <button
+              className="danger"
+              onClick={async () => {
+                if (
+                  !window.confirm(
+                    `Delete the role "${role.title}" and every candidate, interview and score under it permanently? This cannot be undone.`,
+                  )
+                )
+                  return;
+                await api(`/roles/${role.id}`, { method: "DELETE" });
+                changed();
+                back();
+              }}
+            >
+              <Trash2 size={16} /> Delete role
+            </button>
+          )}
           <button
             className="primary"
             disabled={role.status !== "open"}
