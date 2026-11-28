@@ -61,4 +61,4 @@ The v2 prompt told judges to give the top level unless they could name a gap, so
 | gemini/gemini-2.5-pro | 0 | 0 | 83 | 100 | 0 |
 | gemini/gemini-3.1-pro-preview | 0 | 14 | 100 | 100 | 0 |
 
-One answer takes about 12 seconds to score (three judges in parallel), which is fine for background scoring. Vague answers score 0 rather than the provisional 15-30, because most judges mark them as having no substance. These fixtures are still synthetic and not human-reviewed.
+One answer takes about 12 seconds to score (three judges in parallel), which is fine for background scoring. Vague, generic answers score 0 by product decision (28 November 2026): an answer with no specifics earns no credit. These fixtures are still synthetic and not human-reviewed.
