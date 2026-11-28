@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { screeningJudgeSchema, referenceSchema } from "./schemas.js";
 import { createHash } from "node:crypto";
 import { ServiceError } from "./ai.js";
@@ -11,7 +12,7 @@ export { normalize } from "./evidence.js";
 
 // Level 0-4 to a score. Level 1 is "touches the topic, nothing more", so it earns little.
 export const LEVEL_SCORE = [0, 20, 45, 75, 100];
-export const SCORING_VERSION = "anchored-evidence-v3";
+export const SCORING_VERSION = "anchored-evidence-v4";
 // An odd full panel is required; incomplete panels remain retryable rather than silently changing the method.
 export const SAMPLES = Number(process.env.SCORING_SAMPLES || 3);
 if (![3, 5].includes(SAMPLES))
@@ -109,12 +110,16 @@ async function referencePoints(ai, ctx) {
     ...referenceContext,
   });
   if (cache.has(key))
-    return { points: await cache.get(key), usage: { input: 0, output: 0 } };
+    return { ...(await cache.get(key)), usage: { input: 0, output: 0 } };
   const pending = ai.generate(
     referenceSchema.extend({
       points: referenceSchema.shape.points.length(ctx.rubric.length),
+      tested: z
+        .array(z.enum(ctx.rubric.map((r) => r.key)))
+        .min(1)
+        .max(ctx.rubric.length),
     }),
-    "Return exactly ONE assessment anchor per rubric criterion, in the same order, prefixed with that criterion's key. Each anchor describes the observable content that would FULLY meet that criterion for THIS question, role and experience level. Extract the required scope from the question and criterion. Do not write a model-solution checklist or invent additional actions. Accept equivalent valid remedies and implementations; escalation to a specific team, extra goodwill gifts, named tools, or numerical outcomes are not mandatory unless explicitly required. For communication, judge organisation and clarity of the given substance, not whether a separate technical criterion is complete. Short substantive phrases, not delivery style or invented achievements.",
+    "Return exactly ONE assessment anchor per rubric criterion, in the same order, prefixed with that criterion's key. Each anchor describes the observable content that would FULLY meet that criterion for THIS question, role and experience level. Extract the required scope from the question and criterion. Do not write a model-solution checklist or invent additional actions. Accept equivalent valid remedies and implementations; escalation to a specific team, extra goodwill gifts, named tools, or numerical outcomes are not mandatory unless explicitly required. For communication, judge organisation and clarity of the given substance, not whether a separate technical criterion is complete. Short substantive phrases, not delivery style or invented achievements. Also return tested: the keys of the criteria THIS question actually asks the candidate to show. Leave out a criterion only when a good answer to this question would not need to show it at all (for example, AI judgment for a question about parking data with no AI in it).",
     referenceContext,
     {
       mode: ctx.mode || "screening",
@@ -124,14 +129,14 @@ async function referencePoints(ai, ctx) {
   );
   cache.set(
     key,
-    pending.then((out) => out.value.points),
+    pending.then((out) => out.value),
   );
   // Avoid an unhandled rejection while the original request owns the failure.
   cache.get(key).catch(() => {});
   if (cache.size > 256) cache.delete(cache.keys().next().value);
   try {
     const out = await pending;
-    return { points: out.value.points, usage: out.usage };
+    return { ...out.value, usage: out.usage };
   } catch {
     cache.delete(key);
     throw new ServiceError(
@@ -440,10 +445,15 @@ export async function evaluate(ai, ctx) {
   );
   return {
     value: {
-      ...combine(
+      ...onlyTested(
         rubric,
-        answer,
-        ok.map((r) => r.value),
+        combine(
+          rubric,
+          answer,
+          ok.map((r) => r.value),
+        ),
+        // Practice dimensions (correctness, clarity...) apply to every question.
+        ctx.mode === "practice" ? null : ref.tested,
       ),
       assessment: {
         ...manifest,
@@ -457,21 +467,49 @@ export async function evaluate(ai, ctx) {
   };
 }
 
+// A criterion this question does not ask about is left out of the answer's scores instead of counting as 0.
+// Communication-type criteria always count. Scores of 0 for an answer with nothing in it stay on every criterion.
+export function onlyTested(rubric, evaluation, tested) {
+  const keep = new Set([
+    ...(tested || rubric.map((r) => r.key)),
+    ...rubric.filter(isCommunication).map((r) => r.key),
+  ]);
+  const notTested = rubric.map((r) => r.key).filter((key) => !keep.has(key));
+  if (!notTested.length || evaluation.gate) return evaluation;
+  return {
+    ...evaluation,
+    scores: Object.fromEntries(
+      Object.entries(evaluation.scores).filter(([key]) => keep.has(key)),
+    ),
+    evidence: evaluation.evidence.filter((e) => keep.has(e.competency)),
+    notTested,
+  };
+}
+
 // Candidate-level result. Questions the candidate never answered count as 0, so ending early cannot lift a score
 // (the average of answered questions is kept as a separate figure for context).
 export function aggregate(rubric, turns, questionCount) {
-  const weights = rubric.reduce((n, r) => n + r.weight, 0);
-  const weighted = (get) =>
-    Math.round(rubric.reduce((n, r) => n + get(r) * r.weight, 0) / weights);
-  const slots = Math.max(questionCount, turns.length);
+  // Each criterion averages over the questions that test it; an unanswered question counts as 0 for every criterion.
+  const unanswered = Math.max(questionCount, turns.length) - turns.length;
+  const tested = (r) => turns.filter((t) => r.key in t.evaluation.scores);
   const sum = (r) =>
-    turns.reduce((n, t) => n + (t.evaluation.scores[r.key] ?? 0), 0);
+    tested(r).reduce((n, t) => n + t.evaluation.scores[r.key], 0);
+  const weighted = (get) => {
+    const used = rubric.filter((r) => get(r) !== null);
+    const weights = used.reduce((n, r) => n + r.weight, 0);
+    return weights
+      ? Math.round(used.reduce((n, r) => n + get(r) * r.weight, 0) / weights)
+      : 0;
+  };
   const competencyScores = Object.fromEntries(
-    rubric.map((r) => [r.key, Math.round(sum(r) / slots)]),
+    rubric.map((r) => {
+      const slots = tested(r).length + unanswered;
+      return [r.key, slots ? Math.round(sum(r) / slots) : null];
+    }),
   );
   const overall = weighted((r) => competencyScores[r.key]);
   const answeredAverage = turns.length
-    ? weighted((r) => sum(r) / turns.length)
+    ? weighted((r) => (tested(r).length ? sum(r) / tested(r).length : null))
     : 0;
   const noContent = turns.filter(
     (t) => t.evaluation.gate || t.evaluation.substantive === false,

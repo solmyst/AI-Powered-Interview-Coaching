@@ -54,7 +54,7 @@ type ReportBody = {
   strengths: string[];
   concerns: string[];
   suggestedFollowUps: string[];
-  competencyScores: Record<string, number>;
+  competencyScores: Record<string, number | null>;
   overall: number;
   attention: number | null;
   answeredAverage?: number;
@@ -415,7 +415,7 @@ export function CandidateReport({
                 {role.rubric.map((r) => (
                   <div key={r.key}>
                     <span>{r.label}</span>
-                    <Bar value={turn.evaluation!.scores[r.key] ?? 0} />
+                    <Bar value={turn.evaluation!.scores[r.key]} />
                   </div>
                 ))}
               </div>
@@ -614,17 +614,18 @@ function Scorecard({
       return acc;
     }, {}),
   );
-  // Weighted like the overall estimate, so the answers' scores average to it.
-  const weights = rubric.reduce((n, r) => n + r.weight, 0);
-  const answerScore = (t: Turn) =>
-    t.evaluation
+  // Weighted like the overall estimate, over the criteria this question tested.
+  const answerScore = (t: Turn) => {
+    if (!t.evaluation) return null;
+    const used = rubric.filter((r) => r.key in t.evaluation!.scores);
+    const weights = used.reduce((n, r) => n + r.weight, 0);
+    return weights
       ? Math.round(
-          rubric.reduce(
-            (n, r) => n + (t.evaluation!.scores[r.key] ?? 0) * r.weight,
-            0,
-          ) / weights,
+          used.reduce((n, r) => n + t.evaluation!.scores[r.key] * r.weight, 0) /
+            weights,
         )
-      : null;
+      : 0;
+  };
   const hasCamera = summary.cameraAnswers > 0;
   // Averaged here so it shows while the interview is still in progress, before the final report exists.
   const eyeContact = average(
@@ -676,6 +677,10 @@ function Scorecard({
             Any credit of level 2 or more needs a quote the candidate really
             said; otherwise it is capped at level 1. Communication can never
             score more than one level above the best content criterion.
+          </li>
+          <li>
+            Each answer is scored only on the criteria its question tests; the
+            others show as "Not tested" and are left out of that answer.
           </li>
           <li>
             The overall is the weighted average over <strong>all</strong>{" "}

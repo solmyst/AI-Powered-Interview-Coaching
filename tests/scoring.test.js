@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   aggregate,
+  onlyTested,
   combine,
   substanceGate,
   LEVEL_SCORE,
@@ -127,4 +128,25 @@ test("company criterion weights drive the overall", () => {
     r.key === "product" ? { ...r, weight: 5 } : r,
   );
   assert.equal(aggregate(heavier, [turn, turn, turn], 3).overall, 50); // 100*5 / (5+3+2)
+});
+test("a criterion a question does not test is left out, not counted as 0", () => {
+  const full = {
+    scores: { product: 100, judgment: 0, communication: 100 },
+    evidence: [],
+    gate: null,
+  };
+  // Question 1 tests product only (communication always counts); question 2 tests everything.
+  const q1 = { evaluation: onlyTested(rubric, full, ["product"]) };
+  assert.deepEqual(q1.evaluation.scores, { product: 100, communication: 100 });
+  assert.deepEqual(q1.evaluation.notTested, ["judgment"]);
+  const q2 = {
+    evaluation: { scores: { product: 100, judgment: 100, communication: 100 } },
+  };
+  assert.equal(aggregate(rubric, [q1, q2], 2).overall, 100);
+  assert.equal(aggregate(rubric, [q1, q2], 2).competencyScores.judgment, 100);
+  // An unanswered question still counts as 0 for every criterion.
+  assert.equal(aggregate(rubric, [q1, q2], 3).competencyScores.judgment, 50);
+  // A gated answer keeps its zeros everywhere.
+  const gated = onlyTested(rubric, { ...full, gate: "No answer" }, ["product"]);
+  assert.equal(gated.scores.judgment, 0);
 });

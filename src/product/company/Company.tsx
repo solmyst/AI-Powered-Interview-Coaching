@@ -43,7 +43,7 @@ export type CandidateRow = {
   email: string;
   status: string;
   score: number | null;
-  competencyScores: Record<string, number> | null;
+  competencyScores: Record<string, number | null> | null;
   band: Band | null;
   answered: number;
   questionCount: number;
@@ -1226,7 +1226,16 @@ function Candidates({
   );
 }
 
-export function Bar({ value }: { value: number }) {
+export function Bar({ value }: { value: number | null | undefined }) {
+  if (value == null)
+    return (
+      <span
+        className="co-bar"
+        title="This question did not test this criterion"
+      >
+        <b>Not tested</b>
+      </span>
+    );
   return (
     <span className="co-bar" title={`${value} out of 100`}>
       <span style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
