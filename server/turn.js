@@ -225,9 +225,9 @@ export async function decideTurn(ai, session, answer, persona = {}) {
   const thin = answer.trim().split(/\s+/).length < 8;
   const task = `${persona.intro || ""}${midInterview}${nextQuestionTask} The candidate has finished this question: treat this as kind answer. Set relevant to true and reply to an empty string; relevance was already checked by the server. The server supplies the neutral lead. ${
     thin || !relevant
-      ? "The answer was almost empty or unrelated; switch to a different approachable topic from alreadyAsked."
+      ? "The answer was almost empty or unrelated; switch to a different, easier scenario that is not in alreadyAsked but is still about this same role."
       : "The question must refer to a specific detail the candidate actually said; never confirm correctness or propose a solution."
-  }`;
+  } Stay inside this role: every scenario must come from setup.jobDescription, setup.role, setup.industry and setup.company's product. Never fall back to a generic scenario from another field, such as a software release, checkout or deployment, unless the job description is about that.`;
   const context = {
     setup: {
       ...session.setup,
